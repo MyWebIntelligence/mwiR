@@ -1,6 +1,13 @@
 exportPattern("^[[:alpha:]]+")
 
 importFrom("utils", "install.packages")
+importFrom(jsonlite, fromJSON, toJSON)
+importFrom(rjson, fromJSON, toJSON)
+importFrom(readr, guess_encoding)
+importFrom(rvest, guess_encoding)
+importFrom(tools, toHTML)
+importFrom(XML, toHTML)
+
 # Import necessary packages
 import(DBI)
 import(cld3)

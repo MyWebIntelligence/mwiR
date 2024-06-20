@@ -20,6 +20,14 @@
 #' \dontrun{
 #' initmwi()
 #' }
+#' @importFrom jsonlite fromJSON
+#' @importFrom jsonlite toJSON
+#' @importFrom rjson fromJSON
+#' @importFrom rjson toJSON
+#' @importFrom readr guess_encoding
+#' @importFrom rvest guess_encoding
+#' @importFrom tools toHTML
+#' @importFrom XML toHTML
 #' @import DBI cld3 ggplot2 httr lubridate jsonlite mclust mice pdftools readr reticulate rjson rvest RSQLite SnowballC stringr tesseract tools urltools XML zip
 #' @export
 initmwi <- function() {
