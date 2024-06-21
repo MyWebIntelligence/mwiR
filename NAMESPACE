@@ -1,8 +1,6 @@
 exportPattern("^[[:alpha:]]+")
 
 importFrom("utils", "install.packages")
-importFrom(tools, toHTML)
-importFrom(XML, toHTML)
 
 # Import necessary packages
 import(DBI)
@@ -19,5 +17,4 @@ import(stringr)
 import(tesseract)
 import(tools)
 import(urltools)
-import(XML)
 import(zip)
