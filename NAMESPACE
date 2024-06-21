@@ -1,9 +1,6 @@
 exportPattern("^[[:alpha:]]+")
 
 importFrom("utils", "install.packages")
-importFrom(jsonlite, fromJSON, toJSON)
-importFrom(readr, guess_encoding)
-importFrom(rvest, guess_encoding)
 importFrom(tools, toHTML)
 importFrom(XML, toHTML)
 
@@ -16,7 +13,6 @@ import(jsonlite)
 import(pdftools)
 import(readr)
 import(reticulate)
-import(rvest)
 import(RSQLite)
 import(SnowballC)
 import(stringr)
