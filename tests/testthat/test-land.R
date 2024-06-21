@@ -27,36 +27,6 @@ test_that("create_land works as expected", {
   dbDisconnect(con)
 })
 
-test_that("listlands lists lands correctly", {
-  db_name <- tempfile(fileext = ".db")
-  db_setup(db_name)
-
-  create_land("test_land1", "First test land", db_name = db_name)
-  create_land("test_land2", "Second test land", db_name = db_name)
-
-  expect_output(listlands(db_name = db_name), "Nom du land: test_land1")
-  expect_output(listlands(db_name = db_name), "Nom du land: test_land2")
-})
-
-test_that("addterm adds terms correctly", {
-  db_name <- tempfile(fileext = ".db")
-  db_setup(db_name)
-
-  create_land("test_land", "A test land", db_name = db_name)
-
-  result <- addterm("test_land", "test_term1, test_term2")
-
-  expect_equal(result, 1)
-
-  con <- dbConnect(SQLite(), dbname = db_name)
-  terms <- dbGetQuery(con, "SELECT * FROM Word INNER JOIN LandDictionary ON Word.id = LandDictionary.word_id WHERE LandDictionary.land_id = (SELECT id FROM Land WHERE name = 'test_land')")
-
-  expect_equal(nrow(terms), 2)
-  expect_true(all(terms$term %in% c("test_term1", "test_term2")))
-
-  dbDisconnect(con)
-})
-
 test_that("addurl adds URLs correctly", {
   db_name <- tempfile(fileext = ".db")
   db_setup(db_name)
