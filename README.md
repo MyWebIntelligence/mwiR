@@ -1,4 +1,4 @@
-# \[WARNING dont use this package is in dev\] mwiR The R Package of My Web Intelligence Project
+# WARNING dont use this package is in dev mwiR The R Package of My Web Intelligence Project
 
 <!-- badges: start -->
 <!-- badges: end -->
@@ -160,8 +160,25 @@ You can install the development version of mwiR from
 
     ## Using GitHub PAT from the git credential store.
 
-    ## Skipping install of 'mwiR' from a github remote, the SHA1 (270be981) has not changed since last install.
-    ##   Use `force = TRUE` to force installation
+    ## Downloading GitHub repo MyWebIntelligence/mwiR@HEAD
+
+    ## reticulate (1.37.0 -> 1.38.0) [CRAN]
+
+    ## Installing 1 packages: reticulate
+
+    ## 
+    ## The downloaded binary packages are in
+    ##  /var/folders/k3/vj6gzhmn43g3j13116l042jr0000gn/T//RtmpoUq2Ix/downloaded_packages
+    ## ── R CMD build ─────────────────────────────────────────────────────────────────
+    ##      checking for file ‘/private/var/folders/k3/vj6gzhmn43g3j13116l042jr0000gn/T/RtmpoUq2Ix/remotesb4ea180109b9/MyWebIntelligence-mwiR-4ec3e11/DESCRIPTION’ ...  ✔  checking for file ‘/private/var/folders/k3/vj6gzhmn43g3j13116l042jr0000gn/T/RtmpoUq2Ix/remotesb4ea180109b9/MyWebIntelligence-mwiR-4ec3e11/DESCRIPTION’
+    ##   ─  preparing ‘mwiR’:
+    ##    checking DESCRIPTION meta-information ...  ✔  checking DESCRIPTION meta-information
+    ##   ─  checking for LF line-endings in source and make files and shell scripts
+    ##   ─  checking for empty or unneeded directories
+    ##      Omitted ‘LazyData’ from DESCRIPTION
+    ##   ─  building ‘mwiR_0.1.0.tar.gz’
+    ##      
+    ## 
 
 ## Project (‘land’) Setup
 
@@ -191,11 +208,19 @@ This is a basic example which shows you how to solve a common problem:
 
     create_land(name = "AIWork", desc = "Impact of AI on work", lang="en")
 
-    ## A land with this name already exists.
+    ## Land 'AIWork' created
 
     # Add terms
 
     addterm("AIWork", "AI, artificial intelligence, work, employment, job, profession, labor market")
+
+    ## [1] "Term added to land AIWork"
+    ## [1] "Term added to land AIWork"
+    ## [1] "Term added to land AIWork"
+    ## [1] "Term added to land AIWork"
+    ## [1] "Term added to land AIWork"
+    ## [1] "Term added to land AIWork"
+    ## [1] "Term added to land AIWork"
 
     ## [1] 1
 
@@ -204,7 +229,7 @@ This is a basic example which shows you how to solve a common problem:
     listlands("AIWork")
 
     ## Land name: AIWork
-    ## Creation date: 1718974593.63266
+    ## Creation date: 1718975512.2099
     ## Description: Impact of AI on work
     ## Terms in the dictionary:  ai, artificial intelligence, work, employment, job, profession, labor market 
     ## Total number of expressions: 0
@@ -230,7 +255,7 @@ This is a basic example which shows you how to solve a common problem:
     listlands("AIWork")
 
     ## Land name: AIWork
-    ## Creation date: 1718974593.63266
+    ## Creation date: 1718975512.2099
     ## Description: Impact of AI on work
     ## Terms in the dictionary:  ai, artificial intelligence, work, employment, job, profession, labor market 
     ## Total number of expressions: 1
