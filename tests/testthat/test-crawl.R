@@ -1,5 +1,5 @@
 test_that("crawl function works for a specific URL", {
-  url <- "https://www.fr.adp.com/rhinfo/articles/2022/11/la-disparition-de-certains-metiers-est-elle-a-craindre.aspx"
+  url <- "https://www.lemonde.fr/politique/article/2024/06/21/raphael-glucksmann-et-l-union-de-la-gauche-ses-confidences-sur-un-mariage-de-raison_6242114_823448.html"
 
   # Run the crawl function
   result <- crawl(url)
