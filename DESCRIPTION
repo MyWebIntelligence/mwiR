@@ -1,10 +1,14 @@
 Package: mwiR
-Type: Package
-Title: My Web Intelligence Package for R
+Title: The R Package of My Web Intelligence Project
 Version: 0.1.0
-Author: Amar LAKEL
-Maintainer: The package maintainer <amar@lakel.net>
-Description: Make web corpora for social sciences
+Authors@R: 
+    person(given = "Amar",
+           family = "Lakel",
+           role = c("aut", "cre"),
+           email = "amar.lakel@example.com",
+           comment = c(ORCID = "0000-0002-1234-5678"))
+Description: My Web Intelligence (MWI) is a project designed to meet the growing need for tools and methodologies in the field of digital methods in social sciences and information and communication sciences (ICS). The main objective is to map the digital ecosystem to identify key actors, assess their influence, and analyze their discourses and interactions. This project addresses the increasing centrality of digital information and interactions in various fields, including health, politics, culture, and beyond.
+Depends: R (>= 3.5.0)
 License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
@@ -29,3 +33,5 @@ RoxygenNote: 7.3.1
 Suggests: 
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
+URL: https://github.com/MyWebIntelligence/mwiR
+BugReports: https://github.com/MyWebIntelligence/mwiR/issues
