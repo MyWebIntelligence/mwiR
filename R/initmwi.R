@@ -22,16 +22,14 @@
 #' }
 #' @importFrom jsonlite fromJSON
 #' @importFrom jsonlite toJSON
-#' @importFrom rjson fromJSON
-#' @importFrom rjson toJSON
 #' @importFrom readr guess_encoding
 #' @importFrom rvest guess_encoding
 #' @importFrom tools toHTML
 #' @importFrom XML toHTML
-#' @import DBI cld3 ggplot2 httr lubridate jsonlite mclust mice pdftools readr reticulate rjson rvest RSQLite SnowballC stringr tesseract tools urltools XML zip
+#' @import DBI cld3 httr lubridate jsonlite pdftools readr reticulate rvest RSQLite SnowballC stringr tesseract tools urltools XML zip
 #' @export
 initmwi <- function() {
-  required_packages <- c("DBI", "cld3", "ggplot2", "httr", "lubridate", "jsonlite", "mclust", "mice", "pdftools", "readr","reticulate", "rjson", "rvest", "RSQLite", "SnowballC",  "stringr","tesseract", "tools", "urltools", "XML", "zip")
+  required_packages <- c("DBI", "cld3", "httr", "lubridate", "jsonlite", "pdftools", "readr","reticulate", "rvest", "RSQLite", "SnowballC",  "stringr","tesseract", "tools", "urltools", "XML", "zip")
 
   # Check and install missing packages
   for (pkg in required_packages) {
