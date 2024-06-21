@@ -1,4 +1,8 @@
-# mwiR The R Package of My Web Intelligence Project
+---
+output: md_document
+---
+
+# [WARNING dont use this package is in dev] mwiR The R Package of My Web Intelligence Project
 
 <!-- badges: start -->
 
@@ -107,4 +111,44 @@ This is a basic example which shows you how to solve a common problem:
 ```{r example}
 library(mwiR)
 ## basic example code
+```
+
+
+## Step 1: Creating the research project
+
+```{r}
+# Load the packages
+initmwi()
+
+# Database setup
+
+db_setup()
+
+# Create a land
+
+create_land(name = "AIWork", desc = "Impact of AI on work", lang="en")
+
+# Add terms
+
+addterm("AIWork", "AI, artificial intelligence, work, employment, job, profession, labor market")
+
+# Verify that the project is created
+
+listlands("AIWork")
+
+## Manual method or using a file
+
+
+
+addurl("AIWork", urls = "https://www.fr.adp.com/rhinfo/articles/2022/11/la-disparition-de-certains-metiers-est-elle-a-craindre.aspx") # froma a dataframe 'paste(AIWorkdeepcrawl$link, collapse = ",")'
+
+# If using a text file
+#addurl("AIWork", path = "_ai_or_artificial_intelligence___work_or_employment_or_job_or_profession_or_labor_market01.txt")
+
+# List the lands or a specific land
+listlands("AIWork")
+
+# Optionally delete a land
+deleteland(land_name = "AIWork") # OR maxrel= 2 option
+
 ```
