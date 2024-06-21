@@ -9,17 +9,17 @@
 #' @import httr jsonlite rvest
 #' @export
 crawl <- function(url) {
-
-  # Tentative de crawl avec mercury-parser
+  trafilatura <- import("trafilatura")
+  # Attempt to crawl with mercury-parser
   readFull <- tryCatch({
-    # Télécharger le contenu de la page
+    # Download the page content
     downloaded <- trafilatura$fetch_url(url)
 
-    # Extraire le contenu principal au format Markdown
-    readFull <- parse_json(trafilatura$extract(downloaded, include_links=TRUE, output_format = 'json'), simplifyVector = T)
+    # Extract the main content in Markdown format
+    readFull <- parse_json(trafilatura$extract(downloaded, include_links = TRUE, output_format = 'json'), simplifyVector = T)
 
   }, error = function(e) {
-    message("Erreur lors du téléchargement ou de l'extraction du contenu avec TRAFILATURA : ")
+    message("Error during download or extraction of content with TRAFILATURA: ")
     NULL
   })
 
@@ -27,7 +27,7 @@ crawl <- function(url) {
 
     urlarchive <- get_last_memento_url(url)
 
-    # Télécharger le contenu de la page
+    # Download the page content
     tryCatch({
       downloaded <- trafilatura$fetch_url(urlarchive)
       if (!is.null(downloaded) && downloaded != "") {
@@ -36,23 +36,22 @@ crawl <- function(url) {
           readFull <- jsonlite::fromJSON(extracted_content, simplifyVector = TRUE)
           ifelse(!is.null(readFull$hostname), return(readFull), readFull <- NULL)
         } else {
-          stop("Erreur: Contenu extrait non valide ou vide.")
+          stop("Error: Extracted content is invalid or empty.")
         }
       } else {
-        stop("Erreur: Téléchargement non valide ou vide.")
+        stop("Error: Download is invalid or empty.")
       }
     }, error = function(e) {
-      message("Erreur lors du téléchargement ou de l'extraction du contenu avec ARCHIVE.ORG : ")
+      message("Error during download or extraction of content with ARCHIVE.ORG: ")
       return(NULL)
     })
   }
 
-
-  # Si parser réussit et le titre n'est pas null
+  # If parser succeeds and the title is not null
   if (!is.null(readFull) && !is.null(readFull$title)) {
-    #verifie si date_published existe
+    # Check if date_published exists
     if (!"date" %in% names(readFull) || is.null(readFull$date)) {
-      readFull$date <- "date inconnue"
+      readFull$date <- "Unknown date"
     }
     return(as.data.frame(t(unlist(readFull))))
   }
@@ -70,48 +69,47 @@ crawl <- function(url) {
 
   content_type <- httr::http_type(response)
 
-  # Si le contenu est de type PDF
+  # If the content is of type PDF
   if (grepl("application/pdf", content_type, ignore.case = TRUE)) {
-    pdf_content <- PDFtoText(url)  # Remplacez par votre fonction réelle
-    title <- unlist(strsplit(pdf_content, "\n"))[1]  # La première ligne comme titre
-    content <- pdf_content  # Contenu total
-    excerpt <- substr(content, nchar(title) + 2, nchar(title) + 651)  # Extrait après la première ligne
+    pdf_content <- PDFtoText(url)  # Replace with your actual function
+    title <- unlist(strsplit(pdf_content, "\n"))[1]  # The first line as the title
+    content <- pdf_content  # Total content
+    excerpt <- substr(content, nchar(title) + 2, nchar(title) + 651)  # Excerpt after the first line
 
     parsed_url <- url_parse(url)
     domain <- parsed_url$domain
     message("PDF crawled")
     return(data.frame(
       title = trimws(title),
-      date = "Date inconnue",
+      date = "Unknown date",
       text = trimws(content),
       excerpt = trimws(excerpt),
       hostname = domain,
       stringsAsFactors = FALSE
     ))
   } else {
-    # Crawl alternatif
+    # Alternative crawl
     tryCatch({
-
 
       content <- content(response, as = "text")
       parsed_content <- read_html(content)
 
-      # Extraire le titre et la description
+      # Extract the title and description
       title <- html_nodes(parsed_content, "title") %>% html_text(trim = TRUE)
       description <- html_nodes(parsed_content, "meta[name='description']") %>% html_attr("content")
       body_text <- html_nodes(parsed_content, "body") %>% html_text(trim = TRUE)
 
-      # Si les balises ne sont pas trouvées, utilisez un texte par défaut
-      title <- ifelse(length(title) == 0, "Titre non disponible", title)
-      description <- ifelse(length(description) == 0, "Description non disponible", description)
+      # If the tags are not found, use a default text
+      title <- ifelse(length(title) == 0, "Title not available", title)
+      description <- ifelse(length(description) == 0, "Description not available", description)
 
       parsed_url <- url_parse(url)
       domain <- parsed_url$domain
 
-      # Extraire la date de dernière modification si disponible
+      # Extract the last modified date if available
       last_modified <- headers(response)$`last-modified`
       if (is.null(last_modified)) {
-        date_published <- "Date non disponible"
+        date_published <- "Date not available"
       } else {
         date_published <- last_modified
       }
@@ -124,13 +122,14 @@ crawl <- function(url) {
         hostname = domain,
         stringsAsFactors = FALSE
       ))
-      print(paste("Crawl alternatif de", url))
+      print(paste("Alternative crawl of", url))
     }, error = function(e) {
       warning("ALL GET failed for URL:", url)
       return(NULL)
     })
   }
 }
+
 
 #' Extract text from a PDF URL
 #'
@@ -143,19 +142,19 @@ crawl <- function(url) {
 #' @export
 # Fonction pour extraire le texte d'un PDF à partir d'une URL
 PDFtoText <- function(url) {
-  # Télécharger le PDF
+  # Download the PDF
   temp_file <- tempfile(fileext = ".pdf")
   download <- GET(url, write_disk(temp_file))
 
   if (http_status(download)$category != "Success") {
-    return(paste("Erreur de téléchargement: ", http_status(download)$message))
+    return(paste("Download error: ", http_status(download)$message))
   }
 
-  # Tenter d'extraire du texte avec pdftools
+  # Attempt to extract text with pdftools
   text <- pdf_text(temp_file)
 
-  # Si le texte est vide ou contient des caractères non imprimables,
-  # utiliser OCR pour extraire le texte
+  # If the text is empty or contains non-printable characters,
+  # use OCR to extract the text
   if (length(text) == 0) {
     ocr_text <- ocr(temp_file)
     return(ocr_text)
@@ -163,6 +162,7 @@ PDFtoText <- function(url) {
     return(paste(text, collapse = "\n"))
   }
 }
+
 
 #' Clean the extracted URL
 #'
@@ -220,11 +220,11 @@ detect_links_and_add <- function(con, content, parent_id, land_id, urlmax=50) {
   # Refined regex pattern for URL extraction
   links <- str_extract_all(content, "(?<=\\s)https?://[^\\s]+(?=\\s)|(?<=\\()https?://[^\\)]+(?=\\)\\s)")
 
-  # Compteur pour les liens non-médias
+  # Counter for non-media links
   non_media_count <- 0
 
   for (link in links[[1]]) {
-    # Si le compteur atteint urlmax, sortir de la boucle
+    # If the counter reaches urlmax, exit the loop
     if (non_media_count >= urlmax) {
       break
     }
@@ -233,13 +233,13 @@ detect_links_and_add <- function(con, content, parent_id, land_id, urlmax=50) {
     clean_link <- clean_url(link)
 
     if (!is.na(clean_link) && is_media_link(clean_link)) {
-      # Récupérer l'extension du média
+      # Retrieve the media extension
       media_type <- str_extract(clean_link, "\\.([a-zA-Z]+)(?=[?#]|$)")
 
-      # Ajouter à la table Media
+      # Add to the Media table
       dbExecute(con, "INSERT INTO Media (url, expression_id, type) VALUES (?, ?, ?)", params = list(clean_link, parent_id, media_type))
     } else if (!is.na(clean_link)) {
-      # Incrémenter le compteur pour les liens non-médias
+      # Increment the counter for non-media links
       non_media_count <- non_media_count + 1
 
       res <- dbGetQuery(con, "SELECT * FROM Expression WHERE url = ?", params = list(clean_link))
@@ -247,7 +247,7 @@ detect_links_and_add <- function(con, content, parent_id, land_id, urlmax=50) {
       if (nrow(res) == 0) {
         parent_depth <- as.integer(dbGetQuery(con, "SELECT depth FROM Expression WHERE id = ?", params = list(parent_id)))
 
-        # Insère le nouvel URL dans la table "Expression"
+        # Insert the new URL into the "Expression" table
         dbExecute(con, "INSERT INTO Expression (url, land_id, created_at, depth) VALUES (?, ?, ?, ?)", params = list(clean_link, land_id, format(Sys.time(), format = "%Y-%m-%dT%H:%M:%OS3Z"), parent_depth + 1))
 
         new_url_id <- dbGetQuery(con, "SELECT last_insert_rowid()")[1, 1]
@@ -259,7 +259,7 @@ detect_links_and_add <- function(con, content, parent_id, land_id, urlmax=50) {
       link_exists <- dbGetQuery(con, "SELECT * FROM ExpressionLink WHERE source_id = ? AND target_id = ?", params = list(parent_id, new_url_id))
 
       if (nrow(link_exists) == 0) {
-        # Insère le lien dans la table "ExpressionLink"
+        # Insert the link into the "ExpressionLink" table
         dbExecute(con, "INSERT INTO ExpressionLink (source_id, target_id) VALUES (?, ?)", params = list(parent_id, new_url_id))
       }
     }
@@ -383,8 +383,6 @@ expression_relevance <- function(dictionary, expression, language = "en") {
 #' @export
 crawlurls <- function(land_name, urlmax=50, limit = NULL, http_status = NULL, db_name = "mwi.db") {
 
-  trafilatura <- import("trafilatura")
-
   con <- dbConnect(SQLite(), dbname = db_name)
 
   res <- dbGetQuery(con, "SELECT id, lang FROM Land WHERE name = ?", params = list(land_name))
@@ -412,7 +410,7 @@ crawlurls <- function(land_name, urlmax=50, limit = NULL, http_status = NULL, db
     params <- c(params, http_status)
   }
 
-  # Ajout de la clause ORDER BY
+  # Add ORDER BY
   sql_query <- paste0(sql_query, " ORDER BY depth ASC")
 
   if (!is.null(limit)) {
@@ -445,7 +443,7 @@ crawlurls <- function(land_name, urlmax=50, limit = NULL, http_status = NULL, db
 
           dbExecute(con, "UPDATE Expression SET title = ?, readable = ?, domain_id = ?, description = ?, published_at = ?, approved_at = ?, lang = ?, relevance = ? WHERE id = ?", params = list(url_data$title, url_data$text[1], domain_id, url_data$excerpt, url_data$date, format(Sys.time(), format = "%Y-%m-%dT%H:%M:%OS3Z"), detected_lang, relevance_score, urls_to_crawl$id[i]))
 
-          # Nouvelle fonction pour détecter les liens et les ajouter à la base de données
+          # add links to data base
           detect_links_and_add(con, url_data$text[1], urls_to_crawl$id[i], land_id, urlmax)
 
           # Placeholder for the detect_links_and_add function
@@ -476,12 +474,12 @@ crawlurls <- function(land_name, urlmax=50, limit = NULL, http_status = NULL, db
 #' @export
 crawlDetails <- function(url) {
   if (is.null(url) || url == "") {
-    return("URL non fournie")
+    return("")
   }
 
   response <- try(GET(url), silent = TRUE)
   if (inherits(response, "try-error")) {
-    return(paste("Erreur lors de la récupération de l'URL:", url))
+    return(paste("Get URL Domain make an error:", url))
   }
 
   content <- content(response, as = "text")
@@ -489,7 +487,7 @@ crawlDetails <- function(url) {
 
   result <- ""
 
-  # Fonction d'aide pour obtenir le texte des noeuds HTML
+  # Get text from HTML
   get_nodes_text <- function(xpath) {
     nodes <- xpathSApply(doc, xpath, xmlValue)
     if (!is.null(nodes)) {
@@ -498,7 +496,7 @@ crawlDetails <- function(url) {
     return("")
   }
 
-  # Fonction d'aide pour obtenir la valeur des attributs
+  # Get text from attributes nodes form HTML
   get_attribute_value <- function(xpath) {
     attributes <- xpathSApply(doc, xpath, xmlGetAttr, "content")
     if (!is.null(attributes)) {
@@ -549,14 +547,14 @@ crawlDetails <- function(url) {
 #' @import DBI RSQLite
 #' @export
 crawlDomain <- function(nburl = 100, db_name = "mwi.db") {
-  # Établir une connexion à la base de données SQLite
+  # connexion to Data Base SQLite
   con <- dbConnect(SQLite(), dbname = db_name)
 
-  # Extraire nburl URL de la table Domain où fetched_at est NULL
+  # Extract nburl URLs from Domain table of DB
   sql_query <- paste0("SELECT * FROM Domain WHERE fetched_at IS NULL LIMIT ", nburl)
   urls_to_crawl <- dbGetQuery(con, sql_query)
 
-  # Parcourir chaque URL et mettre à jour les champs correspondants dans la table Domain
+  # Update each row of Domain table of Data Base
   for (i in 1:nrow(urls_to_crawl)) {
     tryCatch({
       update_query <- "UPDATE Domain SET fetched_at = ? WHERE id = ?"
@@ -580,7 +578,7 @@ crawlDomain <- function(nburl = 100, db_name = "mwi.db") {
       })
 
       if (!is.null(url_data) && !is.null(url_data$title) && length(url_data$title) == 1) {
-        # Mettre à jour les champs de la table Domain
+        # Update moment
         update_query <- "UPDATE Domain SET title = ?, description = ? WHERE id = ?"
         dbExecute(con, update_query, params = list(
           url_data$title,
@@ -590,7 +588,7 @@ crawlDomain <- function(nburl = 100, db_name = "mwi.db") {
 
         message(paste(urls_to_crawl$name[i], "domain crawled"))
       } else {
-        # Si crawl échoue ou si les données sont incomplètes, indiquer que le domaine n'a pas pu être crawlé
+        #Alert for error on update
         message(paste(urls_to_crawl$name[i], "domain could not be crawled due to insufficient data"))
       }
     }, error = function(e) {
@@ -598,10 +596,10 @@ crawlDomain <- function(nburl = 100, db_name = "mwi.db") {
     })
   }
 
-  # Fermer la connexion
+  # Never forget to close connexion
   dbDisconnect(con)
 
-  message("Crawling et mise à jour de la table Domain terminés.")
+  message("The update of Domain table is succed. ")
 }
 
 
@@ -615,18 +613,16 @@ crawlDomain <- function(nburl = 100, db_name = "mwi.db") {
 #' @export
 crawlForce <- function(land_name, db_name = "mwi.db") {
 
-  # Connecter à la base de données SQLite
+  # Connect to the SQLite database
   con <- dbConnect(RSQLite::SQLite(), db_name)
 
-  # Mettre à NULL la colonne fetched_at où approved_at est NULL
+  # Set the fetched_at column to NULL where approved_at is NULL
   update_query <- "UPDATE Expression SET fetched_at = NULL WHERE approved_at IS NULL AND fetched_at IS NOT NULL AND land_id = (SELECT id FROM Land WHERE name = ?)"
 
   dbExecute(con, update_query, params = list(land_name))
 
-  # Fermer la connexion à la base de données
+  # Close the database connection
   dbDisconnect(con)
-
-
 }
 
 #' Check URL availability in Archive.org
@@ -638,10 +634,10 @@ crawlForce <- function(land_name, db_name = "mwi.db") {
 #' @import httr jsonlite
 #' @export
 archive_available <- function(url) {
-  # Construire l'URL de l'API pour vérifier la disponibilité
+  # Construct the API URL to check availability
   api_url <- paste0("https://archive.org/wayback/available?url=", url)
 
-  # Essayer la requête GET avec gestion des erreurs
+  # Try the GET request with error handling
   tryCatch({
     response <- GET(api_url)
     if (status_code(response) == 200) {
@@ -649,13 +645,14 @@ archive_available <- function(url) {
       json_content <- jsonlite::fromJSON(content)
       return(json_content$archived_snapshots$closest)
     } else {
-      stop("Erreur: Impossible de vérifier la disponibilité de l'URL.")
+      stop("Error: Unable to check the availability of the URL.")
     }
   }, error = function(e) {
-    message("Erreur lors de la requête GET pour vérifier la disponibilité : ", e)
+    message("Error during the GET request to check availability: ", e)
     return(NULL)
   })
 }
+
 
 #' Get the most recent archived URL from Archive.org
 #'

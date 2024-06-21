@@ -23,7 +23,7 @@
 #' @import DBI cld3 httr lubridate jsonlite pdftools readr reticulate RSQLite SnowballC stringr tesseract tools urltools zip mockery
 #' @export
 initmwi <- function() {
-  required_packages <- c("DBI", "cld3", "httr", "lubridate", "jsonlite", "pdftools", "readr","reticulate", "RSQLite", "SnowballC",  "stringr","tesseract", "tools", "urltools", "zip", "mockery")
+  required_packages <- c("DBI", "cld3", "httr", "lubridate", "jsonlite", "pdftools", "readr","reticulate", "RSQLite", "rvest","SnowballC",  "stringr","tesseract", "tools", "urltools", "XML", "zip", "mockery", "stringi")
 
   # Check and install missing packages
   for (pkg in required_packages) {
@@ -37,13 +37,6 @@ initmwi <- function() {
     suppressMessages(suppressWarnings(library(pkg, character.only = TRUE)))
   }
 
-  # Check the installation of the npm parser
-  npm_check <- system("npm list -g @postlight/parser", intern = TRUE)
-  if (length(npm_check) == 0 || grepl("empty", npm_check[1])) {
-    warning("The npm parser @postlight/parser is not installed. Run 'npm install -g @postlight/parser' in the terminal.")
-  } else {
-    message("@postlight/parser is already installed")
-  }
 
   # Check if the 'trafilatura' module is available
   if (reticulate::py_module_available("trafilatura")) {

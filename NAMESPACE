@@ -1,6 +1,6 @@
 exportPattern("^[[:alpha:]]+")
 
-importFrom("utils", "install.packages", "read.csv", "read.delim")
+importFrom("utils", "install.packages", "read.csv", "read.delim", "write.csv")
 
 # Import necessary packages
 import(DBI)
@@ -12,6 +12,7 @@ import(pdftools)
 import(readr)
 import(reticulate)
 import(RSQLite)
+import(rvest)
 import(SnowballC)
 import(stringr)
 import(tesseract)
@@ -19,3 +20,6 @@ import(tools)
 import(urltools)
 import(zip)
 import(mockery)
+import(XML)
+import(stringi)
+

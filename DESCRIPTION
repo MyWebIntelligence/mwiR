@@ -11,7 +11,7 @@ Description: My Web Intelligence (MWI) is a project designed to meet the growing
 Depends: R (>= 3.5.0)
 License: MIT + file LICENSE
 Encoding: UTF-8
-LazyData: true
+LazyData: false
 Imports: 
     cld3,
     DBI,
@@ -22,13 +22,16 @@ Imports:
     readr,
     reticulate,
     RSQLite,
+    rvest,
     SnowballC,
     stringr,
     tesseract,
     tools,
     urltools,
     zip,
-    mockery
+    mockery,
+    XML,
+    stringi
 RoxygenNote: 7.3.1
 Suggests: 
     testthat (>= 3.0.0)

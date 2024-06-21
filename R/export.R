@@ -23,15 +23,15 @@ connect_db <- function(db_name = "mwi.db") {
 #' @import DBI
 #' @export
 export_pagecsv <- function(con, land_name, minimum_relevance, filename) {
-  # Récupérer l'ID du land à partir du nom
+  # Retrieve the land ID from the name
   land_query <- "SELECT id FROM Land WHERE name = ?"
   land_id <- dbGetQuery(con, land_query, params = list(land_name))$id
 
   if (is.null(land_id)) {
-    stop("Le land spécifié n'existe pas.")
+    stop("The specified land does not exist.")
   }
 
-  # Définition du mapping des colonnes et de la requête SQL
+  # Define the column mapping and SQL query
   pagecsv_col_map <- list(
     'id' = 'e.id',
     'url' = 'e.url',
@@ -59,7 +59,7 @@ export_pagecsv <- function(con, land_name, minimum_relevance, filename) {
   GROUP BY e.id
   "
 
-  # Ecrire le fichier
+  # Write the file
   cols <- paste0(sapply(names(pagecsv_col_map), function(x) paste0(pagecsv_col_map[[x]], " AS ", x)), collapse = ", ")
   full_sql <- sprintf(pagecsv_sql, cols)
   result <- dbGetQuery(con, full_sql, params = list(land_id, minimum_relevance))
@@ -68,6 +68,7 @@ export_pagecsv <- function(con, land_name, minimum_relevance, filename) {
 
   return(nrow(result))
 }
+
 
 
 #' Export Full Page CSV
@@ -82,15 +83,15 @@ export_pagecsv <- function(con, land_name, minimum_relevance, filename) {
 #' @import DBI
 #' @export
 export_fullpagecsv <- function(con, land_name, minimum_relevance, filename) {
-  # Récupérer l'ID du land à partir du nom
+  # Retrieve the land ID from the name
   land_query <- "SELECT id FROM Land WHERE name = ?"
   land_id <- dbGetQuery(con, land_query, params = list(land_name))$id
 
   if (is.null(land_id)) {
-    stop("Le land spécifié n'existe pas.")
+    stop("The specified land does not exist.")
   }
 
-  # Définition du mapping des colonnes et de la requête SQL
+  # Define the column mapping and SQL query
   fullpagecsv_col_map <- list(
     'id' = 'e.id',
     'url' = 'e.url',
@@ -119,7 +120,7 @@ export_fullpagecsv <- function(con, land_name, minimum_relevance, filename) {
   GROUP BY e.id
   "
 
-  # Ecrire le fichier
+  # Write the file
   cols <- paste0(sapply(names(fullpagecsv_col_map), function(x) paste0(fullpagecsv_col_map[[x]], " AS ", x)), collapse = ", ")
   full_sql <- sprintf(fullpagecsv_sql, cols)
   result <- dbGetQuery(con, full_sql, params = list(land_id, minimum_relevance))
@@ -128,6 +129,7 @@ export_fullpagecsv <- function(con, land_name, minimum_relevance, filename) {
 
   return(nrow(result))
 }
+
 
 #' Export Node CSV
 #'
@@ -141,15 +143,15 @@ export_fullpagecsv <- function(con, land_name, minimum_relevance, filename) {
 #' @import DBI
 #' @export
 export_nodecsv <- function(con, land_name, minimum_relevance, filename) {
-  # Récupérer l'ID du land à partir du nom
+  # Retrieve the land ID from the name
   land_query <- "SELECT id FROM Land WHERE name = ?"
   land_id <- dbGetQuery(con, land_query, params = list(land_name))$id
 
   if (is.null(land_id)) {
-    stop("Le land spécifié n'existe pas.")
+    stop("The specified land does not exist.")
   }
 
-  # Définition du mapping des colonnes et de la requête SQL
+  # Define the column mapping and SQL query
   nodecsv_col_map <- list(
     'id' = 'd.id',
     'name' = 'd.name',
@@ -165,11 +167,11 @@ export_nodecsv <- function(con, land_name, minimum_relevance, filename) {
       %s
   FROM domain AS d
   JOIN expression AS e ON e.domain_id = d.id
-    WHERE land_id = ? AND e.relevance >= ?
-     GROUP BY d.id
+  WHERE land_id = ? AND e.relevance >= ?
+  GROUP BY d.id
   "
 
-  # Ecrire le fichier
+  # Write the file
   cols <- paste0(sapply(names(nodecsv_col_map), function(x) paste0(nodecsv_col_map[[x]], " AS ", x)), collapse = ", ")
   full_sql <- sprintf(nodecsv_sql, cols)
   result <- dbGetQuery(con, full_sql, params = list(land_id, minimum_relevance))
@@ -178,6 +180,7 @@ export_nodecsv <- function(con, land_name, minimum_relevance, filename) {
 
   return(nrow(result))
 }
+
 
 #' Export Media CSV
 #'
@@ -191,15 +194,15 @@ export_nodecsv <- function(con, land_name, minimum_relevance, filename) {
 #' @import DBI
 #' @export
 export_mediacsv <- function(con, land_name, minimum_relevance, filename) {
-  # Récupérer l'ID du land à partir du nom
+  # Retrieve the land ID from the name
   land_query <- "SELECT id FROM Land WHERE name = ?"
   land_id <- dbGetQuery(con, land_query, params = list(land_name))$id
 
   if (is.null(land_id)) {
-    stop("Le land spécifié n'existe pas.")
+    stop("The specified land does not exist.")
   }
 
-  # Définition du mapping des colonnes et de la requête SQL
+  # Define the column mapping and SQL query
   mediacsv_col_map <- list(
     'id' = 'm.id',
     'expression_id' = 'm.expression_id',
@@ -216,7 +219,7 @@ export_mediacsv <- function(con, land_name, minimum_relevance, filename) {
   GROUP BY m.id
   "
 
-  # Ecrire le fichier
+  # Write the file
   cols <- paste0(sapply(names(mediacsv_col_map), function(x) paste0(mediacsv_col_map[[x]], " AS ", x)), collapse = ", ")
   full_sql <- sprintf(mediacsv_sql, cols)
   result <- dbGetQuery(con, full_sql, params = list(land_id, minimum_relevance))
@@ -226,6 +229,7 @@ export_mediacsv <- function(con, land_name, minimum_relevance, filename) {
   return(nrow(result))
 }
 
+
 #' Clean String
 #'
 #' This function removes control characters, newlines, and tabs from a string.
@@ -234,11 +238,12 @@ export_mediacsv <- function(con, land_name, minimum_relevance, filename) {
 #' @return A cleaned character string.
 #' @export
 clean_string <- function(str) {
-  cleaned_str <- gsub("[\r\n\t]", "", str)  # Supprimer les retours à la ligne, les tabulations
+  cleaned_str <- gsub("[\r\n\t]", "", str)  # Remove line breaks, tabs
 
-  cleaned_str <- gsub("[[:cntrl:]]", "", cleaned_str)  # Supprimer les autres caractères de contrôle
+  cleaned_str <- gsub("[[:cntrl:]]", "", cleaned_str)  # Remove other control characters
   return(cleaned_str)
 }
+
 
 #' Export Page GEXF
 #'
@@ -251,15 +256,15 @@ clean_string <- function(str) {
 #' @import DBI XML
 #' @export
 export_pagegexf <- function(con, land_name, minimum_relevance, filename) {
-  # Récupérer l'ID du land à partir du nom
+  # Retrieve the land ID from the name
   land_query <- "SELECT id FROM Land WHERE name = ?"
   land_id <- dbGetQuery(con, land_query, params = list(land_name))$id
 
   if (is.null(land_id)) {
-    stop("Le land spécifié n'existe pas.")
+    stop("The specified land does not exist.")
   }
 
-  # Définition des attributs GEXF sans les champs non désirés
+  # Define GEXF attributes without undesired fields
   gexf_attributes <- c(
     'id' = 'e.id',
     'url' = 'e.url',
@@ -271,13 +276,13 @@ export_pagegexf <- function(con, land_name, minimum_relevance, filename) {
     'domain_name' = 'd.name'
   )
 
-  # Initialisation du fichier GEXF
+  # Initialize the GEXF file
   gexf <- newXMLNode("gexf", namespaceDefinitions=c(gexf="http://www.gexf.net/1.2draft"), attrs=c(version="1.2"))
   graph <- newXMLNode("graph", attrs=c(mode="static", defaultedgetype="directed"), parent=gexf)
   nodes <- newXMLNode("nodes", parent=graph)
   edges <- newXMLNode("edges", parent=graph)
 
-  # Construction de la requête SQL pour les nœuds en excluant les champs non désirés
+  # Construct the SQL query for nodes excluding undesired fields
   cols <- paste0(sapply(names(gexf_attributes), function(x) paste0(gexf_attributes[[x]], " AS ", x)), collapse = ", ")
   node_sql <- sprintf("
     SELECT
@@ -290,22 +295,22 @@ export_pagegexf <- function(con, land_name, minimum_relevance, filename) {
 
   nodes_result <- dbGetQuery(con, node_sql, params = list(land_id, minimum_relevance))
 
-  # Nettoyer le champ 'title' des caractères de contrôle
+  # Clean the 'title' field of control characters
   nodes_result$title <- gsub("[[:cntrl:]]", "", nodes_result$title)
 
-  # Ajouter les nœuds au fichier GEXF
+  # Add nodes to the GEXF file
   for(i in 1:nrow(nodes_result)) {
     node <- newXMLNode("node", attrs=c(id=nodes_result$id[i], label=nodes_result$url[i]), parent=nodes)
     attributes <- newXMLNode("attributes", parent=node)
     for(attr_name in names(gexf_attributes)) {
-      # Condition pour ne créer un noeud d'attribut que si la colonne existe dans le résultat
+      # Condition to create an attribute node only if the column exists in the result
       if(attr_name %in% colnames(nodes_result)) {
         newXMLNode("attribute", attrs=c(id=attr_name, title=attr_name, type="string", value=nodes_result[[attr_name]][i]), parent=attributes)
       }
     }
   }
 
-  # Requête SQL pour récupérer les arêtes
+  # SQL query to retrieve edges
   edges_sql <- "
   WITH idx(x) AS (
     SELECT
@@ -326,14 +331,15 @@ export_pagegexf <- function(con, land_name, minimum_relevance, filename) {
 
   edges_result <- dbGetQuery(con, edges_sql, params = list(land_id, minimum_relevance))
 
-  # Ajouter les arêtes au fichier GEXF
+  # Add edges to the GEXF file
   for(i in 1:nrow(edges_result)) {
     newXMLNode("edge", attrs=c(id=paste0("e", i), source=edges_result$source_id[i], target=edges_result$target_id[i], weight=1), parent=edges)
   }
 
-  # Écrire le fichier GEXF
+  # Write the GEXF file
   saveXML(gexf, file=filename)
 }
+
 
 #' Convert Date String to Date Object
 #'
@@ -351,10 +357,11 @@ convert_date <- function(date_str) {
       if (!is.na(date)) {
         return(date)
       }
-    }, error = function(e) NULL) # Si une erreur se produit, ne faites rien et essayez le prochain format
+    }, error = function(e) NULL) # If an error occurs, do nothing and try the next format
   }
-  return(NA)  # Renvoyer NA si aucune correspondance n'est trouvée ou si une erreur se produit
+  return(NA)  # Return NA if no match is found or if an error occurs
 }
+
 
 #' Export Node GEXF
 #'
@@ -367,15 +374,15 @@ convert_date <- function(date_str) {
 #' @import DBI XML
 #' @export
 export_nodegexf <- function(con, land_name, minimum_relevance, filename) {
-  # Récupérer l'ID du land à partir du nom
+  # Retrieve the land ID from the name
   land_query <- "SELECT id FROM Land WHERE name = ?"
   land_id <- dbGetQuery(con, land_query, params = list(land_name))$id
 
   if (is.null(land_id)) {
-    stop("Le land spécifié n'existe pas.")
+    stop("The specified land does not exist.")
   }
 
-  # Définition des attributs GEXF
+  # Define GEXF attributes
   gexf_attributes <- list(
     'name' = 'string',
     'description' = 'string',
@@ -386,11 +393,11 @@ export_nodegexf <- function(con, land_name, minimum_relevance, filename) {
     'last_expression_date' = 'string'
   )
 
-  # Initialisation du fichier GEXF
+  # Initialize the GEXF file
   gexf <- newXMLNode("gexf", namespaceDefinitions = c(gexf = "http://www.gexf.net/1.3"), attrs = c(version = "1.3"))
   graph <- newXMLNode("graph", attrs = c(mode = "dynamic", defaultedgetype = "directed", timeformat="datetime"), parent = gexf)
 
-  # Déclaration des attributs du graphe
+  # Declare graph attributes
   attributes_graph <- newXMLNode("attributes", attrs = c(class = "node"), parent = graph)
   for (attr_name in names(gexf_attributes)) {
     newXMLNode("attribute", attrs = c(id = attr_name, title = attr_name, type = gexf_attributes[[attr_name]]), parent = attributes_graph)
@@ -398,7 +405,7 @@ export_nodegexf <- function(con, land_name, minimum_relevance, filename) {
   nodes <- newXMLNode("nodes", parent = graph)
   edges <- newXMLNode("edges", parent = graph)
 
-  # Requête SQL pour récupérer les nœuds
+  # SQL query to retrieve nodes
   node_sql <- "
   SELECT
       d.id, d.name, d.title, d.description, d.keywords, COUNT(*) as nbexpressions, ROUND(AVG(e.relevance), 2) as average_relevance,
@@ -411,17 +418,13 @@ export_nodegexf <- function(con, land_name, minimum_relevance, filename) {
 
   nodes_result <- dbGetQuery(con, node_sql, params = list(land_id, minimum_relevance))
 
-  # Convertir les chaînes de caractères first_expression_date et last_expression_date en objets POSIXct
-  #nodes_result$first_expression_date <- as.Date(convert_date(nodes_result$first_expression_date))
-  #nodes_result$last_expression_date <- as.Date(convert_date(nodes_result$last_expression_date)) + 3
-
+  # Convert the character strings first_expression_date and last_expression_date to POSIXct objects
   nodes_result$first_expression_date <- as.Date(sapply(nodes_result$first_expression_date, convert_date), origin="1970-1-1")
-  nodes_result$last_expression_date <- as.Date(sapply(nodes_result$last_expression_date, convert_date),origin="1970-1-1") + 3
-
+  nodes_result$last_expression_date <- as.Date(sapply(nodes_result$last_expression_date, convert_date), origin="1970-1-1") + 3
 
   nodes_result <- as.data.frame(lapply(nodes_result, clean_string))
 
-  # Ajouter les nœuds au fichier GEXF
+  # Add nodes to the GEXF file
   for (i in 1:nrow(nodes_result)) {
     node <- newXMLNode("node", attrs = c(id = nodes_result$id[i], label = nodes_result$name[i], start = nodes_result$first_expression_date[i], end = nodes_result$last_expression_date[i]), parent = nodes)
     attvalues <- newXMLNode("attvalues", parent = node)
@@ -430,7 +433,7 @@ export_nodegexf <- function(con, land_name, minimum_relevance, filename) {
     }
   }
 
-  # Requête SQL pour récupérer les arêtes
+  # SQL query to retrieve edges
   edges_sql <- "
   WITH idx(x) AS (
     SELECT
@@ -454,14 +457,15 @@ export_nodegexf <- function(con, land_name, minimum_relevance, filename) {
 
   edges_result <- as.data.frame(lapply(edges_result, clean_string))
 
-  # Ajouter les arêtes au fichier GEXF
-  for (i in 67:nrow(edges_result)) {
+  # Add edges to the GEXF file
+  for (i in 1:nrow(edges_result)) {
     newXMLNode("edge", attrs = c(id = paste0("e", i), source = edges_result$source_domain_id[i], target = edges_result$target_domain_id[i], weight = edges_result$COUNT[i]), parent = edges)
   }
 
-  # Écrire le fichier GEXF
+  # Write the GEXF file
   saveXML(gexf, file = filename)
 }
+
 
 #' Slugify a String
 #'
@@ -516,19 +520,19 @@ Source: \"%s\"\n
 #' @import DBI utils
 #' @export
 export_corpus <- function(con, land_name, minimum_relevance) {
-  # Récupérer l'ID du land à partir du nom
+  # Retrieve the land ID from the name
   land_query <- "SELECT id FROM Land WHERE name = ?"
   land_id <- dbGetQuery(con, land_query, params = list(land_name))$id
 
   if (is.null(land_id)) {
-    stop("Le land spécifié n'existe pas.")
+    stop("The specified land does not exist.")
   }
 
-  # Créer un répertoire pour stocker les fichiers du corpus
+  # Create a directory to store the corpus files
   dir_name <- paste0(land_name, "_corpus")
   dir.create(dir_name)
 
-  # Requête SQL pour récupérer les données
+  # SQL query to retrieve data
   col_map <- list(
     'e.id' = 'e.id',
     'e.url' = 'e.url',
@@ -547,24 +551,24 @@ export_corpus <- function(con, land_name, minimum_relevance) {
 
   result <- dbGetQuery(con, sql, params = list(land_id, minimum_relevance))
 
-  # Écrire chaque enregistrement dans un fichier texte
+  # Write each record to a text file
   for (i in 1:nrow(result)) {
     lignes <- result[i,]
-    file_name <- paste0(slugify(paste(land_name,"_", lignes$id, sep="")), ".txt")
+    file_name <- paste0(slugify(paste(land_name, "_", lignes$id, sep="")), ".txt")
     file_path <- file.path(dir_name, file_name)
     metadata <- to_metadata(lignes)
     content <- paste(metadata, lignes$readable)
     write(content, file = file_path)
   }
 
-  # Compresser tous les fichiers texte en un fichier zip
-  # Liste des fichiers complets dans le répertoire
+  # Compress all text files into a zip file
+  # List of all files in the directory
   file_paths <- list.files(dir_name, full.names = TRUE)
 
-  # Créer un fichier zip contenant tous les fichiers
+  # Create a zip file containing all the files
   zip(zipfile = paste0(dir_name, ".zip"), files = file_paths)
-
 }
+
 
 #' Export Land Data
 #'
@@ -574,7 +578,7 @@ export_corpus <- function(con, land_name, minimum_relevance) {
 #' @param export_type A character string specifying the type of export ("pagecsv", "fullpagecsv", "nodecsv", "mediacsv", "pagegexf", "nodegexf", or "corpus").
 #' @param minimum_relevance A numeric value specifying the minimum relevance score for inclusion in the export. Default is 1.
 #' @param labase A character string specifying the name of the database file. Default is "mwi.db".
-#' @import DBI RSQLite
+#' @import DBI RSQLite XML
 #' @export
 export_land <- function(land_name, export_type, minimum_relevance = 1, labase = "mwi.db") {
   con <- dbConnect(SQLite(), labase)
@@ -601,9 +605,9 @@ export_land <- function(land_name, export_type, minimum_relevance = 1, labase = 
   } else if (export_type == 'corpus') {
     export_corpus(con, land_name, minimum_relevance)
   } else {
-    message("Type d'exportation non reconnu.")
+    message("Unknown export type. Waz it that ?")
   }
 
-  # Fermer la connexion à la base de données
+  # dont forget to close the con
   dbDisconnect(con)
 }

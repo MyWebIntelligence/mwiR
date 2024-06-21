@@ -28,11 +28,8 @@ test_that("initmwi function works correctly", {
   expect_true(requireNamespace("RSQLite", quietly = TRUE))
   expect_true(requireNamespace("tools", quietly = TRUE))
 
-  # Check for npm package warning message
-  expect_warning(system("npm list -g @postlight/parser", intern = TRUE), "Le parser npm @postlight/parser n'est pas installé.")
-
   # Check for trafilatura message
-  expect_message(message("Trafilatura est installé et disponible."))
+  expect_message(message("Trafilatura is not installed. Run 'pip install trafilatura' in your Python environment."))
 
   # Reset the global environment
   rm(list = ls(envir = .GlobalEnv), envir = .GlobalEnv)
