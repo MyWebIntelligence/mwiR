@@ -1,6 +1,6 @@
 exportPattern("^[[:alpha:]]+")
 
-importFrom("utils", "install.packages")
+importFrom("utils", "install.packages", "read.csv", "read.delim")
 
 # Import necessary packages
 import(DBI)
@@ -18,3 +18,4 @@ import(tesseract)
 import(tools)
 import(urltools)
 import(zip)
+import(mockery)

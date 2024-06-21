@@ -20,10 +20,10 @@
 #' \dontrun{
 #' initmwi()
 #' }
-#' @import DBI cld3 httr lubridate jsonlite pdftools readr reticulate RSQLite SnowballC stringr tesseract tools urltools zip
+#' @import DBI cld3 httr lubridate jsonlite pdftools readr reticulate RSQLite SnowballC stringr tesseract tools urltools zip mockery
 #' @export
 initmwi <- function() {
-  required_packages <- c("DBI", "cld3", "httr", "lubridate", "jsonlite", "pdftools", "readr","reticulate", "RSQLite", "SnowballC",  "stringr","tesseract", "tools", "urltools", "zip")
+  required_packages <- c("DBI", "cld3", "httr", "lubridate", "jsonlite", "pdftools", "readr","reticulate", "RSQLite", "SnowballC",  "stringr","tesseract", "tools", "urltools", "zip", "mockery")
 
   # Check and install missing packages
   for (pkg in required_packages) {
