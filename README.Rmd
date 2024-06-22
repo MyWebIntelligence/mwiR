@@ -113,42 +113,177 @@ library(mwiR)
 ## basic example code
 ```
 
+## Step 1: Creating the Research Project
 
-## Step 1: Creating the research project
+In this step-by-step guide, we will walk through the initial setup and execution of a research project using the My Web Intelligence (MWI) method. This method allows researchers to analyze the impact of various factors, such as AI on work, by collecting and organizing web data. Here is a breakdown of the R script provided:
+
+### 1. Load the Required Packages
 
 ```{r}
-# Load the packages
 initmwi()
+```
 
-# Database setup
+The `initmwi()` function initializes the My Web Intelligence environment by loading all necessary packages and setting up the environment for further operations. This function ensures that all dependencies and configurations are correctly initialized.
 
+### 2. Set Up the Database
+
+```{r}
 db_setup()
+```
 
-# Create a land
+The `db_setup()` function sets up the database needed for storing and managing the data collected during the research project. It initializes the necessary database schema and ensures that the database is ready for data insertion and retrieval.
 
+-   `db_name`: A string specifying the name of the SQLite database file. Default is `"mwi.db"`.
+
+### 3. Create a Research Project (Land)
+
+```{r}
 create_land(name = "AIWork", desc = "Impact of AI on work", lang="en")
+```
 
-# Add terms
+The `create_land()` function creates a new research project, referred to as a "land" in MWI terminology. This land will serve as the container for all data and analyses related to the project.
 
+-   `name`: A string specifying the name of the land.
+-   `desc`: A string providing a description of the land.
+-   `lang`: A string specifying the language of the land. Default is `"en"`.
+-   `db_name`: A string specifying the name of the SQLite database file. Default is `"mwi.db"`.
+
+### 4. Add Search Terms
+
+```{r}
 addterm("AIWork", "AI, artificial intelligence, work, employment, job, profession, labor market")
+```
 
-# Verify that the project is created
+The `addterm()` function adds search terms to the project. These terms will be used to crawl and collect relevant web data.
 
+-   `land_name`: A string specifying the name of the land.
+-   `terms`: A comma-separated string of terms to add.
+
+### 5. Verify the Project Creation
+
+```{r}
 listlands("AIWork")
+```
 
-## Manual method or using a file
+The `listlands()` function lists all lands or projects that have been created. By specifying the project name "AIWork", it verifies that the project has been successfully created.
 
+-   `land_name`: A string specifying the name of the land to list. If `NULL`, all lands are listed. Default is `NULL`.
+-   `db_name`: A string specifying the name of the SQLite database file. Default is `"mwi.db"`.
 
+### 6. Add URLs Manually or Using a File
 
-addurl("AIWork", urls = "https://www.fr.adp.com/rhinfo/articles/2022/11/la-disparition-de-certains-metiers-est-elle-a-craindre.aspx") # froma a dataframe 'paste(AIWorkdeepcrawl$link, collapse = ",")'
+```{r}
+addurl("AIWork", urls = "https://www.fr.adp.com/rhinfo/articles/2022/11/la-disparition-de-certains-metiers-est-elle-a-craindre.aspx")
+```
 
+The `addurl()` function adds URLs to the project. These URLs point to web pages that contain relevant information for the research.
+
+-   `land_name`: A string specifying the name of the land.
+-   `urls`: A comma-separated string of URLs to add. Default is `NULL`.
+-   `path`: A string specifying the path to a file containing URLs. Default is `NULL`.
+-   `db_name`: A string specifying the name of the SQLite database file. Default is `"mwi.db"`.
+
+Alternatively, URLs can be added using a text file:
+
+```{r}
 # If using a text file
-#addurl("AIWork", path = "_ai_or_artificial_intelligence___work_or_employment_or_job_or_profession_or_labor_market01.txt")
+# addurl("AIWork", path = "_ai_or_artificial_intelligence___work_or_employment_or_job_or_profession_or_labor_market01.txt")
+```
 
-# List the lands or a specific land
+-   `path`: The path to a text file containing the URLs to be added.
+
+### 7. List the Projects or a Specific Project
+
+```{r}
 listlands("AIWork")
+```
 
-# Optionally delete a land
-deleteland(land_name = "AIWork") # OR maxrel= 2 option
+This function is used again to list the projects or a specific project, ensuring that the URLs have been added correctly to "AIWork".
 
+### 8. Optionally Delete a Project
+
+```{r}
+deleteland(land_name = "AIWork")
+
+```
+
+The `deleteland()` function deletes a specified project. This can be useful for cleaning up after the research is completed or if a project needs to be restarted.
+
+-   `land_name`: A string specifying the name of the land to delete.
+-   `maxrel`: An integer specifying the maximum relevance for expressions to delete. Default is `NULL`.
+-   `db_name`: A string specifying the name of the SQLite database file. Default is `"mwi.db"`.
+
+This script demonstrates the basic setup and execution of a research project using My Web Intelligence, including project creation, term addition, URL management, and project verification.
+
+## Step 2: Crawling
+
+In this section, we will walk through the process of crawling URLs and extracting content for analysis using the My Web Intelligence (MWI) method. The following R code snippets demonstrate how to perform these tasks.
+
+### Crawl URLs for a Specific Land
+
+```{r}
+crawlurls("IATravail", limit = 10)
+```
+
+The `crawlurls()` function crawls URLs for a specific land, updates the database, and calculates relevance scores.
+
+-   `land_name`: A character string representing the name of the land.
+-   `urlmax`: An integer specifying the maximum number of URLs to be processed (default is 50).
+-   `limit`: An optional integer specifying the limit on the number of URLs to crawl.
+-   `http_status`: An optional character string specifying the HTTP status to filter URLs.
+-   `db_name`: A string specifying the name of the SQLite database file. Default is `"mwi.db"`.
+
+**Example:**
+
+This example demonstrates crawling up to 10 URLs for the land named "IATravail".
+
+```{r}
+crawlurls("IATravail", limit = 10)
+```
+
+### Crawl Domains
+
+```{r}
+crawlDomain(1000)
+```
+
+The `crawlDomain()` function crawls domains and updates the Domain table with the fetched data.
+
+-   `nburl`: An integer specifying the number of URLs to be crawled (default is 100).
+-   `db_name`: A string specifying the name of the SQLite database file. Default is `"mwi.db"`.
+
+**Example:**
+
+This example demonstrates crawling 1000 URLs and updating the Domain table.
+
+```{r}
+crawlDomain(1000)
+```
+
+## Step 3: Export Files and Corpora
+
+In this section, we will walk through the process of exporting data and corpora from a research project using the My Web Intelligence (MWI) method. The following R code snippets demonstrate how to perform these tasks.
+
+### Export Land Data
+
+```{r}
+#type = ['pagecsv', 'pagegexf', 'fullpagecsv', 'nodecsv', 'nodegexf', 'mediacsv', 'corpus']
+
+# Exemple d'utilisation "le projet", "type d'export", "relevance", "file"
+#export_land("giletsjaunes", "pagegexf", 3)
+```
+
+The `export_land()` function manages the exportation of land data based on the specified export type.
+
+-   `land_name`: A character string specifying the name of the land.
+-   `export_type`: A character string specifying the type of export. Options include `"pagecsv"`, `"fullpagecsv"`, `"nodecsv"`, `"mediacsv"`, `"pagegexf"`, `"nodegexf"`, or `"corpus"`.
+-   `minimum_relevance`: A numeric value specifying the minimum relevance score for inclusion in the export. Default is `1`.
+-   `labase`: A character string specifying the name of the database file. Default is `"mwi.db"`.
+
+**Example:**
+
+This example demonstrates exporting data for the project "giletsjaunes" with a minimum relevance score of 3 into a GEXF file.
+
+```{r}
+#export_land("giletsjaunes", "pagegexf", 3)
 ```

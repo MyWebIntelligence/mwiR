@@ -160,57 +160,76 @@ You can install the development version of mwiR from
 
     ## Using GitHub PAT from the git credential store.
 
-    ## Downloading GitHub repo MyWebIntelligence/mwiR@HEAD
-
-    ## reticulate (1.37.0 -> 1.38.0) [CRAN]
-
-    ## Installing 1 packages: reticulate
-
-    ## 
-    ## The downloaded binary packages are in
-    ##  /var/folders/k3/vj6gzhmn43g3j13116l042jr0000gn/T//RtmpoUq2Ix/downloaded_packages
-    ## ── R CMD build ─────────────────────────────────────────────────────────────────
-    ##      checking for file ‘/private/var/folders/k3/vj6gzhmn43g3j13116l042jr0000gn/T/RtmpoUq2Ix/remotesb4ea180109b9/MyWebIntelligence-mwiR-4ec3e11/DESCRIPTION’ ...  ✔  checking for file ‘/private/var/folders/k3/vj6gzhmn43g3j13116l042jr0000gn/T/RtmpoUq2Ix/remotesb4ea180109b9/MyWebIntelligence-mwiR-4ec3e11/DESCRIPTION’
-    ##   ─  preparing ‘mwiR’:
-    ##    checking DESCRIPTION meta-information ...  ✔  checking DESCRIPTION meta-information
-    ##   ─  checking for LF line-endings in source and make files and shell scripts
-    ##   ─  checking for empty or unneeded directories
-    ##      Omitted ‘LazyData’ from DESCRIPTION
-    ##   ─  building ‘mwiR_0.1.0.tar.gz’
-    ##      
-    ## 
+    ## Skipping install of 'mwiR' from a github remote, the SHA1 (217eb23f) has not changed since last install.
+    ##   Use `force = TRUE` to force installation
 
 ## Project (‘land’) Setup
 
 This is a basic example which shows you how to solve a common problem:
 
     library(mwiR)
+
+    ## Warning: replacing previous import 'readr::guess_encoding' by
+    ## 'rvest::guess_encoding' when loading 'mwiR'
+
+    ## Warning: replacing previous import 'tools::toHTML' by 'XML::toHTML' when
+    ## loading 'mwiR'
+
     ## basic example code
 
-## Step 1: Creating the research project
+## Step 1: Creating the Research Project
 
-    # Load the packages
+In this step-by-step guide, we will walk through the initial setup and
+execution of a research project using the My Web Intelligence (MWI)
+method. This method allows researchers to analyze the impact of various
+factors, such as AI on work, by collecting and organizing web data. Here
+is a breakdown of the R script provided:
+
+### 1. Load the Required Packages
+
     initmwi()
-
-    ## @postlight/parser is already installed
 
     ## Trafilatura is installed and available.
 
     ## Enter your SERP API key or press Enter:
 
-    # Database setup
+The `initmwi()` function initializes the My Web Intelligence environment
+by loading all necessary packages and setting up the environment for
+further operations. This function ensures that all dependencies and
+configurations are correctly initialized.
+
+### 2. Set Up the Database
 
     db_setup()
 
     ## Database setup completed.
 
-    # Create a land
+The `db_setup()` function sets up the database needed for storing and
+managing the data collected during the research project. It initializes
+the necessary database schema and ensures that the database is ready for
+data insertion and retrieval.
+
+-   `db_name`: A string specifying the name of the SQLite database file.
+    Default is `"mwi.db"`.
+
+### 3. Create a Research Project (Land)
 
     create_land(name = "AIWork", desc = "Impact of AI on work", lang="en")
 
     ## Land 'AIWork' created
 
-    # Add terms
+The `create_land()` function creates a new research project, referred to
+as a “land” in MWI terminology. This land will serve as the container
+for all data and analyses related to the project.
+
+-   `name`: A string specifying the name of the land.
+-   `desc`: A string providing a description of the land.
+-   `lang`: A string specifying the language of the land. Default is
+    `"en"`.
+-   `db_name`: A string specifying the name of the SQLite database file.
+    Default is `"mwi.db"`.
+
+### 4. Add Search Terms
 
     addterm("AIWork", "AI, artificial intelligence, work, employment, job, profession, labor market")
 
@@ -224,23 +243,36 @@ This is a basic example which shows you how to solve a common problem:
 
     ## [1] 1
 
-    # Verify that the project is created
+The `addterm()` function adds search terms to the project. These terms
+will be used to crawl and collect relevant web data.
+
+-   `land_name`: A string specifying the name of the land.
+-   `terms`: A comma-separated string of terms to add.
+
+### 5. Verify the Project Creation
 
     listlands("AIWork")
 
     ## Land name: AIWork
-    ## Creation date: 1718975512.2099
+    ## Creation date: 1719056878.8222
     ## Description: Impact of AI on work
     ## Terms in the dictionary:  ai, artificial intelligence, work, employment, job, profession, labor market 
     ## Total number of expressions: 0
     ## Number of expressions remaining to be fetched: 0
     ## HTTP status codes: NA: NA
 
-    ## Manual method or using a file
+The `listlands()` function lists all lands or projects that have been
+created. By specifying the project name “AIWork”, it verifies that the
+project has been successfully created.
 
+-   `land_name`: A string specifying the name of the land to list. If
+    `NULL`, all lands are listed. Default is `NULL`.
+-   `db_name`: A string specifying the name of the SQLite database file.
+    Default is `"mwi.db"`.
 
+### 6. Add URLs Manually or Using a File
 
-    addurl("AIWork", urls = "https://www.fr.adp.com/rhinfo/articles/2022/11/la-disparition-de-certains-metiers-est-elle-a-craindre.aspx") # froma a dataframe 'paste(AIWorkdeepcrawl$link, collapse = ",")'
+    addurl("AIWork", urls = "https://www.fr.adp.com/rhinfo/articles/2022/11/la-disparition-de-certains-metiers-est-elle-a-craindre.aspx")
 
     ## [1] "URL added: https://www.fr.adp.com/rhinfo/articles/2022/11/la-disparition-de-certains-metiers-est-elle-a-craindre.aspx"
     ## [1] "Total number of new URLs added: 1"
@@ -248,23 +280,175 @@ This is a basic example which shows you how to solve a common problem:
 
     ## [1] 1
 
-    # If using a text file
-    #addurl("AIWork", path = "_ai_or_artificial_intelligence___work_or_employment_or_job_or_profession_or_labor_market01.txt")
+The `addurl()` function adds URLs to the project. These URLs point to
+web pages that contain relevant information for the research.
 
-    # List the lands or a specific land
+-   `land_name`: A string specifying the name of the land.
+-   `urls`: A comma-separated string of URLs to add. Default is `NULL`.
+-   `path`: A string specifying the path to a file containing URLs.
+    Default is `NULL`.
+-   `db_name`: A string specifying the name of the SQLite database file.
+    Default is `"mwi.db"`.
+
+Alternatively, URLs can be added using a text file:
+
+    # If using a text file
+    # addurl("AIWork", path = "_ai_or_artificial_intelligence___work_or_employment_or_job_or_profession_or_labor_market01.txt")
+
+-   `path`: The path to a text file containing the URLs to be added.
+
+### 7. List the Projects or a Specific Project
+
     listlands("AIWork")
 
     ## Land name: AIWork
-    ## Creation date: 1718975512.2099
+    ## Creation date: 1719056878.8222
     ## Description: Impact of AI on work
     ## Terms in the dictionary:  ai, artificial intelligence, work, employment, job, profession, labor market 
     ## Total number of expressions: 1
     ## Number of expressions remaining to be fetched: 1
     ## HTTP status codes: NA: 1
 
-    # Optionally delete a land
-    deleteland(land_name = "AIWork") # OR maxrel= 2 option
+This function is used again to list the projects or a specific project,
+ensuring that the URLs have been added correctly to “AIWork”.
+
+### 8. Optionally Delete a Project
+
+    deleteland(land_name = "AIWork")
 
     ## [1] "Land AIWork and all its associated records have been deleted"
 
     ## [1] 1
+
+The `deleteland()` function deletes a specified project. This can be
+useful for cleaning up after the research is completed or if a project
+needs to be restarted.
+
+-   `land_name`: A string specifying the name of the land to delete.
+-   `maxrel`: An integer specifying the maximum relevance for
+    expressions to delete. Default is `NULL`.
+-   `db_name`: A string specifying the name of the SQLite database file.
+    Default is `"mwi.db"`.
+
+This script demonstrates the basic setup and execution of a research
+project using My Web Intelligence, including project creation, term
+addition, URL management, and project verification.
+
+## Step 2: Crawling
+
+In this section, we will walk through the process of crawling URLs and
+extracting content for analysis using the My Web Intelligence (MWI)
+method. The following R code snippets demonstrate how to perform these
+tasks.
+
+### Crawl URLs for a Specific Land
+
+    crawlurls("IATravail", limit = 10)
+
+    ## [1] "Land IATravail not found"
+
+    ## [1] 0
+
+The `crawlurls()` function crawls URLs for a specific land, updates the
+database, and calculates relevance scores.
+
+-   `land_name`: A character string representing the name of the land.
+-   `urlmax`: An integer specifying the maximum number of URLs to be
+    processed (default is 50).
+-   `limit`: An optional integer specifying the limit on the number of
+    URLs to crawl.
+-   `http_status`: An optional character string specifying the HTTP
+    status to filter URLs.
+-   `db_name`: A string specifying the name of the SQLite database file.
+    Default is `"mwi.db"`.
+
+**Example:**
+
+This example demonstrates crawling up to 10 URLs for the land named
+“IATravail”.
+
+    crawlurls("IATravail", limit = 10)
+
+    ## [1] "Land IATravail not found"
+
+    ## [1] 0
+
+### Crawl Domains
+
+    crawlDomain(1000)
+
+    ## Error during download or extraction of content with TRAFILATURA:
+
+    ## Warning in rep(no, length.out = len): 'x' is NULL so the result will be NULL
+
+    ## Error during download or extraction of content with ARCHIVE.ORG:
+
+    ## ALL parser and GET failed for URL:https://NA
+
+    ## NA domain could not be crawled due to insufficient data
+
+    ## Error processing URL:  - Parameter 2 does not have length 1.
+
+    ## The update of Domain table is succed.
+
+The `crawlDomain()` function crawls domains and updates the Domain table
+with the fetched data.
+
+-   `nburl`: An integer specifying the number of URLs to be crawled
+    (default is 100).
+-   `db_name`: A string specifying the name of the SQLite database file.
+    Default is `"mwi.db"`.
+
+**Example:**
+
+This example demonstrates crawling 1000 URLs and updating the Domain
+table.
+
+    crawlDomain(1000)
+
+    ## Error during download or extraction of content with TRAFILATURA:
+
+    ## Warning in rep(no, length.out = len): 'x' is NULL so the result will be NULL
+
+    ## Error during download or extraction of content with ARCHIVE.ORG:
+
+    ## ALL parser and GET failed for URL:https://NA
+
+    ## NA domain could not be crawled due to insufficient data
+
+    ## Error processing URL:  - Parameter 2 does not have length 1.
+
+    ## The update of Domain table is succed.
+
+## Step 3: Export Files and Corpora
+
+In this section, we will walk through the process of exporting data and
+corpora from a research project using the My Web Intelligence (MWI)
+method. The following R code snippets demonstrate how to perform these
+tasks.
+
+### Export Land Data
+
+    #type = ['pagecsv', 'pagegexf', 'fullpagecsv', 'nodecsv', 'nodegexf', 'mediacsv', 'corpus']
+
+    # Exemple d'utilisation "le projet", "type d'export", "relevance", "file"
+    #export_land("giletsjaunes", "pagegexf", 3)
+
+The `export_land()` function manages the exportation of land data based
+on the specified export type.
+
+-   `land_name`: A character string specifying the name of the land.
+-   `export_type`: A character string specifying the type of export.
+    Options include `"pagecsv"`, `"fullpagecsv"`, `"nodecsv"`,
+    `"mediacsv"`, `"pagegexf"`, `"nodegexf"`, or `"corpus"`.
+-   `minimum_relevance`: A numeric value specifying the minimum
+    relevance score for inclusion in the export. Default is `1`.
+-   `labase`: A character string specifying the name of the database
+    file. Default is `"mwi.db"`.
+
+**Example:**
+
+This example demonstrates exporting data for the project “giletsjaunes”
+with a minimum relevance score of 3 into a GEXF file.
+
+    #export_land("giletsjaunes", "pagegexf", 3)
