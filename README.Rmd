@@ -187,7 +187,8 @@ Alternatively, URLs can be added using a text file:
 
 ```{r}
 # If using a text file
-# addurl("AIWork", path = "_ai_or_artificial_intelligence___work_or_employment_or_job_or_profession_or_labor_market01.txt")
+
+addurl("AIWork", path = "_ai_or_artificial_intelligence___work_or_employment_or_job_or_profession_or_labor_market01.txt")
 ```
 
 -   `path`: The path to a text file containing the URLs to be added.
@@ -270,7 +271,8 @@ In this section, we will walk through the process of exporting data and corpora 
 #type = ['pagecsv', 'pagegexf', 'fullpagecsv', 'nodecsv', 'nodegexf', 'mediacsv', 'corpus']
 
 # Exemple d'utilisation "le projet", "type d'export", "relevance", "file"
-#export_land("giletsjaunes", "pagegexf", 3)
+
+export_land("giletsjaunes", "pagegexf", 3)
 ```
 
 The `export_land()` function manages the exportation of land data based on the specified export type.
@@ -285,5 +287,6 @@ The `export_land()` function manages the exportation of land data based on the s
 This example demonstrates exporting data for the project "giletsjaunes" with a minimum relevance score of 3 into a GEXF file.
 
 ```{r}
-#export_land("giletsjaunes", "pagegexf", 3)
+
+export_land("giletsjaunes", "pagegexf", 3)
 ```
