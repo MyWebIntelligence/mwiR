@@ -1,4 +1,4 @@
-# WARNING dont use this package is in dev mwiR The R Package of My Web Intelligence Project
+# mwiR 0.8.0 (Beta) The R Package of My Web Intelligence Project
 
 <!-- badges: start -->
 <!-- badges: end -->
@@ -160,8 +160,26 @@ You can install the development version of mwiR from
 
     ## Using GitHub PAT from the git credential store.
 
-    ## Skipping install of 'mwiR' from a github remote, the SHA1 (217eb23f) has not changed since last install.
-    ##   Use `force = TRUE` to force installation
+    ## Downloading GitHub repo MyWebIntelligence/mwiR@HEAD
+
+    ## cli        (3.6.2  -> 3.6.3 ) [CRAN]
+    ## reticulate (1.37.0 -> 1.38.0) [CRAN]
+
+    ## Installing 2 packages: cli, reticulate
+
+    ## 
+    ## The downloaded binary packages are in
+    ##  /var/folders/k3/vj6gzhmn43g3j13116l042jr0000gn/T//Rtmp9TswMt/downloaded_packages
+    ## ── R CMD build ─────────────────────────────────────────────────────────────────
+    ##      checking for file ‘/private/var/folders/k3/vj6gzhmn43g3j13116l042jr0000gn/T/Rtmp9TswMt/remotes108d34485cc3c/MyWebIntelligence-mwiR-e85cea1/DESCRIPTION’ ...  ✔  checking for file ‘/private/var/folders/k3/vj6gzhmn43g3j13116l042jr0000gn/T/Rtmp9TswMt/remotes108d34485cc3c/MyWebIntelligence-mwiR-e85cea1/DESCRIPTION’
+    ##   ─  preparing ‘mwiR’:
+    ##      checking DESCRIPTION meta-information ...  ✔  checking DESCRIPTION meta-information
+    ##   ─  checking for LF line-endings in source and make files and shell scripts
+    ##   ─  checking for empty or unneeded directories
+    ##    Omitted ‘LazyData’ from DESCRIPTION
+    ##   ─  building ‘mwiR_0.1.0.tar.gz’
+    ##      
+    ## 
 
 ## Project (‘land’) Setup
 
@@ -254,7 +272,7 @@ will be used to crawl and collect relevant web data.
     listlands("AIWork")
 
     ## Land name: AIWork
-    ## Creation date: 1719056878.8222
+    ## Creation date: 1719057037.79256
     ## Description: Impact of AI on work
     ## Terms in the dictionary:  ai, artificial intelligence, work, employment, job, profession, labor market 
     ## Total number of expressions: 0
@@ -302,7 +320,7 @@ Alternatively, URLs can be added using a text file:
     listlands("AIWork")
 
     ## Land name: AIWork
-    ## Creation date: 1719056878.8222
+    ## Creation date: 1719057037.79256
     ## Description: Impact of AI on work
     ## Terms in the dictionary:  ai, artificial intelligence, work, employment, job, profession, labor market 
     ## Total number of expressions: 1

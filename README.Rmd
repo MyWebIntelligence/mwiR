@@ -2,7 +2,7 @@
 output: md_document
 ---
 
-# WARNING dont use this package is in dev mwiR The R Package of My Web Intelligence Project
+# mwiR 0.8.0 (Beta) The R Package of My Web Intelligence Project
 
 <!-- badges: start -->
 
