@@ -155,31 +155,7 @@ exploit web data for in-depth and relevant analyses.
 You can install the development version of mwiR from
 [GitHub](https://github.com/) with:
 
-    # install.packages("devtools")
-    devtools::install_github("MyWebIntelligence/mwiR")
-
-    ## Using GitHub PAT from the git credential store.
-
-    ## Downloading GitHub repo MyWebIntelligence/mwiR@HEAD
-
-    ## cli        (3.6.2  -> 3.6.3 ) [CRAN]
-    ## reticulate (1.37.0 -> 1.38.0) [CRAN]
-
-    ## Installing 2 packages: cli, reticulate
-
-    ## 
-    ## The downloaded binary packages are in
-    ##  /var/folders/k3/vj6gzhmn43g3j13116l042jr0000gn/T//Rtmp9TswMt/downloaded_packages
-    ## ── R CMD build ─────────────────────────────────────────────────────────────────
-    ##      checking for file ‘/private/var/folders/k3/vj6gzhmn43g3j13116l042jr0000gn/T/Rtmp9TswMt/remotes108d34485cc3c/MyWebIntelligence-mwiR-e85cea1/DESCRIPTION’ ...  ✔  checking for file ‘/private/var/folders/k3/vj6gzhmn43g3j13116l042jr0000gn/T/Rtmp9TswMt/remotes108d34485cc3c/MyWebIntelligence-mwiR-e85cea1/DESCRIPTION’
-    ##   ─  preparing ‘mwiR’:
-    ##      checking DESCRIPTION meta-information ...  ✔  checking DESCRIPTION meta-information
-    ##   ─  checking for LF line-endings in source and make files and shell scripts
-    ##   ─  checking for empty or unneeded directories
-    ##    Omitted ‘LazyData’ from DESCRIPTION
-    ##   ─  building ‘mwiR_0.1.0.tar.gz’
-    ##      
-    ## 
+   
 
 ## Project (‘land’) Setup
 
@@ -311,7 +287,8 @@ web pages that contain relevant information for the research.
 Alternatively, URLs can be added using a text file:
 
     # If using a text file
-    # addurl("AIWork", path = "_ai_or_artificial_intelligence___work_or_employment_or_job_or_profession_or_labor_market01.txt")
+    
+    addurl("AIWork", path = "_ai_or_artificial_intelligence___work_or_employment_or_job_or_profession_or_labor_market01.txt")
 
 -   `path`: The path to a text file containing the URLs to be added.
 
@@ -363,9 +340,6 @@ tasks.
 
     crawlurls("IATravail", limit = 10)
 
-    ## [1] "Land IATravail not found"
-
-    ## [1] 0
 
 The `crawlurls()` function crawls URLs for a specific land, updates the
 database, and calculates relevance scores.
@@ -387,27 +361,13 @@ This example demonstrates crawling up to 10 URLs for the land named
 
     crawlurls("IATravail", limit = 10)
 
-    ## [1] "Land IATravail not found"
 
-    ## [1] 0
 
 ### Crawl Domains
 
     crawlDomain(1000)
 
-    ## Error during download or extraction of content with TRAFILATURA:
 
-    ## Warning in rep(no, length.out = len): 'x' is NULL so the result will be NULL
-
-    ## Error during download or extraction of content with ARCHIVE.ORG:
-
-    ## ALL parser and GET failed for URL:https://NA
-
-    ## NA domain could not be crawled due to insufficient data
-
-    ## Error processing URL:  - Parameter 2 does not have length 1.
-
-    ## The update of Domain table is succed.
 
 The `crawlDomain()` function crawls domains and updates the Domain table
 with the fetched data.
@@ -424,19 +384,7 @@ table.
 
     crawlDomain(1000)
 
-    ## Error during download or extraction of content with TRAFILATURA:
-
-    ## Warning in rep(no, length.out = len): 'x' is NULL so the result will be NULL
-
-    ## Error during download or extraction of content with ARCHIVE.ORG:
-
-    ## ALL parser and GET failed for URL:https://NA
-
-    ## NA domain could not be crawled due to insufficient data
-
-    ## Error processing URL:  - Parameter 2 does not have length 1.
-
-    ## The update of Domain table is succed.
+    
 
 ## Step 3: Export Files and Corpora
 
@@ -450,7 +398,8 @@ tasks.
     #type = ['pagecsv', 'pagegexf', 'fullpagecsv', 'nodecsv', 'nodegexf', 'mediacsv', 'corpus']
 
     # Exemple d'utilisation "le projet", "type d'export", "relevance", "file"
-    #export_land("giletsjaunes", "pagegexf", 3)
+    
+    export_land("giletsjaunes", "pagegexf", 3)
 
 The `export_land()` function manages the exportation of land data based
 on the specified export type.
@@ -469,4 +418,4 @@ on the specified export type.
 This example demonstrates exporting data for the project “giletsjaunes”
 with a minimum relevance score of 3 into a GEXF file.
 
-    #export_land("giletsjaunes", "pagegexf", 3)
+    export_land("giletsjaunes", "pagegexf", 3)
