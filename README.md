@@ -161,6 +161,7 @@ You can install the development version of mwiR from
 
 This is a basic example which shows you how to solve a common problem:
 
+    install_github("MyWebIntelligence/mwiR")
     library(mwiR)
 
     ## Warning: replacing previous import 'readr::guess_encoding' by
