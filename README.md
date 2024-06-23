@@ -79,14 +79,14 @@ social network analysis, and text mining methods to:
     their positions, and evaluate their impact on patients’ perceptions
     and behaviors. [Source](https://journals.openedition.org/rfsic/8376)
 
-1.  **Online Political Controversy**
+2.  **Online Political Controversy**
 
 -   **Juan Branco Project**: Analysis of discourses and influence
     surrounding the public figure Juan Branco, exploring the dynamics of
     positioning and controversy.
     [Source](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4584133)
 
-1.  **Research Sociology**
+3.  **Research Sociology**
 
 -   **Digital Humanities**: Studies on the impact of digital
     technologies on humanities and social sciences, including how
