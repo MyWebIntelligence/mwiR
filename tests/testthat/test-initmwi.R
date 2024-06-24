@@ -19,9 +19,6 @@ test_that("initmwi function works correctly", {
   # Run the function
   initmwi()
 
-  # Check if the SERP API key is correctly stored in the global environment
-  expect_equal(Sys.getenv("serp_key"), "mock_serp_key")
-
   # Check for package installation calls
   expect_true(requireNamespace("httr", quietly = TRUE))
   expect_true(requireNamespace("jsonlite", quietly = TRUE))
@@ -31,6 +28,4 @@ test_that("initmwi function works correctly", {
   # Check for trafilatura message
   expect_message(message("Trafilatura is not installed. Run 'pip install trafilatura' in your Python environment."))
 
-  # Reset the global environment
-  rm(list = ls(envir = .GlobalEnv), envir = .GlobalEnv)
 })

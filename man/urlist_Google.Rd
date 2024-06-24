@@ -4,14 +4,7 @@
 \alias{urlist_Google}
 \title{Query to URLs with SerpAPI Google Search}
 \usage{
-urlist_Google(
-  query,
-  datestart,
-  dateend,
-  timestep = "week",
-  sleep_seconds = 1,
-  lang = "fr"
-)
+urlist_Google(query, datestart, dateend, timestep = "week")
 }
 \arguments{
 \item{query}{A character string representing the search query.}
@@ -36,7 +29,7 @@ then processes the response to extract and save the URLs in a text file.
 }
 \examples{
 \dontrun{
-urlist_Google("data science", "2023-01-01", "2023-03-01", timestep = "month", sleep_seconds = 2, lang = "en")
+urlist_Google("data science", "2023-01-01", "2023-03-01", timestep = "month")
 }
 
 }

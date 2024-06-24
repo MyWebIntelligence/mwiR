@@ -32,6 +32,7 @@ related_query <- function(query, lang = "fr", country = "France") {
     if (is.null(serp_key) || serp_key == "") {
       stop("Error: SerpAPI key is required to execute this function.")
     }
+    assign("serp_key", gsub("\"", "", serp_key), envir = .GlobalEnv)
   }
 
   # Convert the query to lowercase and replace spaces with '+'
@@ -106,7 +107,7 @@ related_query <- function(query, lang = "fr", country = "France") {
 #' }
 #'
 #' @export
-urlist_Google <- function(query, datestart, dateend, timestep = "week", sleep_seconds = 1, lang = "fr") {
+urlist_Google <- function(query, datestart, dateend, timestep = "week") {
 
   # Check if serp_key is NULL
   if (is.null(api_key) || api_key == "") {
@@ -115,6 +116,7 @@ urlist_Google <- function(query, datestart, dateend, timestep = "week", sleep_se
     if (is.null(serp_key) || serp_key == "") {
       stop("Error: SerpAPI key is required to execute this function.")
     }
+    assign("serp_key", gsub("\"", "", serp_key), envir = .GlobalEnv)
   }
 
   # Convert the query to lowercase and replace spaces with '+'
@@ -253,6 +255,7 @@ urlist_Duck <- function(query, filename = NULL, sleep_seconds = 1, lang = "fr") 
     if (is.null(serp_key) || serp_key == "") {
       stop("Error: SerpAPI key is required to execute this function.")
     }
+    assign("serp_key", gsub("\"", "", serp_key), envir = .GlobalEnv)
   }
 
   # Create a filename based on the query
@@ -358,6 +361,7 @@ urlist_Bing <- function(query, filename = NULL, sleep_seconds = 1, lang = "fr") 
     if (is.null(serp_key) || serp_key == "") {
       stop("Error: SerpAPI key is required to execute this function.")
     }
+    assign("serp_key", gsub("\"", "", serp_key), envir = .GlobalEnv)
   }
 
   # Create a filename based on the query
