@@ -172,6 +172,14 @@ This is a basic example which shows you how to solve a common problem:
 
     ## basic example code
 
+Trafilatura is a python package necessary library for using this package.
+If it is not already installed, you can install it using the following code in your terminal console:
+'pip install trafilatura
+
+For 'Enter your SERP API key or press Enter:'
+The serp_api function is a future feature. For now, you can just press Enter.
+In future versions, this feature will allow the use of an API key to interact with search engine results pages (SERP).
+
 ## Step 1: Creating the Research Project
 
 In this step-by-step guide, we will walk through the initial setup and
