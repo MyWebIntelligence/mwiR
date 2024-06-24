@@ -79,14 +79,14 @@ social network analysis, and text mining methods to:
     their positions, and evaluate their impact on patients’ perceptions
     and behaviors. [Source](https://journals.openedition.org/rfsic/8376)
 
-1.  **Online Political Controversy**
+2.  **Online Political Controversy**
 
 -   **Juan Branco Project**: Analysis of discourses and influence
     surrounding the public figure Juan Branco, exploring the dynamics of
     positioning and controversy.
     [Source](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4584133)
 
-1.  **Research Sociology**
+3.  **Research Sociology**
 
 -   **Digital Humanities**: Studies on the impact of digital
     technologies on humanities and social sciences, including how
@@ -161,6 +161,7 @@ You can install the development version of mwiR from
 
 This is a basic example which shows you how to solve a common problem:
 
+    devtools::install_github("MyWebIntelligence/mwiR")
     library(mwiR)
 
     ## Warning: replacing previous import 'readr::guess_encoding' by
@@ -170,6 +171,15 @@ This is a basic example which shows you how to solve a common problem:
     ## loading 'mwiR'
 
     ## basic example code
+
+Trafilatura is a python package necessary library for using this package.
+If it is not already installed, you can install it using the following code in your terminal console:
+
+pip install trafilatura
+
+For 'Enter your SERP API key or press Enter:'
+The serp_api function is a future feature. For now, you can just press Enter.
+In future versions, this feature will allow the use of an API key to interact with search engine results pages (SERP).
 
 ## Step 1: Creating the Research Project
 
