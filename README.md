@@ -1,6 +1,6 @@
 # mwiR 0.8.0 (Beta) The R Package of My Web Intelligence Project
-
 <!-- badges: start -->
+![MyWebIntelligence Banner](man/figures/mwibanner.png)
 <!-- badges: end -->
 
 ## Purpose of My Web Intelligence
