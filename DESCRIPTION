@@ -28,7 +28,6 @@ Imports:
     tesseract,
     tools,
     urltools,
-    zip,
     mockery,
     XML,
     stringi,
