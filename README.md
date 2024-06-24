@@ -429,3 +429,93 @@ This example demonstrates exporting data for the project “giletsjaunes”
 with a minimum relevance score of 3 into a GEXF file.
 
     export_land("giletsjaunes", "pagegexf", 3)
+
+## Extra: Build a URLs List from Query
+
+The `listurl.R` file provides functions to build a list of URLs from various search engines using the SerpAPI service. This can be useful for web scraping, data collection, and research purposes.
+
+### Functions Overview
+
+The main functions included in `listurl.R` are:
+
+- `urlist_Google`: Retrieves URLs from Google search results.
+- `urlist_Duck`: Retrieves URLs from DuckDuckGo search results.
+- `urlist_Bing`: Retrieves URLs from Bing search results.
+
+### Usage Examples
+
+#### Retrieving URLs from Google Search
+
+The `urlist_Google` function allows you to retrieve URLs from Google search results based on a query, date range, and other parameters.
+
+```r
+library(mwiR)
+
+# Retrieve URLs from Google search
+urlist_Google(
+  query = "data science",
+  datestart = "2023-01-01",
+  dateend = "2023-03-01",
+  timestep = "month",
+  sleep_seconds = 2,
+  lang = "en"
+)
+```
+
+Parameters:
+- `query`: A character string representing the search query.
+- `datestart`: A character string representing the start date for the search in "yyyy-mm-dd" format.
+- `dateend`: A character string representing the end date for the search in "yyyy-mm-dd" format.
+- `timestep`: A character string representing the time step for the date sequence (default is "week").
+- `sleep_seconds`: A numeric value representing the sleep time between API requests to avoid rate-limiting (default is 1).
+- `lang`: A character string representing the language for the search (default is "fr").
+
+#### Retrieving URLs from DuckDuckGo Search
+
+The `urlist_Duck` function allows you to retrieve URLs from DuckDuckGo search results.
+
+```r
+library(mwiR)
+
+# Retrieve URLs from DuckDuckGo search
+urlist_Duck(
+  query = "data science",
+  filename = "data_science_results.txt",
+  sleep_seconds = 2,
+  lang = "en"
+)
+```
+
+Parameters:
+- `query`: A character string representing the search query.
+- `filename`: A character string representing the name of the file where the results will be saved. If NULL, a filename will be generated based on the query (default is NULL).
+- `sleep_seconds`: A numeric value representing the sleep time between API requests to avoid rate-limiting (default is 1).
+- `lang`: A character string representing the language for the search (default is "fr").
+
+#### Retrieving URLs from Bing Search
+
+The `urlist_Bing` function allows you to retrieve URLs from Bing search results.
+
+```r
+library(mwiR)
+
+# Retrieve URLs from Bing search
+urlist_Bing(
+  query = "data science",
+  filename = "data_science_results.txt",
+  sleep_seconds = 2,
+  lang = "en"
+)
+```
+
+Parameters:
+- `query`: A character string representing the search query.
+- `filename`: A character string representing the name of the file where the results will be saved. If NULL, a filename will be generated based on the query (default is NULL).
+- `sleep_seconds`: A numeric value representing the sleep time between API requests to avoid rate-limiting (default is 1).
+- `lang`: A character string representing the language for the search (default is "fr").
+
+### Note
+
+To use these functions, you need to set up an API key for the SerpAPI service. You will be prompted to enter your API key if it is not already set.
+
+These functions write the search results to a text file, making it easy to analyze and utilize the retrieved URLs for your research or data collection projects.
