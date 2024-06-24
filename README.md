@@ -174,7 +174,8 @@ This is a basic example which shows you how to solve a common problem:
 
 Trafilatura is a python package necessary library for using this package.
 If it is not already installed, you can install it using the following code in your terminal console:
-'pip install trafilatura
+
+pip install trafilatura
 
 For 'Enter your SERP API key or press Enter:'
 The serp_api function is a future feature. For now, you can just press Enter.
