@@ -137,3 +137,97 @@ plotlog <- function(df, variables = NULL) {
   }
 }
 
+#' Apply Power Law Scaling Transformations to Numeric Variables
+#'
+#' This function applies various scaling transformations to numeric variables
+#' in a data frame, including log-scaling, Mclust classification, and
+#' quartile-based categorization.
+#'
+#' @param df A data frame containing the variables to transform.
+#' @param variables Optional. A character vector of variable names to transform.
+#'   If NULL (default), all numeric variables in the data frame are transformed.
+#'
+#' @return A new data frame with the original variables and their transformed versions.
+#'   For each transformed variable, four new columns are added:
+#'   \itemize{
+#'     \item \code{[varname]_scalecat}: Categorized log-scaled values
+#'     \item \code{[varname]_log1P}: Log1p transformed values
+#'     \item \code{[varname]_mclust}: Mclust classification
+#'     \item \code{[varname]_IQ}: Quartile-based categorization
+#'   }
+#'
+#' @details
+#' The function performs the following transformations:
+#' \itemize{
+#'   \item Log-scaling and categorization into 5 levels
+#'   \item Log1p transformation
+#'   \item Mclust classification
+#'   \item Quartile-based categorization with outlier detection
+#' }
+#'
+#' @examples
+#' # Create a sample data frame
+#' df <- data.frame(
+#'   var1 = rnorm(100, 50, 10),
+#'   var2 = rexp(100, 1/50)
+#' )
+#'
+#' # Apply transformations to all numeric variables
+#' new_df <- powerscaled(df)
+#'
+#' # Apply transformations to specific variables
+#' new_df <- powerscaled(df, c("var1"))
+#'
+#' @importFrom stats quantile scale
+#' @importFrom mclust Mclust
+#' @export
+powerscaled <- function(df, variables = NULL) {
+  # Check if specific variables are passed
+  if (is.null(variables)) {
+    # If no variable is specified, select all numeric variables
+    variables <- names(df)[sapply(df, is.numeric)]
+  } else {
+    # Check if all specified variables exist and are numeric
+    if (!all(variables %in% names(df))) {
+      stop("Some specified variables do not exist in the dataframe.")
+    }
+    if (!all(sapply(df[variables], is.numeric))) {
+      stop("Some specified variables are not numeric.")
+    }
+  }
+
+  # Create a new DataFrame to store the results
+  new_df <- df
+
+  # Loop through the selected variables
+  for (col_name in variables) {
+    # Apply powerscaled
+    new_col_name_scalecat <- paste(col_name, "scalecat", sep = "_")
+    new_df[[new_col_name_scalecat]] <- as.factor(cut(scale(log(df[[col_name]] + 1)),
+                                                     breaks = c(-Inf, -1, 1, 2, 3, Inf),
+                                                     labels = c("0", "1", "2", "3", "4"),
+                                                     right = FALSE))
+
+    # Apply rkscale
+    new_col_name_log1P <- paste(col_name, "log1P", sep = "_")
+    new_df[[new_col_name_log1P]] <- log1p(df[[col_name]])
+
+    # Apply fitscale
+    new_col_name_fit <- paste(col_name, "mclust", sep = "_")
+    fit <- Mclust(df[[col_name]])
+    new_df[[new_col_name_fit]] <- as.factor(fit$classification)
+
+    # Add quartile-based categorization
+    new_col_name_IQ <- paste(col_name, "IQ", sep = "_")
+    Q1 <- quantile(log1p(df[[col_name]]), 0.25)
+    Q2 <- quantile(log1p(df[[col_name]]), 0.5)
+    Q3 <- quantile(log1p(df[[col_name]]), 0.75)
+    IQ <- Q3 - Q1
+    new_df[[new_col_name_IQ]] <- as.factor(cut(df[[col_name]],
+                                               breaks = c(-Inf, Q1, Q2, Q3, Q3 + 1.5 * IQ, Inf),
+                                               labels = c("0", "1", "2", "3", "4"),
+                                               right = TRUE))
+  }
+
+  return(new_df)
+}

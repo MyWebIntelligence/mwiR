@@ -23,7 +23,7 @@
 #' @import DBI cld3 httr lubridate jsonlite pdftools readr reticulate RSQLite SnowballC stringr tesseract tools urltools zip mockery
 #' @export
 initmwi <- function() {
-  required_packages <- c("DBI", "cld3", "ggplot2", "gridExtra","httr", "lubridate", "jsonlite", "pdftools", "readr","reticulate", "RSQLite", "rvest","SnowballC",  "stringr","tesseract", "tools", "urltools", "XML", "zip", "mockery", "stringi")
+  required_packages <- c("DBI", "cld3", "ggplot2", "gridExtra","httr", "lubridate", "jsonlite", "mclust","pdftools", "readr","reticulate", "RSQLite", "rvest","SnowballC",  "stringr", "stats","tesseract", "tools", "urltools", "XML", "zip", "mockery", "stringi")
 
   # Check and install missing packages
   for (pkg in required_packages) {

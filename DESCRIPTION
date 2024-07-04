@@ -20,6 +20,7 @@ Imports:
     httr,
     jsonlite,
     lubridate,
+    mclust,
     pdftools,
     readr,
     reticulate,
