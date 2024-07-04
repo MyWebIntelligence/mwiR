@@ -65,3 +65,75 @@ mwiR_detectLang <- function(df, variables) {
 
   return(lang)
 }
+
+#' Plot Original and Log-Transformed Distributions Side by Side
+#'
+#' This function plots the original and log-transformed distributions of numeric variables in a data frame side by side.
+#'
+#' @param df A data frame containing the variables to analyze.
+#' @param variables Optional. A character vector of variable names to analyze. If NULL (default), all numeric variables are analyzed.
+#'
+#' @return None. This function produces plots as a side effect.
+#'
+#' @examples
+#' \dontrun{
+#' # Analyze all numeric variables
+#' plotlog(mtcars)
+#'
+#' # Analyze specific variables
+#' plotlog(mtcars, c("mpg", "disp"))
+#' }
+#'
+#' @import ggplot2
+#' @importFrom gridExtra grid.arrange
+#' @export
+plotlog <- function(df, variables = NULL) {
+  # Check if required packages are installed
+  if (!requireNamespace("ggplot2", quietly = TRUE) || !requireNamespace("gridExtra", quietly = TRUE)) {
+    stop("Packages 'ggplot2' and 'gridExtra' are required. Please install them.")
+  }
+
+  # Identify numeric columns
+  if (is.null(variables)) {
+    num_cols <- names(df)[sapply(df, is.numeric)]
+  } else {
+    num_cols <- intersect(variables, names(df)[sapply(df, is.numeric)])
+    if (length(num_cols) == 0) {
+      stop("None of the specified variables are numeric.")
+    }
+  }
+
+  # Function to create a single plot
+  create_plot <- function(data, title, fill_color, x_label) {
+    data <- data[is.finite(data)]
+    if (length(data) > 0) {
+      bin_w <- diff(range(data)) / 30
+      ggplot2::ggplot(data.frame(x = data), ggplot2::aes(x = x)) +
+        ggplot2::geom_histogram(binwidth = bin_w, fill = fill_color, alpha = 0.7) +
+        ggplot2::ggtitle(title) +
+        ggplot2::xlab(x_label) +
+        ggplot2::theme_minimal()
+    } else {
+      ggplot2::ggplot() + ggplot2::ggtitle("Insufficient data") + ggplot2::theme_minimal()
+    }
+  }
+
+  # Create and display plots for each variable
+  for (col_name in num_cols) {
+    original_data <- df[[col_name]]
+    log_data <- log(df[[col_name]][df[[col_name]] > 1])
+
+    p_original <- create_plot(original_data,
+                              paste("Original distribution of", col_name),
+                              "green",
+                              col_name)
+    p_log <- create_plot(log_data,
+                         paste("Log-transformed distribution of", col_name),
+                         "blue",
+                         paste("log(", col_name, ")"))
+
+    # Arrange and print plots side by side
+    gridExtra::grid.arrange(p_original, p_log, ncol = 2)
+  }
+}
+

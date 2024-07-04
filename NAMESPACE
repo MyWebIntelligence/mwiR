@@ -5,6 +5,8 @@ importFrom("utils", "install.packages", "read.csv", "read.delim", "write.csv")
 # Import necessary packages
 import(DBI)
 import(cld3)
+import(ggplot2)
+import(gridExtra)
 import(httr)
 import(lubridate)
 import(jsonlite)

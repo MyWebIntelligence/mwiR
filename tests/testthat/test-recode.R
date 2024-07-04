@@ -42,3 +42,26 @@ test_that("mwiR_detectLang works with empty data frame", {
   languages_empty <- mwiR_detectLang(df_empty, c("title", "description"))
   expect_equal(length(languages_empty), 0)
 })
+
+test_that("plotlog fonctionne correctement", {
+  # Créer des données de test
+  df_test <- data.frame(
+    numeric1 = c(1, 2, 3, 4, 5),
+    numeric2 = c(10, 100, 1000, 10000, 100000),
+    character = c("a", "b", "c", "d", "e")
+  )
+
+  # Tester la fonction avec toutes les variables numériques
+  expect_error(plotlog(df_test), NA)
+
+  # Tester la fonction avec des variables spécifiques
+  expect_error(plotlog(df_test, c("numeric1", "numeric2")), NA)
+
+  # Tester que la fonction génère une erreur avec des variables non numériques
+  expect_error(plotlog(df_test, c("numeric1", "character")))
+
+  # Tester que la fonction génère une erreur avec des variables inexistantes
+  expect_error(plotlog(df_test, c("numeric1", "non_existent")))
+
+  # Vous pouvez ajouter d'autres tests ici...
+})
