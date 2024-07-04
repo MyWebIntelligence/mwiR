@@ -178,7 +178,7 @@ plotlog <- function(df, variables = NULL) {
 #' # Apply transformations to specific variables
 #' new_df <- powerscaled(df, c("var1"))
 #'
-#' @importFrom stats quantile scale
+#' @importFrom stats quantile
 #' @importFrom mclust Mclust
 #' @export
 powerscaled <- function(df, variables = NULL) {
@@ -230,4 +230,208 @@ powerscaled <- function(df, variables = NULL) {
   }
 
   return(new_df)
+}
+
+#' Fetch SEO Rank Data for URLs
+#'
+#' This function retrieves SEO rank data for a list of URLs using the SEO Rank API
+#' and writes the results to a CSV file.
+#'
+#' @param filename A character string specifying the name of the output CSV file
+#'   (without extension). If NULL, the function will stop and prompt for input.
+#' @param urls A character vector of URLs to fetch SEO rank data for. If NULL,
+#'   the function will stop and prompt for input.
+#' @param api_key A character string containing the API key for the SEO Rank API.
+#'   If NULL, the function will stop and prompt for input.
+#'
+#' @return This function does not return a value. It writes the fetched data to a CSV file
+#'   and prints messages to the console about the progress.
+#'
+#' @details
+#' The function performs the following steps:
+#' 1. Validates input parameters.
+#' 2. Initializes an empty data frame to store column names.
+#' 3. For each URL, it fetches data from the SEO Rank API.
+#' 4. Dynamically creates columns based on the API response.
+#' 5. Writes each row of data to the specified CSV file.
+#' 6. Adds a small delay between API calls to avoid overwhelming the server.
+#'
+#' If the API call fails for a URL, a warning message is printed, and the function
+#' continues with the next URL.
+#'
+#' @note
+#' This function requires an active internet connection and a valid API key from
+#' https://seo-rank.my-addr.com/.
+#'
+#' @examples
+#' \dontrun{
+#' # Fetch data for two URLs
+#' mwir_seorank("my_seo_data", c("example.com", "example.org"), "YOUR_API_KEY")
+#'
+#' # Fetch data for a single URL
+#' mwir_seorank("single_url_data", "example.net", "YOUR_API_KEY")
+#' }
+#'
+#' @importFrom httr GET status_code content
+#' @importFrom jsonlite fromJSON
+#' @importFrom readr write_csv
+#'
+#' @export
+mwir_seorank <- function(filename=NULL, urls=NULL, api_key=NULL) {
+
+  # Input validation for filename
+  while (is.null(filename) || !is.character(filename) || nchar(filename) == 0) {
+    stop("filename needed for export. Please enter a filename ex. 'myproject' without extention")
+  }
+
+  # Input validation for urls
+  while (is.null(urls) || !is.character(urls) || length(urls) == 0) {
+    stop("no urls given")
+  }
+
+  # Input validation for api_key
+  while (is.null(api_key) || !is.character(api_key) || nchar(api_key) == 0) {
+    stop("need an api key for 'https://seo-rank.my-addr.com/' API services")
+  }
+
+  # Initialize an empty data frame to store column names
+  result_template <- data.frame(url = character())
+
+  for (url in urls) {
+    api_url <- paste0("https://seo-rank.my-addr.com/api2/moz+sr+fb/", api_key, "/", url)
+
+    tryCatch({
+      response <- GET(api_url)
+      if (status_code(response) == 200) {
+        data <- fromJSON(content(response, "text"))
+
+        # Create a new row with the current URL
+        new_row <- data.frame(url = url)
+
+        # Dynamically add columns based on API response
+        for (col_name in names(data)) {
+          new_row[[col_name]] <- as.character(data[[col_name]])
+          if (!(col_name %in% names(result_template))) {
+            result_template[[col_name]] <- character()
+          }
+        }
+
+        # Ensure all columns are present in the new row
+        for (col_name in names(result_template)) {
+          if (!(col_name %in% names(new_row))) {
+            new_row[[col_name]] <- NA
+          }
+        }
+
+        # Write to CSV (append if file exists, create if it doesn't)
+        write_csv(new_row, paste0(filename, ".csv"), append = file.exists(paste0(filename, ".csv")))
+
+        message(paste("Data fetched and written for URL:", url))
+      } else {
+        warning(paste("Failed to fetch data for URL:", url, "Status code:", status_code(response)))
+      }
+    }, error = function(e) {
+      warning(paste("Error fetching data for URL:", url, "Error:", e$message))
+    })
+
+    # Add a small delay to avoid overwhelming the API
+    Sys.sleep(1)
+  }
+
+  message("Data fetching and CSV writing completed.")
+}
+
+#' Update Database Table with Externally Modified Data
+#'
+#' @description
+#' This function allows reinsertion of externally modified data into the project's database.
+#' It's particularly useful in collaborative or open science workflows where data might be
+#' modified outside the main project environment, such as by collaborators or in open science initiatives.
+#'
+#' @param dataplus A data frame containing the modified data to be inserted into the database.
+#' @param table A character string specifying the name of the table to be updated in the database.
+#' @param champ A character string specifying the name of the field (column) to be updated.
+#' @param by A character string specifying the name of the key field used to match rows for updating.
+#' @param labase A character string specifying the name of the SQLite database file. Default is "mwi.db".
+#'
+#' @return This function does not return a value. It updates the specified table in the database
+#' and prints a success message upon completion.
+#'
+#' @details
+#' The function performs the following steps:
+#' 1. Establishes a connection to the specified SQLite database.
+#' 2. Verifies the existence of the specified table and fields.
+#' 3. Prepares an SQL UPDATE statement.
+#' 4. Executes the update in a transaction for improved performance and data integrity.
+#' 5. Commits the changes if successful, or rolls back if an error occurs.
+#'
+#' This function is designed to facilitate workflows where data might be exported, modified
+#' externally (e.g., by collaborators or in spreadsheet software), and then reintegrated
+#' into the main project database. It ensures that externally processed data can be
+#' seamlessly incorporated back into the project's central data store.
+#'
+#' @note
+#' - Ensure that the structure of `dataplus` matches the database table, particularly
+#'   the columns specified by `champ` and `by`.
+#' - The function uses transactions, so either all updates are applied, or none are
+#'   (in case of an error), maintaining database consistency.
+#' - It's recommended to backup your database before performing large-scale updates.
+#'
+#' @examples
+#' \dontrun{
+#' # Assuming 'modified_data' is a data frame with updated information
+#' AnnotatedData(dataplus = modified_data,
+#'               table = "expression",
+#'               champ = "description",
+#'               by = "id",
+#'               labase = "mwi.db")
+#' }
+#'
+#' @importFrom RSQLite dbConnect dbDisconnect dbExecute dbExistsTable dbGetQuery dbBegin dbCommit dbRollback SQLite
+#'
+#' @export
+annotatedData <- function(dataplus, table, champ, by, labase = "mwi.db") {
+  # Establish database connection
+  con <- dbConnect(RSQLite::SQLite(), dbname = labase)
+  on.exit(dbDisconnect(con), add = TRUE)  # Ensure connection is closed even if an error occurs
+
+  tryCatch({
+    # Check if table exists
+    if (!dbExistsTable(con, table)) {
+      stop(paste("Error: The specified table", table, "does not exist in the database. Available tables:",
+                 paste(dbListTables(con), collapse = ", ")))
+    }
+
+    # Get table structure
+    table_info <- dbGetQuery(con, sprintf("PRAGMA table_info(%s)", table))
+    fields <- table_info$name
+
+    # Check if fields exist
+    if (!(champ %in% fields)) {
+      stop(paste("Error: The specified field", champ, "does not exist in the table", table,
+                 ". Available fields:", paste(fields, collapse = ", ")))
+    }
+    if (!(by %in% fields)) {
+      stop(paste("Error: The specified key", by, "does not exist in the table", table,
+                 ". Available fields:", paste(fields, collapse = ", ")))
+    }
+
+    # Prepare the update statement
+    query <- sprintf("UPDATE %s SET %s = ? WHERE %s = ?", table, champ, by)
+
+    # Start a transaction for better performance
+    dbBegin(con)
+
+    # Update the table
+    update_data <- dataplus[, c(champ, by)]
+    dbExecute(con, query, params = as.list(update_data))
+
+    # Commit the transaction
+    dbCommit(con)
+
+    message(paste("Table", table, "updated successfully!"))
+  }, error = function(e) {
+    dbRollback(con)
+    stop(paste("An error occurred:", e$message))
+  })
 }
