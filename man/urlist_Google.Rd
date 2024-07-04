@@ -29,7 +29,7 @@ then processes the response to extract and save the URLs in a text file.
 }
 \examples{
 \dontrun{
-urlist_Google("data science", "2023-01-01", "2023-03-01", timestep = "month")
+urlist_Google("data science", "2023-01-01", "2023-03-01", timestep = "month", sleep_seconds = 2, lang = "en")
 }
 
 }
