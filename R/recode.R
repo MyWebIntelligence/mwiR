@@ -476,5 +476,5 @@ GPT_Recode <- function(prompt, cell, sysprompt= "You are a helpful assistant.", 
     temperature = temperature
   )
 
-  return(response$choices$message$content)
+  return(response$choices$message.content[1])
 }
