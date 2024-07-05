@@ -440,3 +440,41 @@ annotatedData <- function(dataplus, table, champ, by, labase = "mwi.db") {
     stop(paste("An error occurred:", e$message))
   })
 }
+
+#' GPT_Recode
+#'
+#' A function to recode a cell value using the GPT-3.5-turbo model by providing a prompt.
+#'
+#' @param prompt A character string. The prompt to provide to the model.
+#' @param cell A character string. The cell value to be recoded.
+#' @param sysprompt A character string. The system prompt to guide the model's behavior. Default is "You are a helpful assistant.".
+#' @param model A character string. The model to use for the completion. Default is "gpt-3.5-turbo". Most famous are "gpt-4o"
+#' @param temperature A numeric value. The temperature setting for the model's response. Default is 0.2.
+#'
+#' @return A character string. The recoded cell value based on the provided prompt.
+#' @export
+#'
+#' @examples
+#' \dontrun{
+#'   # Load the necessary library
+#'   library(openai)
+#'
+#'   # Set the API key for OpenAI
+#'   Sys.setenv(OPENAI_API_KEY = "sk-proj-XXXXXXXXXXXX")
+#'
+#'   # Use the GPT_Recode function
+#'   result <- GPT_Recode(prompt = "Translate to French", cell = "Hello, how are you?")
+#'   print(result)
+#' }
+GPT_Recode <- function(prompt, cell, sysprompt= "You are a helpful assistant.", model = "gpt-3.5-turbo", temperature = 0.2) {
+  response <- create_chat_completion(
+    model = model,
+    messages = list(
+      list(role = "system", content = sysprompt),
+      list(role = "user", content = paste0(prompt, ":\n\n", cell))
+    ),
+    temperature = temperature
+  )
+
+  return(response$choices$message$content)
+}

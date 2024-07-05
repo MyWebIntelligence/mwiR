@@ -21,6 +21,7 @@ Imports:
     jsonlite,
     lubridate,
     mclust,
+    openai,
     pdftools,
     readr,
     reticulate,
