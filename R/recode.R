@@ -121,7 +121,7 @@ plotlog <- function(df, variables = NULL) {
   # Create and display plots for each variable
   for (col_name in num_cols) {
     original_data <- df[[col_name]]
-    log_data <- log(df[[col_name]][df[[col_name]] > 1])
+    log_data <- log1p(df[[col_name]])
 
     p_original <- create_plot(original_data,
                               paste("Original distribution of", col_name),
@@ -203,7 +203,7 @@ powerscaled <- function(df, variables = NULL) {
   for (col_name in variables) {
     # Apply powerscaled
     new_col_name_scalecat <- paste(col_name, "scalecat", sep = "_")
-    new_df[[new_col_name_scalecat]] <- as.factor(cut(scale(log(df[[col_name]] + 1)),
+    new_df[[new_col_name_scalecat]] <- as.factor(cut(scale(log1p(df[[col_name]])),
                                                      breaks = c(-Inf, -1, 1, 2, 3, Inf),
                                                      labels = c("0", "1", "2", "3", "4"),
                                                      right = FALSE))
@@ -214,19 +214,24 @@ powerscaled <- function(df, variables = NULL) {
 
     # Apply fitscale
     new_col_name_fit <- paste(col_name, "mclust", sep = "_")
-    fit <- Mclust(df[[col_name]])
+    fit <- Mclust(log1p(df[[col_name]]))
     new_df[[new_col_name_fit]] <- as.factor(fit$classification)
 
     # Add quartile-based categorization
     new_col_name_IQ <- paste(col_name, "IQ", sep = "_")
-    Q1 <- quantile(log1p(df[[col_name]]), 0.25)
-    Q2 <- quantile(log1p(df[[col_name]]), 0.5)
-    Q3 <- quantile(log1p(df[[col_name]]), 0.75)
-    IQ <- Q3 - Q1
-    new_df[[new_col_name_IQ]] <- as.factor(cut(df[[col_name]],
-                                               breaks = c(-Inf, Q1, Q2, Q3, Q3 + 1.5 * IQ, Inf),
-                                               labels = c("0", "1", "2", "3", "4"),
-                                               right = TRUE))
+    Q1 <- median(log1p(df[[col_name]]))
+    Q2 <- mean(log1p(df[[col_name]]))
+    Q3 <- as.numeric(quantile(log1p(df[[col_name]]), 0.75))
+    IQ <- as.numeric(Q3 - Q1)
+    new_df[[new_col_name_IQ]] <- tryCatch({
+      as.factor(cut(df[[col_name]],
+                    breaks = c(-Inf, Q1, Q2, Q3, Q3 + (1.5 * IQ), Inf),
+                    labels = c("0", "1", "2", "3", "4"),
+                    right = TRUE))
+    }, error = function(e) {
+      NA
+    })
+
   }
 
   return(new_df)
