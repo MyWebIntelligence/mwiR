@@ -161,16 +161,9 @@ You can install the development version of mwiR from
 
 This is a basic example which shows you how to solve a common problem:
 
-    devtools::install_github("MyWebIntelligence/mwiR")
+    devtools::install_github("MyWebIntelligence/mwiR", auth_token = "github_pat_XXXXXX")
     library(mwiR)
 
-    ## Warning: replacing previous import 'readr::guess_encoding' by
-    ## 'rvest::guess_encoding' when loading 'mwiR'
-
-    ## Warning: replacing previous import 'tools::toHTML' by 'XML::toHTML' when
-    ## loading 'mwiR'
-
-    ## basic example code
 
 Trafilatura is a python package necessary library for using this package.
 If it is not already installed, you can install it using the following code in your terminal console:
@@ -193,9 +186,7 @@ is a breakdown of the R script provided:
 
     initmwi()
 
-    ## Trafilatura is installed and available.
 
-    ## Enter your SERP API key or press Enter:
 
 The `initmwi()` function initializes the My Web Intelligence environment
 by loading all necessary packages and setting up the environment for
