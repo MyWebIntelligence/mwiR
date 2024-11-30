@@ -348,7 +348,7 @@ tasks.
 
 ### Crawl URLs for a Specific Land
 
-    crawlurls("IATravail", limit = 10)
+    crawlurls("AIWork", limit = 10)
 
 
 The `crawlurls()` function crawls URLs for a specific land, updates the
@@ -369,7 +369,7 @@ database, and calculates relevance scores.
 This example demonstrates crawling up to 10 URLs for the land named
 “IATravail”.
 
-    crawlurls("IATravail", limit = 10)
+    crawlurls("AIWork", limit = 10)
 
 
 
