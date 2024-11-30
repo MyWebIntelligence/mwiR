@@ -197,7 +197,6 @@ configurations are correctly initialized.
 
     db_setup()
 
-    ## Database setup completed.
 
 The `db_setup()` function sets up the database needed for storing and
 managing the data collected during the research project. It initializes
@@ -211,7 +210,6 @@ data insertion and retrieval.
 
     create_land(name = "AIWork", desc = "Impact of AI on work", lang="en")
 
-    ## Land 'AIWork' created
 
 The `create_land()` function creates a new research project, referred to
 as a “land” in MWI terminology. This land will serve as the container
@@ -228,16 +226,6 @@ for all data and analyses related to the project.
 
     addterm("AIWork", "AI, artificial intelligence, work, employment, job, profession, labor market")
 
-    ## [1] "Term added to land AIWork"
-    ## [1] "Term added to land AIWork"
-    ## [1] "Term added to land AIWork"
-    ## [1] "Term added to land AIWork"
-    ## [1] "Term added to land AIWork"
-    ## [1] "Term added to land AIWork"
-    ## [1] "Term added to land AIWork"
-
-    ## [1] 1
-
 The `addterm()` function adds search terms to the project. These terms
 will be used to crawl and collect relevant web data.
 
@@ -247,14 +235,6 @@ will be used to crawl and collect relevant web data.
 ### 5. Verify the Project Creation
 
     listlands("AIWork")
-
-    ## Land name: AIWork
-    ## Creation date: 1719057037.79256
-    ## Description: Impact of AI on work
-    ## Terms in the dictionary:  ai, artificial intelligence, work, employment, job, profession, labor market 
-    ## Total number of expressions: 0
-    ## Number of expressions remaining to be fetched: 0
-    ## HTTP status codes: NA: NA
 
 The `listlands()` function lists all lands or projects that have been
 created. By specifying the project name “AIWork”, it verifies that the
@@ -269,11 +249,6 @@ project has been successfully created.
 
     addurl("AIWork", urls = "https://www.fr.adp.com/rhinfo/articles/2022/11/la-disparition-de-certains-metiers-est-elle-a-craindre.aspx")
 
-    ## [1] "URL added: https://www.fr.adp.com/rhinfo/articles/2022/11/la-disparition-de-certains-metiers-est-elle-a-craindre.aspx"
-    ## [1] "Total number of new URLs added: 1"
-    ## [1] "URLs added to land AIWork"
-
-    ## [1] 1
 
 The `addurl()` function adds URLs to the project. These URLs point to
 web pages that contain relevant information for the research.
@@ -297,14 +272,6 @@ Alternatively, URLs can be added using a text file:
 
     listlands("AIWork")
 
-    ## Land name: AIWork
-    ## Creation date: 1719057037.79256
-    ## Description: Impact of AI on work
-    ## Terms in the dictionary:  ai, artificial intelligence, work, employment, job, profession, labor market 
-    ## Total number of expressions: 1
-    ## Number of expressions remaining to be fetched: 1
-    ## HTTP status codes: NA: 1
-
 This function is used again to list the projects or a specific project,
 ensuring that the URLs have been added correctly to “AIWork”.
 
@@ -312,9 +279,6 @@ ensuring that the URLs have been added correctly to “AIWork”.
 
     deleteland(land_name = "AIWork")
 
-    ## [1] "Land AIWork and all its associated records have been deleted"
-
-    ## [1] 1
 
 The `deleteland()` function deletes a specified project. This can be
 useful for cleaning up after the research is completed or if a project
@@ -421,7 +385,7 @@ with a minimum relevance score of 3 into a GEXF file.
 
     export_land("giletsjaunes", "pagegexf", 3)
 
-## Extra: Build a URLs List from Query
+## Extra: Build a URLs List from Query [NOT WORK still on]
 
 The `listurl.R` file provides functions to build a list of URLs from various search engines using the SerpAPI service. This can be useful for web scraping, data collection, and research purposes.
 
