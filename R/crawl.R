@@ -9,126 +9,115 @@
 #' @import httr jsonlite rvest
 #' @export
 crawl <- function(url) {
-  trafilatura <- import("trafilatura")
-  # Attempt to crawl with mercury-parser
+  # Importation de Trafilatura
+  trafilatura <- reticulate::import("trafilatura")
+
+  # Fonction pour extraire le contenu
   readFull <- tryCatch({
-    # Download the page content
     downloaded <- trafilatura$fetch_url(url)
-
-    # Extract the main content in Markdown format
-    readFull <- parse_json(trafilatura$extract(downloaded, include_links = TRUE, output_format = 'json'), simplifyVector = T)
-
+    if (!is.null(downloaded)) {
+      extracted_content <- trafilatura$extract(
+        filecontent = downloaded,
+        url = url,
+        include_links = TRUE,
+        output_format = "json",
+        with_metadata = TRUE
+      )
+      if (!is.null(extracted_content) && extracted_content != "") {
+        # Convertir le JSON en structure R
+        jsonlite::fromJSON(extracted_content, simplifyVector = TRUE)
+      } else {
+        stop("Extraction échouée ou contenu vide.")
+      }
+    } else {
+      stop("Téléchargement échoué ou URL invalide.")
+    }
   }, error = function(e) {
-    message("Error during download or extraction of content with TRAFILATURA: ")
+    message("Erreur lors de la récupération ou de l'extraction avec Trafilatura : ", e$message)
     NULL
   })
 
+  # Si l'extraction principale échoue, essayer avec Archive.org
   if (is.null(readFull)) {
-
-    urlarchive <- get_last_memento_url(url)
-
-    # Download the page content
+    urlarchive <- get_last_memento_url(url) # Fonction personnalisée pour Archive.org
     tryCatch({
       downloaded <- trafilatura$fetch_url(urlarchive)
-      if (!is.null(downloaded) && downloaded != "") {
-        extracted_content <- trafilatura$extract(downloaded, include_links = TRUE, output_format = 'json')
+      if (!is.null(downloaded)) {
+        extracted_content <- trafilatura$extract(
+          filecontent = downloaded,
+          url = urlarchive,
+          include_links = TRUE,
+          output_format = "json",
+          with_metadata = TRUE
+        )
         if (!is.null(extracted_content) && extracted_content != "") {
           readFull <- jsonlite::fromJSON(extracted_content, simplifyVector = TRUE)
-          ifelse(!is.null(readFull$hostname), return(readFull), readFull <- NULL)
-        } else {
-          stop("Error: Extracted content is invalid or empty.")
         }
-      } else {
-        stop("Error: Download is invalid or empty.")
       }
     }, error = function(e) {
-      message("Error during download or extraction of content with ARCHIVE.ORG: ")
-      return(NULL)
+      message("Erreur lors de la récupération avec Archive.org : ", e$message)
     })
   }
 
-  # If parser succeeds and the title is not null
+  # Gestion des métadonnées et renvoi sous forme de DataFrame
   if (!is.null(readFull) && !is.null(readFull$title)) {
-    # Check if date_published exists
-    if (!"date" %in% names(readFull) || is.null(readFull$date)) {
-      readFull$date <- "Unknown date"
+    if (!"filedate" %in% names(readFull) || is.null(readFull$filedate)) {
+      readFull$date <- "Date inconnue"
     }
+    readFull$date <- readFull$filedate
     return(as.data.frame(t(unlist(readFull))))
   }
 
+  # Si tout échoue, utilisation de httr::GET pour des solutions alternatives
   response <- tryCatch({
-    GET(url, timeout(10))
+    httr::GET(url, httr::timeout(10))
   }, error = function(e) {
     NULL
   })
 
-  if (is.null(response)) {
-    message("ALL parser and GET failed for URL:", url)
-    return(NULL)
-  }
-
-  content_type <- httr::http_type(response)
-
-  # If the content is of type PDF
-  if (grepl("application/pdf", content_type, ignore.case = TRUE)) {
-    pdf_content <- PDFtoText(url)  # Replace with your actual function
-    title <- unlist(strsplit(pdf_content, "\n"))[1]  # The first line as the title
-    content <- pdf_content  # Total content
-    excerpt <- substr(content, nchar(title) + 2, nchar(title) + 651)  # Excerpt after the first line
-
-    parsed_url <- url_parse(url)
-    domain <- parsed_url$domain
-    message("PDF crawled")
-    return(data.frame(
-      title = trimws(title),
-      date = "Unknown date",
-      text = trimws(content),
-      excerpt = trimws(excerpt),
-      hostname = domain,
-      stringsAsFactors = FALSE
-    ))
-  } else {
-    # Alternative crawl
-    tryCatch({
-
-      content <- content(response, as = "text")
-      parsed_content <- read_html(content)
-
-      # Extract the title and description
-      title <- html_nodes(parsed_content, "title") %>% html_text(trim = TRUE)
-      description <- html_nodes(parsed_content, "meta[name='description']") %>% html_attr("content")
-      body_text <- html_nodes(parsed_content, "body") %>% html_text(trim = TRUE)
-
-      # If the tags are not found, use a default text
-      title <- ifelse(length(title) == 0, "Title not available", title)
-      description <- ifelse(length(description) == 0, "Description not available", description)
-
-      parsed_url <- url_parse(url)
-      domain <- parsed_url$domain
-
-      # Extract the last modified date if available
-      last_modified <- headers(response)$`last-modified`
-      if (is.null(last_modified)) {
-        date_published <- "Date not available"
-      } else {
-        date_published <- last_modified
+  if (!is.null(response)) {
+    content_type <- httr::http_type(response)
+    if (grepl("application/pdf", content_type, ignore.case = TRUE)) {
+      pdf_content <- PDFtoText(url) # Fonction personnalisée pour extraire du texte PDF
+      if (!is.null(pdf_content)) {
+        title <- unlist(strsplit(pdf_content, "\n"))[1]
+        excerpt <- substr(pdf_content, nchar(title) + 2, nchar(title) + 651)
+        return(data.frame(
+          title = trimws(title),
+          date = "Date inconnue",
+          text = trimws(pdf_content),
+          excerpt = trimws(excerpt),
+          hostname = httr::parse_url(url)$hostname,
+          stringsAsFactors = FALSE
+        ))
       }
-      message("GET Direct crawled")
-      return(data.frame(
-        title = title,
-        date = last_modified,
-        text = body_text,
-        excerpt = description,
-        hostname = domain,
-        stringsAsFactors = FALSE
-      ))
-      print(paste("Alternative crawl of", url))
-    }, error = function(e) {
-      warning("ALL GET failed for URL:", url)
-      return(NULL)
-    })
+    } else {
+      # Extraction HTML classique
+      tryCatch({
+        parsed_content <- xml2::read_html(httr::content(response, as = "text"))
+        title <- xml2::xml_text(xml2::xml_find_first(parsed_content, "//title"))
+        body_text <- xml2::xml_text(xml2::xml_find_first(parsed_content, "//body"))
+        domain <- httr::parse_url(url)$hostname
+        date_published <- httr::headers(response)$`last-modified` %||% "Date non disponible"
+        return(data.frame(
+          title = title,
+          date = date_published,
+          text = body_text,
+          excerpt = NA,
+          hostname = domain,
+          stringsAsFactors = FALSE
+        ))
+      }, error = function(e) {
+        message("Extraction HTML échouée pour l'URL : ", url)
+        return(NULL)
+      })
+    }
+  } else {
+    message("Toutes les méthodes ont échoué pour l'URL : ", url)
   }
+  return(NULL)
 }
+
 
 
 #' Extract text from a PDF URL
