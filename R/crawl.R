@@ -25,6 +25,7 @@ crawl <- function(url) {
       )
       if (!is.null(extracted_content) && extracted_content != "") {
         # Convertir le JSON en structure R
+        message("Extraction avec Trafilutara")
         jsonlite::fromJSON(extracted_content, simplifyVector = TRUE)
       } else {
         stop("Extraction échouée ou contenu vide.")
@@ -39,6 +40,7 @@ crawl <- function(url) {
 
   # Si l'extraction principale échoue, essayer avec Archive.org
   if (is.null(readFull$title)) {
+    message("Tentative avec Archive.org")
     urlarchive <- get_last_memento_url(url) # Fonction personnalisée pour Archive.org
     tryCatch({
       downloaded <- trafilatura$fetch_url(urlarchive)
@@ -51,6 +53,7 @@ crawl <- function(url) {
           with_metadata = TRUE
         )
         if (!is.null(extracted_content) && extracted_content != "") {
+          message("Extraction avec Archive.org")
           readFull <- jsonlite::fromJSON(extracted_content, simplifyVector = TRUE)
         }
       }
@@ -64,11 +67,13 @@ crawl <- function(url) {
     if (!"date" %in% names(readFull) || is.null(readFull$date)) {
       readFull$date <- "Date inconnue"
     }
+    message("Extraction reussie de : ", readFull$title)
     return(as.data.frame(t(unlist(readFull))))
   }
 
   # Si tout échoue, utilisation de httr::GET pour des solutions alternatives
   response <- tryCatch({
+    message("Tentative avec GET")
     httr::GET(url, httr::timeout(10))
   }, error = function(e) {
     NULL
@@ -77,6 +82,7 @@ crawl <- function(url) {
   if (!is.null(response)) {
     content_type <- httr::http_type(response)
     if (grepl("application/pdf", content_type, ignore.case = TRUE)) {
+      message("Tentative de lecture d'un PDF")
       pdf_content <- PDFtoText(url) # Fonction personnalisée pour extraire du texte PDF
       if (!is.null(pdf_content)) {
         title <- unlist(strsplit(pdf_content, "\n"))[1]
@@ -93,6 +99,7 @@ crawl <- function(url) {
     } else {
       # Extraction HTML classique
       tryCatch({
+        message("Tentative avec GET HTML")
         parsed_content <- xml2::read_html(httr::content(response, as = "text"))
         title <- xml2::xml_text(xml2::xml_find_first(parsed_content, "//title"))
         body_text <- xml2::xml_text(xml2::xml_find_first(parsed_content, "//body"))
