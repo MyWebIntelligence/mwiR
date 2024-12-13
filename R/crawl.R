@@ -38,7 +38,7 @@ crawl <- function(url) {
   })
 
   # Si l'extraction principale échoue, essayer avec Archive.org
-  if (is.null(readFull)) {
+  if (is.null(readFull$title)) {
     urlarchive <- get_last_memento_url(url) # Fonction personnalisée pour Archive.org
     tryCatch({
       downloaded <- trafilatura$fetch_url(urlarchive)
