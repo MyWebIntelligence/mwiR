@@ -61,10 +61,9 @@ crawl <- function(url) {
 
   # Gestion des métadonnées et renvoi sous forme de DataFrame
   if (!is.null(readFull) && !is.null(readFull$title)) {
-    if (!"filedate" %in% names(readFull) || is.null(readFull$filedate)) {
+    if (!"date" %in% names(readFull) || is.null(readFull$date)) {
       readFull$date <- "Date inconnue"
     }
-    readFull$date <- readFull$filedate
     return(as.data.frame(t(unlist(readFull))))
   }
 
