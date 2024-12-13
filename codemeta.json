@@ -1,0 +1,130 @@
+{
+  "@context": [
+    "https://doi.org/10.5063/schema/codemeta-2.0",
+    "http://schema.org"
+  ],
+  "@type": "SoftwareSourceCode",
+  "name": "mwiR",
+  "description": "My Web Intelligence (MWI) is an R package designed to address the growing need for tools and methodologies in the field of digital methods within social sciences and information and communication sciences. The main objective is to map the digital ecosystem to identify key actors, assess their influence, and analyze their discourse and interactions.",
+  "identifier": "https://doi.org/10.5281/zenodo.1234567",
+  "applicationCategory": "Research Tool",
+  "keywords": [
+    "digital methods",
+    "web intelligence",
+    "social sciences",
+    "data mining",
+    "network analysis",
+    "text analysis",
+    "internet sociology",
+    "R package"
+  ],
+  "license": "https://spdx.org/licenses/MIT",
+  "programmingLanguage": [
+    {
+      "@type": "ComputerLanguage",
+      "name": "R",
+      "url": "https://www.r-project.org"
+    },
+    {
+      "@type": "ComputerLanguage",
+      "name": "Python",
+      "url": "https://www.python.org"
+    }
+  ],
+  "runtimePlatform": "R version 4.1.0 or later",
+  "operatingSystem": [
+    "Linux",
+    "Windows",
+    "macOS"
+  ],
+  "softwareRequirements": [
+    "R (>= 4.0.0)",
+    "Python (>= 3.6)",
+    "trafilatura"
+  ],
+  "codeRepository": "https://github.com/MyWebIntelligence/mwiR",
+  "issueTracker": "https://github.com/MyWebIntelligence/mwiR/issues",
+  "downloadUrl": "https://github.com/MyWebIntelligence/mwiR/archive/refs/tags/v0.8.0-beta.zip",
+  "releaseNotes": "Initial beta release with basic functionality for web crawling, data analysis, and visualization",
+  "dateCreated": "2023-05-19",
+  "datePublished": "2024",
+  "version": "0.9.0",
+  "developmentStatus": "beta",
+  "funder": {
+    "@type": "Organization",
+    "name": "Université Bordeaux Montaigne"
+  },
+  "funding": [
+    {
+      "@type": "Grant",
+      "name": "Projet My Web Intelligence",
+      "funder": {
+        "@type": "Organization",
+        "name": "MICA Labo, Université de Bordeaux Montaigne"
+      }
+    }
+  ],
+  "isPartOf": "https://github.com/MyWebIntelligence",
+  "referencePublication": "https://cv.hal.science/amar-lakel",
+  "author": [
+    {
+      "@type": "Person",
+      "givenName": "Amar",
+      "familyName": "Lakel",
+      "email": "amar.lakel@u-bordeaux-montaigne.fr",
+      "affiliation": {
+        "@type": "Organization",
+        "name": "MICA Labo, Université de Bordeaux Montaigne"
+      },
+      "@id": "https://orcid.org/0000-0002-1825-0097"
+    }
+  ],
+  "contributor": [
+    {
+      "@type": "Person",
+      "givenName": "Amar",
+      "familyName": "Lakel",
+      "email": "amar.lakel@u-bordeaux-montaigne.fr",
+      "affiliation": {
+        "@type": "Organization",
+        "name": "University of Bordeaux Montaigne"
+      }
+    }
+  ],
+  "review": {
+    "@type": "Review",
+    "reviewAspect": "Accuracy",
+    "reviewBody": "The package provides accurate results for web data analysis and visualization."
+  },
+"referencePublication": [
+    {
+        "@type": "ScholarlyArticle",
+        "name": "My Web Intelligence: Challenges of Heterogeneous Digital Corpora",
+        "alternativeName": "My web intelligence : un outil pour l'analyse du web et des réseaux",
+        "author": [
+            {
+                "@type": "Person",
+                "givenName": "Amar",
+                "familyName": "LAKEL",
+                "affiliation": {
+                    "@type": "Organization",
+                    "name": "MICA - Médiation, Information, Communication, Art",
+                    "parentOrganization": {
+                        "@type": "Organization",
+                        "name": "Université Bordeaux Montaigne"
+                    }
+                }
+            }
+        ],
+        "abstract": "My Web Intelligence is a program directed by Amar LAKEL within the E3D team of the MICA Laboratory (MICA) at the University of Bordeaux Montaigne. The program aims to develop a tool for extracting (crawling), archiving, qualifying, and visualizing the Web in the service of digital methods. The objective is to provide, to all experts and researchers who wish to develop studies in digital intelligence and digital humanities, with a device based on the analysis of online speech[1].",
+        "identifier": "hal-03233584",
+        "url": "https://hal.science/hal-03233584",
+        "datePublished": "2021",
+        "publisher": {
+            "@type": "Organization",
+            "name": "HAL Science"
+        },
+        "inLanguage": ["eng", "fra"]
+    }
+]
+}
