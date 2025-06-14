@@ -266,11 +266,11 @@ detect_links_and_add <- function(con, content, parent_id, land_id, urlmax=50) {
 #' This function performs stemming on a given word using the specified language.
 #'
 #' @param word A character string representing the word to be stemmed.
-#' @param language A character string specifying the language for stemming (default is "en").
-#' @return The stemmed version of the word.
+#' @param language A character string specifying the language for stemming (default is "fr").
+#' @return The stemmed version of theword.
 #' @import SnowballC
 #' @export
-stem_word <- function(word, language = "en") {
+stem_word <- function(word, language = "fr") {
   return(wordStem(tolower(word), language = language))
 }
 
@@ -290,11 +290,11 @@ phrase_tokenizer <- function(text) {
 #' This function creates a dictionary by tokenizing and stemming phrases from the input text.
 #'
 #' @param text A character string representing the input text.
-#' @param language A character string specifying the language for stemming (default is "en").
+#' @param language A character string specifying the language for stemming (default is "fr").
 #' @return A data frame containing the stemmed phrases as the dictionary.
 #' @import dplyr stringr
 #' @export
-mkdictionary <- function(text, language = "en") {
+mkdictionary <- function(text, language = "fr") {
   phrases <- phrase_tokenizer(text)
   stemmed_phrases <- lapply(phrases, function(phrase) {
     words <- unlist(strsplit(phrase, " "))
@@ -323,11 +323,11 @@ word_tokenizer <- function(text) {
 #' @param text A character string representing the text to be analyzed.
 #' @param weight A numeric value representing the weight of the relevance.
 #' @param dictionary A character vector of terms to be used for relevance calculation.
-#' @param language A character string specifying the language for stemming (default is "en").
+#' @param language A character string specifying the language for stemming (default is "fr").
 #' @return A numeric vector of relevance scores.
 #' @import stringr
 #' @export
-get_relevance <- function(text, weight, dictionary, language = "en") {
+get_relevance <- function(text, weight, dictionary, language = "fr") {
   stems <- unlist(lapply(word_tokenizer(text), function(w) stem_word(w, language)))
   stemmed_text <- paste(stems, collapse = " ")
   lemma_counts <- sapply(dictionary, function(lemma) {
@@ -342,11 +342,11 @@ get_relevance <- function(text, weight, dictionary, language = "en") {
 #'
 #' @param dictionary A character vector of terms to be used for relevance calculation.
 #' @param expression A data frame containing the title and text of the expression.
-#' @param language A character string specifying the language for stemming (default is "en").
+#' @param language A character string specifying the language for stemming (default is "fr").
 #' @return A numeric value representing the relevance score.
 #' @import stringr
 #' @export
-expression_relevance <- function(dictionary, expression, language = "en") {
+expression_relevance <- function(dictionary, expression, language = "fr") {
   # Convert title and text to lowercase
   expression$title <- tolower(expression$title)
   expression$text <- tolower(expression$text)
@@ -392,6 +392,9 @@ crawlurls <- function(land_name, urlmax=50, limit = NULL, http_status = NULL, db
 
   # Extract the language associated with the land from the Land table
   language <- res$lang[1]
+  if (is.null(language) || language == "") {
+    language <- "fr"
+  }
 
   # Extract keywords associated with the land from the database
   dictionary <- dbGetQuery(con, "SELECT lemma FROM LandDictionary JOIN Word ON word_id = id WHERE land_id = ?", params = list(land_id))

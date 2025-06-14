@@ -466,7 +466,7 @@ annotatedData <- function(dataplus, table, champ, by, labase = "mwi.db") {
 #'   result <- GPT_Recode(prompt = "Translate to French", cell = "Hello, how are you?")
 #'   print(result)
 #' }
-GPT_Recode <- function(prompt, cell, sysprompt= "You are a helpful assistant.", model = "gpt-3.5-turbo", temperature = 0.2) {
+GPT_Recode <- function(prompt, cell, sysprompt= "You are a helpful assistant. You recode a dataframe sot get response without comment", model = "gpt-4o", temperature = 0.8) {
   response <- create_chat_completion(
     model = model,
     messages = list(
