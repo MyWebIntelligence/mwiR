@@ -2,16 +2,16 @@
 % Please edit documentation in R/export.R
 \name{to_metadata}
 \alias{to_metadata}
-\title{Convert to Metadata}
+\title{Convert a Data Frame Row to a Metadata String}
 \usage{
 to_metadata(lignes)
 }
 \arguments{
-\item{lignes}{A data frame row containing the fields for metadata.}
+\item{lignes}{A single row from a data frame containing fields to be converted into metadata.}
 }
 \value{
-A character string containing the metadata.
+Returns a character string representing the metadata constructed from the input data frame row.
 }
 \description{
-This function creates a metadata string from the given data frame row.
+This function takes a row from a data frame and constructs a metadata string by extracting and formatting the relevant fields. The resulting string can be used for annotation, documentation, or further processing in data workflows.
 }

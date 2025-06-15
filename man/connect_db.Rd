@@ -2,16 +2,34 @@
 % Please edit documentation in R/export.R
 \name{connect_db}
 \alias{connect_db}
-\title{Establish a Database Connection}
+\title{Établir une connexion à une base de données SQLite}
 \usage{
 connect_db(db_name = "mwi.db")
 }
 \arguments{
-\item{db_name}{A character string specifying the name of the database file. Default is "mwi.db".}
+\item{db_name}{Nom du fichier de base de données SQLite à ouvrir (chaîne de caractères). Par défaut : "mwi.db". Exemple : "ma_base.db".}
 }
 \value{
-A database connection object.
+Un objet de connexion à la base de données, à utiliser avec les fonctions d'interrogation ou de modification de la base.
 }
 \description{
-This function establishes a connection to the specified SQLite database.
+Cette fonction établit une connexion à une base de données SQLite spécifiée.
+\strong{Utilité :} accéder, lire ou modifier les données du projet depuis R.
+}
+\details{
+\subsection{Conseils d'utilisation}{
+- Utilisez cette fonction en début de script pour ouvrir la base, puis passez l'objet de connexion aux autres fonctions de manipulation de données.
+- N'oubliez pas de fermer la connexion avec \code{DBI::dbDisconnect()} une fois les opérations terminées.
+- En cas d'erreur d'ouverture, vérifiez le chemin et les droits d'accès au fichier.
+}
+}
+\examples{
+# Exemple : Se connecter à la base par défaut
+con <- connect_db()
+
+# Exemple : Se connecter à une base spécifique
+con2 <- connect_db("autre_base.db")
+
+# Toujours fermer la connexion après usage
+DBI::dbDisconnect(con)
 }

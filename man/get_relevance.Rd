@@ -2,22 +2,22 @@
 % Please edit documentation in R/crawl.R
 \name{get_relevance}
 \alias{get_relevance}
-\title{Calculate relevance of text}
+\title{Calculate Relevance Scores for Text Based on a Dictionary}
 \usage{
-get_relevance(text, weight, dictionary, language = "en")
+get_relevance(text, weight, dictionary, language = "fr")
 }
 \arguments{
-\item{text}{A character string representing the text to be analyzed.}
+\item{text}{A character string representing the text content to be analyzed for relevance.}
 
-\item{weight}{A numeric value representing the weight of the relevance.}
+\item{weight}{A numeric value representing the weight or importance assigned to the relevance calculation. This can adjust the influence of the relevance score.}
 
-\item{dictionary}{A character vector of terms to be used for relevance calculation.}
+\item{dictionary}{A character vector of terms that serve as the reference for calculating relevance. These terms are used to assess how closely the text matches the desired concepts.}
 
-\item{language}{A character string specifying the language for stemming (default is "en").}
+\item{language}{A character string specifying the language used for stemming and text processing. The default is "fr" (French), which affects how words are reduced to their root forms for comparison.}
 }
 \value{
-A numeric vector of relevance scores.
+Returns a numeric vector of relevance scores corresponding to the analyzed text. These scores quantify the degree of relevance based on the dictionary terms and weighting.
 }
 \description{
-This function calculates the relevance of a text based on a dictionary of terms.
+This function computes relevance scores for a given text by comparing it against a provided dictionary of terms. The weight parameter allows adjusting the impact of the relevance calculation. The language parameter controls the stemming process, which reduces words to their base forms to improve matching accuracy. These relevance scores can be used for filtering, ranking, or further analysis of text data.
 }

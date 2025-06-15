@@ -2,19 +2,19 @@
 % Please edit documentation in R/export.R
 \name{export_pagegexf}
 \alias{export_pagegexf}
-\title{Export Page GEXF}
+\title{Export Expression Data to GEXF Format for Network Analysis}
 \usage{
 export_pagegexf(con, land_name, minimum_relevance, filename)
 }
 \arguments{
-\item{con}{A database connection object.}
+\item{con}{A database connection object. This connection is used to access the database containing expression and page data.}
 
-\item{land_name}{A character string specifying the name of the land.}
+\item{land_name}{A character string specifying the name of the land (dataset or domain) from which expression data will be exported. This helps filter the relevant subset of data.}
 
-\item{minimum_relevance}{A numeric value specifying the minimum relevance score for inclusion in the export.}
+\item{minimum_relevance}{A numeric value specifying the minimum relevance score threshold. Only expressions with a relevance score equal to or above this threshold will be included in the export. This allows focusing on the most significant expressions.}
 
-\item{filename}{A character string specifying the name of the output GEXF file.}
+\item{filename}{A character string specifying the name (and path) of the output GEXF file where the exported expression data will be saved.}
 }
 \description{
-This function exports expression data from the specified land to a GEXF file for network analysis.
+This function exports expression data associated with pages from a specified land (dataset) to a GEXF file, which is a standard XML-based format used for representing network graphs. The exported data includes nodes and their attributes filtered by a minimum relevance score threshold. This GEXF file can be used for network analysis and visualization in compatible tools such as Gephi.
 }

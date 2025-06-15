@@ -2,33 +2,43 @@
 % Please edit documentation in R/land.R
 \name{create_land}
 \alias{create_land}
-\title{Create a new research project (land)}
+\title{Créer un nouveau projet de recherche ("land")}
 \usage{
 create_land(name, desc, lang = "en", db_name = "mwi.db")
 }
 \arguments{
-\item{name}{A string specifying the name of the land.}
+\item{name}{Nom du projet ("land") à créer (chaîne de caractères). Exemple : "Climat".}
 
-\item{desc}{A string providing a description of the land.}
+\item{desc}{Description du projet, précisant son objectif ou son périmètre (chaîne de caractères). Exemple : "Recherche sur les impacts du changement climatique".}
 
-\item{lang}{A string specifying the language of the land. Default is "en".}
+\item{lang}{Langue principale du projet (code ISO, chaîne de caractères). Par défaut : "en" (anglais). Exemple : "fr" pour le français.}
 
-\item{db_name}{A string specifying the name of the SQLite database file. Default is "mwi.db".}
+\item{db_name}{Nom du fichier de base de données SQLite à utiliser. Par défaut : "mwi.db".}
 }
 \value{
-None. This function is called for its side effects.
+Aucune valeur retournée. La fonction est appelée pour son effet de bord (création d'une entrée dans la base).
 }
 \description{
-This function creates a new entry in the Land table, representing a new research project.
-If a land with the same name already exists, a message is displayed and no new entry is created.
+Cette fonction crée un nouveau projet de recherche ("land") dans la base de données, en ajoutant une entrée à la table Land.
+\strong{Utilité :} structurer et organiser les corpus, analyses ou veilles thématiques par projet distinct.
 }
 \details{
-The function first checks if a land with the same name already exists in the database.
-If it does, a message is displayed. Otherwise, a new entry is inserted into the Land table
-with the provided name, description, language, and the current timestamp.
+\subsection{Fonctionnement}{
+- Vérifie si un projet portant le même nom existe déjà dans la base.
+- Si oui, affiche un message et n'ajoute rien.
+- Sinon, insère une nouvelle entrée avec le nom, la description, la langue et la date de création.
+}
+\subsection{Conseils d'utilisation}{
+- Choisissez un nom unique et explicite pour chaque projet.
+- Rédigez une description claire pour faciliter la gestion collaborative.
+- Précisez la langue pour optimiser les traitements linguistiques ultérieurs.
+- Pratique pour initier un nouveau corpus, une veille, ou un chantier d'analyse.
+}
 }
 \examples{
-\dontrun{
-create_land("Climate Research", "Research on climate change impacts", "en", "my_database.db")
-}
+# Exemple : Créer un projet de recherche en anglais
+create_land("Climate", "Research on climate change impacts", "en")
+
+# Exemple : Créer un projet en français dans une base alternative
+create_land("Santé publique", "Veille sur la santé publique", "fr", db_name = "autre_base.db")
 }

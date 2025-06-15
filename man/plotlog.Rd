@@ -2,28 +2,69 @@
 % Please edit documentation in R/recode.R
 \name{plotlog}
 \alias{plotlog}
-\title{Plot Original and Log-Transformed Distributions Side by Side}
+\title{Visualize Original and Transformed Distributions of Numeric Variables}
 \usage{
-plotlog(df, variables = NULL)
+plotlog(
+  df,
+  variables = NULL,
+  trans_type = "log1p",
+  bins = NULL,
+  colors = c("#1f77b4", "#ff7f0e"),
+  alpha = 0.7,
+  theme = ggplot2::theme_minimal(),
+  save = FALSE,
+  save_dir = "plotlog_output",
+  save_format = "png",
+  save_dpi = 300
+)
 }
 \arguments{
-\item{df}{A data frame containing the variables to analyze.}
+\item{df}{A data frame containing the numeric variables to visualize.}
 
-\item{variables}{Optional. A character vector of variable names to analyze. If NULL (default), all numeric variables are analyzed.}
+\item{variables}{An optional character vector specifying the names of variables to analyze.
+If NULL (default), all numeric variables in the data frame are analyzed.}
+
+\item{trans_type}{A character string specifying the type of transformation to apply to the data before plotting. Options include "log1p" (default), "log", "sqrt", or "none".}
+
+\item{bins}{An integer specifying the number of bins to use in the histograms. If NULL (default), Sturges' rule is used to determine the number of bins.}
+
+\item{colors}{A character vector of length 2 specifying the colors to use for the original and transformed histograms. Default is c("#1f77b4", "#ff7f0e").}
+
+\item{alpha}{A numeric value between 0 and 1 specifying the transparency level of the histograms. Default is 0.7.}
+
+\item{theme}{A ggplot2 theme object to apply to the plots. Default is ggplot2::theme_minimal().}
+
+\item{save}{A logical value indicating whether to save the generated plots to files. Default is FALSE.}
+
+\item{save_dir}{A character string specifying the directory where plots will be saved if save=TRUE. Default is "plotlog_output".}
+
+\item{save_format}{A character string specifying the file format for saved plots. Options are "png", "pdf", or "jpg". Default is "png".}
+
+\item{save_dpi}{An integer specifying the resolution (dots per inch) for saved plot images. Default is 300.}
 }
 \value{
-None. This function produces plots as a side effect.
+Invisibly returns a list of ggplot objects representing the generated histograms. The primary effect of the function is to produce visual plots.
 }
 \description{
-This function plots the original and log-transformed distributions of numeric variables in a data frame side by side.
+This function generates side-by-side histograms comparing the original and transformed distributions of numeric variables in a data frame. It supports multiple transformation types and offers extensive customization options for colors, transparency, themes, and saving output.
+}
+\details{
+The function workflow includes:
+1. Validating all input parameters.
+2. Identifying numeric variables to plot.
+3. Creating comparison histograms for each variable.
+4. Handling missing or infinite values gracefully.
+5. Providing options to save the generated plots to files.
 }
 \examples{
 \dontrun{
-# Analyze all numeric variables
+# Basic usage with all numeric variables
 plotlog(mtcars)
 
-# Analyze specific variables
-plotlog(mtcars, c("mpg", "disp"))
-}
+# Specific variables with custom colors
+plotlog(mtcars, c("mpg", "wt"), colors = c("darkgreen", "purple"))
 
+# Save plots as PDF
+plotlog(iris, save = TRUE, save_format = "pdf")
+}
 }

@@ -47,196 +47,415 @@
 #' @export
 #' @importFrom cld3 detect_language
 mwiR_detectLang <- function(df, variables) {
+  # Validate inputs
+  if (!is.data.frame(df)) {
+    stop("Input 'df' must be a data frame")
+  }
+  if (!is.character(variables) || length(variables) == 0) {
+    stop("'variables' must be a non-empty character vector")
+  }
+
   # Check if cld3 package is available
   if (!requireNamespace("cld3", quietly = TRUE)) {
     stop("Package 'cld3' is required but not installed. Please install it using install.packages('cld3').")
   }
 
   # Check if all specified variables exist in the data frame
-  if (!all(variables %in% names(df))) {
-    stop("Some specified variables do not exist in the data frame.")
+  missing_vars <- setdiff(variables, names(df))
+  if (length(missing_vars) > 0) {
+    stop(paste("The following variables do not exist in the data frame:",
+               paste(missing_vars, collapse = ", ")))
   }
 
-  # Combine the texts from the specified variables
-  combined_text <- apply(df[, variables, drop = FALSE], 1, paste, collapse = " ")
+  # Combine the texts from the specified variables more efficiently
+  combined_text <- do.call(paste, c(df[variables], sep = " "))
 
-  # Detect the language for all combined texts at once using the cld3 package
-  lang <- cld3::detect_language(combined_text)
-
-  return(lang)
+  # Detect the language with error handling
+  tryCatch({
+    lang <- cld3::detect_language(combined_text)
+    # Handle NULL returns from cld3
+    if (is.null(lang)) lang <- rep(NA_character_, length(combined_text))
+    return(lang)
+  }, error = function(e) {
+    warning(paste("Language detection failed:", e$message))
+    return(rep(NA_character_, nrow(df)))
+  })
 }
 
-#' Plot Original and Log-Transformed Distributions Side by Side
+#' Visualize Original and Transformed Distributions
 #'
-#' This function plots the original and log-transformed distributions of numeric variables in a data frame side by side.
+#' @description
+#' This function creates side-by-side histograms comparing the original and
+#' transformed distributions of numeric variables. It supports multiple
+#' transformation types and provides extensive customization options.
 #'
-#' @param df A data frame containing the variables to analyze.
-#' @param variables Optional. A character vector of variable names to analyze. If NULL (default), all numeric variables are analyzed.
+#' @param df A data frame containing the variables to visualize.
+#' @param variables Optional character vector of variable names to analyze.
+#'   If NULL (default), all numeric variables are analyzed.
+#' @param trans_type Transformation type: "log1p" (default), "log", "sqrt", or "none".
+#' @param bins Number of bins for histograms. If NULL (default), uses Sturges' rule.
+#' @param colors Character vector of length 2 specifying colors for original and
+#'   transformed plots. Default: c("#1f77b4", "#ff7f0e").
+#' @param alpha Transparency level (0-1). Default: 0.7.
+#' @param theme ggplot2 theme to use. Default: theme_minimal().
+#' @param save Logical indicating whether to save plots to files. Default: FALSE.
+#' @param save_dir Directory to save plots if save=TRUE. Default: "plotlog_output".
+#' @param save_format File format: "png", "pdf", or "jpg". Default: "png".
+#' @param save_dpi Resolution for saved images. Default: 300.
 #'
-#' @return None. This function produces plots as a side effect.
+#' @return Invisibly returns a list of ggplot objects. Primarily produces plots as a side effect.
+#'
+#' @details
+#' The function performs the following steps:
+#' 1. Validates all input parameters
+#' 2. Identifies numeric variables to plot
+#' 3. Creates comparison histograms for each variable
+#' 4. Handles missing/infinite values gracefully
+#' 5. Provides options to save output
 #'
 #' @examples
 #' \dontrun{
-#' # Analyze all numeric variables
+#' # Basic usage with all numeric variables
 #' plotlog(mtcars)
 #'
-#' # Analyze specific variables
-#' plotlog(mtcars, c("mpg", "disp"))
+#' # Specific variables with custom colors
+#' plotlog(mtcars, c("mpg", "wt"), colors = c("darkgreen", "purple"))
+#'
+#' # Save plots as PDF
+#' plotlog(iris, save = TRUE, save_format = "pdf")
 #' }
 #'
 #' @import ggplot2
 #' @importFrom gridExtra grid.arrange
+#' @importFrom grDevices png pdf jpeg dev.off
+#' @importFrom stats na.omit
 #' @export
-plotlog <- function(df, variables = NULL) {
-  # Check if required packages are installed
-  if (!requireNamespace("ggplot2", quietly = TRUE) || !requireNamespace("gridExtra", quietly = TRUE)) {
-    stop("Packages 'ggplot2' and 'gridExtra' are required. Please install them.")
+plotlog <- function(df, variables = NULL, trans_type = "log1p", bins = NULL,
+                   colors = c("#1f77b4", "#ff7f0e"), alpha = 0.7,
+                   theme = ggplot2::theme_minimal(), save = FALSE,
+                   save_dir = "plotlog_output", save_format = "png",
+                   save_dpi = 300) {
+  
+  # Input validation
+  if (!is.data.frame(df)) stop("'df' must be a data frame")
+  if (!is.null(variables) && !is.character(variables)) {
+    stop("'variables' must be NULL or a character vector")
   }
-
+  if (!trans_type %in% c("log1p", "log", "sqrt", "none")) {
+    stop("'trans_type' must be one of: 'log1p', 'log', 'sqrt', 'none'")
+  }
+  if (length(colors) != 2 || !all(sapply(colors, is.character))) {
+    stop("'colors' must be a character vector of length 2")
+  }
+  
+  # Check for required packages
+  if (!requireNamespace("ggplot2", quietly = TRUE)) {
+    stop("Package 'ggplot2' is required but not installed")
+  }
+  if (!requireNamespace("gridExtra", quietly = TRUE)) {
+    stop("Package 'gridExtra' is required but not installed")
+  }
+  
+  # Create save directory if needed
+  if (save && !dir.exists(save_dir)) {
+    dir.create(save_dir, recursive = TRUE)
+  }
+  
   # Identify numeric columns
   if (is.null(variables)) {
     num_cols <- names(df)[sapply(df, is.numeric)]
   } else {
     num_cols <- intersect(variables, names(df)[sapply(df, is.numeric)])
-    if (length(num_cols) == 0) {
-      stop("None of the specified variables are numeric.")
-    }
+    if (length(num_cols) == 0) stop("No numeric variables found")
   }
-
-  # Function to create a single plot
-  create_plot <- function(data, title, fill_color, x_label) {
-    data <- data[is.finite(data)]
-    if (length(data) > 0) {
-      bin_w <- diff(range(data)) / 30
-      ggplot2::ggplot(data.frame(x = data), ggplot2::aes(x = x)) +
-        ggplot2::geom_histogram(binwidth = bin_w, fill = fill_color, alpha = 0.7) +
-        ggplot2::ggtitle(title) +
-        ggplot2::xlab(x_label) +
-        ggplot2::theme_minimal()
-    } else {
-      ggplot2::ggplot() + ggplot2::ggtitle("Insufficient data") + ggplot2::theme_minimal()
-    }
+  
+  # Apply transformation
+  apply_trans <- function(x, type) {
+    switch(type,
+           "log1p" = log1p(x),
+           "log" = log(x),
+           "sqrt" = sqrt(x),
+           "none" = x)
   }
-
-  # Create and display plots for each variable
+  
+  # Create plots
+  plot_list <- list()
+  
   for (col_name in num_cols) {
-    original_data <- df[[col_name]]
-    log_data <- log1p(df[[col_name]])
-
-    p_original <- create_plot(original_data,
-                              paste("Original distribution of", col_name),
-                              "green",
-                              col_name)
-    p_log <- create_plot(log_data,
-                         paste("Log-transformed distribution of", col_name),
-                         "blue",
-                         paste("log(", col_name, ")"))
-
-    # Arrange and print plots side by side
-    gridExtra::grid.arrange(p_original, p_log, ncol = 2)
-  }
-}
-
-#' Apply Power Law Scaling Transformations to Numeric Variables
-#'
-#' This function applies various scaling transformations to numeric variables
-#' in a data frame, including log-scaling, Mclust classification, and
-#' quartile-based categorization.
-#'
-#' @param df A data frame containing the variables to transform.
-#' @param variables Optional. A character vector of variable names to transform.
-#'   If NULL (default), all numeric variables in the data frame are transformed.
-#'
-#' @return A new data frame with the original variables and their transformed versions.
-#'   For each transformed variable, four new columns are added:
-#'   \itemize{
-#'     \item \code{[varname]_scalecat}: Categorized log-scaled values
-#'     \item \code{[varname]_log1P}: Log1p transformed values
-#'     \item \code{[varname]_mclust}: Mclust classification
-#'     \item \code{[varname]_IQ}: Quartile-based categorization
-#'   }
-#'
-#' @details
-#' The function performs the following transformations:
-#' \itemize{
-#'   \item Log-scaling and categorization into 5 levels
-#'   \item Log1p transformation
-#'   \item Mclust classification
-#'   \item Quartile-based categorization with outlier detection
-#' }
-#'
-#' @examples
-#' # Create a sample data frame
-#' df <- data.frame(
-#'   var1 = rnorm(100, 50, 10),
-#'   var2 = rexp(100, 1/50)
-#' )
-#'
-#' # Apply transformations to all numeric variables
-#' new_df <- powerscaled(df)
-#'
-#' # Apply transformations to specific variables
-#' new_df <- powerscaled(df, c("var1"))
-#'
-#' @importFrom stats quantile
-#' @importFrom mclust Mclust
-#' @export
-powerscaled <- function(df, variables = NULL) {
-  # Check if specific variables are passed
-  if (is.null(variables)) {
-    # If no variable is specified, select all numeric variables
-    variables <- names(df)[sapply(df, is.numeric)]
-  } else {
-    # Check if all specified variables exist and are numeric
-    if (!all(variables %in% names(df))) {
-      stop("Some specified variables do not exist in the dataframe.")
+    # Handle missing values
+    clean_data <- na.omit(df[[col_name]])
+    if (length(clean_data) == 0) {
+      warning(paste("Skipping", col_name, "- no valid data"))
+      next
     }
-    if (!all(sapply(df[variables], is.numeric))) {
-      stop("Some specified variables are not numeric.")
-    }
-  }
-
-  # Create a new DataFrame to store the results
-  new_df <- df
-
-  # Loop through the selected variables
-  for (col_name in variables) {
-    # Apply powerscaled
-    new_col_name_scalecat <- paste(col_name, "scalecat", sep = "_")
-    new_df[[new_col_name_scalecat]] <- as.factor(cut(scale(log1p(df[[col_name]])),
-                                                     breaks = c(-Inf, -1, 1, 2, 3, Inf),
-                                                     labels = c("0", "1", "2", "3", "4"),
-                                                     right = FALSE))
-
-    # Apply rkscale
-    new_col_name_log1P <- paste(col_name, "log1P", sep = "_")
-    new_df[[new_col_name_log1P]] <- log1p(df[[col_name]])
-
-    # Apply fitscale
-    new_col_name_fit <- paste(col_name, "mclust", sep = "_")
-    fit <- Mclust(log1p(df[[col_name]]))
-    new_df[[new_col_name_fit]] <- as.factor(fit$classification)
-
-    # Add quartile-based categorization
-    new_col_name_IQ <- paste(col_name, "IQ", sep = "_")
-    Q1 <- median(log1p(df[[col_name]]))
-    Q2 <- mean(log1p(df[[col_name]]))
-    Q3 <- as.numeric(quantile(log1p(df[[col_name]]), 0.75))
-    IQ <- as.numeric(Q3 - Q1)
-    new_df[[new_col_name_IQ]] <- tryCatch({
-      as.factor(cut(df[[col_name]],
-                    breaks = c(-Inf, Q1, Q2, Q3, Q3 + (1.5 * IQ), Inf),
-                    labels = c("0", "1", "2", "3", "4"),
-                    right = TRUE))
+    
+    # Apply transformation
+    trans_data <- tryCatch({
+      apply_trans(clean_data, trans_type)
     }, error = function(e) {
-      NA
+      warning(paste("Transformation failed for", col_name, ":", e$message))
+      return(NULL)
     })
-
+    
+    if (is.null(trans_data)) next
+    
+    # Create plots
+    p1 <- ggplot2::ggplot(data.frame(x = clean_data), ggplot2::aes(x = x)) +
+      ggplot2::geom_histogram(fill = colors[1], alpha = alpha, bins = bins) +
+      ggplot2::ggtitle(paste("Original:", col_name)) +
+      theme
+    
+    trans_title <- switch(trans_type,
+                         "log1p" = paste("log1p(", col_name, ")"),
+                         "log" = paste("log(", col_name, ")"),
+                         "sqrt" = paste("sqrt(", col_name, ")"),
+                         "none" = col_name)
+    
+    p2 <- ggplot2::ggplot(data.frame(x = trans_data), ggplot2::aes(x = x)) +
+      ggplot2::geom_histogram(fill = colors[2], alpha = alpha, bins = bins) +
+      ggplot2::ggtitle(trans_title) +
+      theme
+    
+    # Arrange and display
+    gridExtra::grid.arrange(p1, p2, ncol = 2)
+    plot_list[[col_name]] <- list(original = p1, transformed = p2)
+    
+    # Save if requested
+    if (save) {
+      filename <- file.path(save_dir, paste0(col_name, ".", save_format))
+      switch(save_format,
+             "png" = png(filename, width = 10, height = 5, units = "in", res = save_dpi),
+             "pdf" = pdf(filename, width = 10, height = 5),
+             "jpg" = jpeg(filename, width = 10, height = 5, units = "in", res = save_dpi))
+      gridExtra::grid.arrange(p1, p2, ncol = 2)
+      dev.off()
+    }
   }
-
-  return(new_df)
+  
+  invisible(plot_list)
 }
 
+# ------------------------------------------------------------------------------
+# 1. DIAGNOSTIC DE VARIABLE
+# ------------------------------------------------------------------------------
+
+#' @title Diagnostiquer une variable numérique
+#' @description Calcule les statistiques descriptives clés pour évaluer la
+#' distribution d'une variable.
+#' @param x Vecteur numérique.
+#' @return Un tibble avec skewness, kurtosis, et le p-value du test de
+#'   Shapiro-Wilk.
+#' @export
+diagnose_variable <- function(x) {
+  stopifnot(is.numeric(x))
+  
+  x_finite <- x[is.finite(x)]
+  
+  if (length(x_finite) < 3) {
+    return(tibble::tibble(
+      n_valid = length(x_finite),
+      skewness = NA_real_,
+      kurtosis = NA_real_,
+      shapiro_wilk_p = NA_real_,
+      comment = "Pas assez de données valides."
+    ))
+  }
+  
+  # Le test de Shapiro-Wilk est limité à 5000 observations.
+  shapiro_sample <- if (length(x_finite) > 5000) {
+    sample(x_finite, 5000)
+  } else {
+    x_finite
+  }
+  
+  tibble::tibble(
+    n_valid = length(x_finite),
+    skewness = moments::skewness(x_finite),
+    kurtosis = moments::kurtosis(x_finite), # Excès de kurtosis
+    shapiro_wilk_p = stats::shapiro.test(shapiro_sample)$p.value
+  )
+}
+
+
+# ------------------------------------------------------------------------------
+# 2. TRANSFORMATION
+# ------------------------------------------------------------------------------
+
+#' @title Transformer un vecteur numérique
+#' @description Applique une transformation pour stabiliser la variance ou
+#'   normaliser la distribution.
+#' @param x Vecteur numérique.
+#' @param method Une de "none", "log1p", "log", "boxcox", "yeojohnson".
+#' @param ... Arguments additionnels passés aux fonctions de `bestNormalize`
+#'   (ex: `standardize = FALSE`).
+#' @return Une liste contenant `$val` (vecteur transformé) et `$param` (objet
+#'   contenant les paramètres du fit, utile pour `predict`).
+#' @export
+transform_variable <- function(x, method = "yeojohnson", ...) {
+  stopifnot(is.numeric(x),
+            method %in% c("none", "log1p", "log", "boxcox", "yeojohnson"))
+  
+  if (stats::var(x, na.rm = TRUE) == 0) {
+    warning("La variance de x est nulle. La transformation n'a pas d'effet.")
+    return(list(val = x, param = NULL))
+  }
+
+  switch(
+    method,
+    none = list(val = x, param = NULL),
+    log1p = list(val = log1p(pmax(x, 0)), param = NULL),
+    log = {
+      y <- x
+      if (any(y <= 0, na.rm = TRUE)) {
+        warning("Les valeurs <= 0 ont été mises à NA pour la transformation log.")
+        y[y <= 0] <- NA_real_
+      }
+      list(val = log(y), param = NULL)
+    },
+    boxcox = {
+      tf <- bestNormalize::boxcox(x, ...)
+      list(val = tf$x.t, param = tf)
+    },
+    yeojohnson = {
+      tf <- bestNormalize::yeojohnson(x, ...)
+      list(val = tf$x.t, param = tf)
+    }
+  )
+}
+
+
+# ------------------------------------------------------------------------------
+# 3. DISCRÉTISATION
+# ------------------------------------------------------------------------------
+
+#' @title Discrétiser un vecteur numérique
+#' @description Transforme un vecteur numérique en facteur. Il est
+#'   recommandé d'appliquer cette fonction sur la variable BRUTE pour une
+#'   meilleure interprétabilité.
+#' @param x Vecteur numérique.
+#' @param method Une de "equal_width" (intervalles égaux), "equal_freq"
+#'   (effectifs égaux), "manual".
+#' @param bins Nombre de classes (ignoré si `method = "manual"`).
+#' @param breaks Vecteur de seuils (utilisé si `method = "manual"`).
+#' @return Un facteur.
+#' @examples
+#' # Obtenir des quartiles (4 groupes d'effectifs égaux)
+#' # discretize_variable(rnorm(100), method = "equal_freq", bins = 4)
+#' @export
+discretize_variable <- function(x, method = "equal_freq", bins = 5, breaks = NULL) {
+  stopifnot(is.numeric(x),
+            method %in% c("equal_width", "equal_freq", "manual"))
+  
+  if (method == "manual") {
+    stopifnot("Pour la méthode 'manual', l'argument 'breaks' doit être fourni." = !is.null(breaks))
+    brks <- breaks
+  } else {
+    stopifnot("L'argument 'bins' doit être un entier >= 2." = (is.numeric(bins) && bins >= 2))
+    brks <- switch(
+      method,
+      equal_width = seq(min(x, na.rm = TRUE), max(x, na.rm = TRUE), length.out = bins + 1),
+      equal_freq = stats::quantile(x, probs = seq(0, 1, length.out = bins + 1), na.rm = TRUE)
+    )
+  }
+  
+  # Gérer les seuils non-uniques dus à des distributions asymétriques
+  brks <- unique(brks)
+  if (length(brks) < 2) {
+    warning("Impossible de créer les classes, pas assez de seuils uniques. Retour de NA.")
+    return(factor(rep(NA, length(x))))
+  }
+  
+  cut(x, breaks = brks, include.lowest = TRUE, right = FALSE)
+}
+
+
+# ------------------------------------------------------------------------------
+# 4. CLUSTERING (1D)
+# ------------------------------------------------------------------------------
+
+#' @title Identifier des clusters dans un vecteur numérique
+#' @description Utilise des modèles de mélange gaussiens pour trouver des
+#'   groupes latents.
+#' @details Il est souvent plus pertinent d'appliquer le clustering sur une
+#'   variable **transformée** pour éviter que les outliers ne dominent la
+#'   solution.
+#' @param x Vecteur numérique.
+#' @param max_G Nombre maximum de clusters à tester.
+#' @param auto_select_model TRUE pour laisser Mclust choisir le meilleur modèle
+#'   (structure de covariance) via BIC. FALSE pour forcer `modelNames`.
+#' @param modelNames Modèles à tester si `auto_select_model = FALSE`.
+#' @return Liste contenant `$fit_object` (l'objet mclust complet pour plots, etc.),
+#'   `$best_model`, `$n_clusters`, et `$classification`.
+#' @export
+find_clusters <- function(x, max_G = 9, auto_select_model = TRUE, modelNames = "V") {
+  x_finite <- x[is.finite(x)]
+  
+  if (length(unique(x_finite)) < 2L) {
+    stop("Le vecteur doit avoir au moins 2 valeurs finies uniques.")
+  }
+  
+  # On ne peut pas chercher plus de clusters qu'il y a de valeurs uniques.
+  max_G_adj <- min(max_G, length(unique(x_finite)))
+  
+  fit <- mclust::Mclust(
+    x_finite,
+    G = 1:max_G_adj,
+    modelNames = if (auto_select_model) NULL else modelNames
+  )
+  
+  # Reconstruire le vecteur de classification pour matcher la longueur de x
+  classification_full <- rep(NA_integer_, length(x))
+  classification_full[is.finite(x)] <- fit$classification
+  
+  list(
+    fit_object = fit,
+    best_model = fit$modelName,
+    n_clusters = fit$G,
+    classification = factor(classification_full)
+  )
+}
+
+# ------------------------------------------------------------------------------
+# 5. ANALYSE DE LOI DE PUISSANCE
+# ------------------------------------------------------------------------------
+
+#' @title Tester l'hypothèse d'une loi de puissance
+#' @description Analyse si la queue d'une distribution suit une loi de
+#'   puissance. Ce n'est PAS une fonction de transformation.
+#' @param x Vecteur de données numériques positives.
+#' @param type "discrete" pour les comptes (entiers), "continuous" pour les
+#'   mesures continues. Ce choix est crucial pour la méthode d'estimation.
+#' @return Liste avec $xmin, $alpha, $gof_p (p-value du test de
+#'   bootstrap goodness-of-fit), et l'objet poweRlaw complet.
+#' @export
+analyse_powerlaw <- function(x, type = "discrete") {
+  stopifnot("Le type doit être 'discrete' ou 'continuous'" = type %in% c("discrete", "continuous"))
+  
+  x_pos <- x[is.finite(x) & x > 0]
+  if (length(x_pos) < 50) {
+    stop("Taille d'échantillon insuffisante (< 50) pour une analyse de loi de puissance fiable.")
+  }
+
+  pl_model <- switch(type,
+    discrete = poweRlaw::displ$new(x_pos),
+    continuous = poweRlaw::conpl$new(x_pos)
+  )
+  
+  est <- poweRlaw::estimate_xmin(pl_model)
+  pl_model$setXmin(est)
+  
+  # Un p-value élevé suggère que les données sont compatibles avec une loi de puissance.
+  # Pour une analyse plus rigoureuse, comparer avec d'autres distributions
+  # (ex: log-normale) avec poweRlaw::compare_distributions().
+  gof <- poweRlaw::bootstrap_p(pl_model, no_of_sims = 500, threads = 2)
+  
+  list(
+    xmin = pl_model$getXmin(),
+    alpha = pl_model$getPars(),
+    gof_p_value = gof$p,
+    fit_object = pl_model
+  )
+}
 #' Fetch SEO Rank Data for URLs
 #'
 #' This function retrieves SEO rank data for a list of URLs using the SEO Rank API
@@ -441,40 +660,115 @@ annotatedData <- function(dataplus, table, champ, by, labase = "mwi.db") {
   })
 }
 
-#' GPT_Recode
+#' Recode Cell Values Using GPT
 #'
-#' A function to recode a cell value using the GPT-3.5-turbo model by providing a prompt.
+#' @description
+#' This function uses OpenAI's GPT models to recode/transform cell values based on a provided prompt.
+#' It includes robust error handling, input validation, and rate limiting.
 #'
-#' @param prompt A character string. The prompt to provide to the model.
-#' @param cell A character string. The cell value to be recoded.
-#' @param sysprompt A character string. The system prompt to guide the model's behavior. Default is "You are a helpful assistant.".
-#' @param model A character string. The model to use for the completion. Default is "gpt-3.5-turbo". Most famous are "gpt-4o"
-#' @param temperature A numeric value. The temperature setting for the model's response. Default is 0.2.
+#' @param prompt A character string specifying the transformation prompt (e.g., "Translate to French").
+#' @param cell A character string containing the value to be recoded.
+#' @param sysprompt Optional system prompt to guide the model's behavior. 
+#'   Default: "You are a helpful assistant that recodes dataframe values. Return only the transformed value."
+#' @param model The GPT model to use. Default: "gpt-4o". Alternatives: "gpt-3.5-turbo".
+#' @param temperature Controls randomness (0-2). Lower = more deterministic. Default: 0.8.
+#' @param max_tokens Maximum length of response. Default: 1000.
+#' @param max_retries Maximum API retry attempts on failure. Default: 3.
+#' @param retry_delay Seconds between retries. Default: 1.
 #'
-#' @return A character string. The recoded cell value based on the provided prompt.
-#' @export
+#' @return A character string containing the recoded value, or NA if the operation fails.
+#'
+#' @details
+#' The function performs the following steps:
+#' 1. Validates all input parameters
+#' 2. Checks for OpenAI API key in environment variables
+#' 3. Makes API call with retry logic
+#' 4. Handles various error conditions gracefully
+#' 5. Returns transformed value or NA on failure
+#'
+#' @note
+#' Requires the 'openai' package and a valid OPENAI_API_KEY environment variable.
+#' For bulk operations, consider implementing additional rate limiting.
 #'
 #' @examples
 #' \dontrun{
-#'   # Load the necessary library
-#'   library(openai)
+#' # Set API key
+#' Sys.setenv(OPENAI_API_KEY = "your-key-here")
 #'
-#'   # Set the API key for OpenAI
-#'   Sys.setenv(OPENAI_API_KEY = "sk-proj-XXXXXXXXXXXX")
+#' # Simple translation
+#' GPT_Recode("Translate to French", "Hello world")
 #'
-#'   # Use the GPT_Recode function
-#'   result <- GPT_Recode(prompt = "Translate to French", cell = "Hello, how are you?")
-#'   print(result)
+#' # More complex transformation
+#' GPT_Recode("Extract the main verb", "The cat sat on the mat")
 #' }
-GPT_Recode <- function(prompt, cell, sysprompt= "You are a helpful assistant. You recode a dataframe sot get response without comment", model = "gpt-4o", temperature = 0.8) {
-  response <- create_chat_completion(
-    model = model,
-    messages = list(
-      list(role = "system", content = sysprompt),
-      list(role = "user", content = paste0(prompt, ":\n\n", cell))
-    ),
-    temperature = temperature
+#'
+#' @importFrom openai create_chat_completion
+#' @export
+GPT_Recode <- function(prompt, cell, 
+                      sysprompt = "You are a helpful assistant that recodes dataframe values. Return only the transformed value.",
+                      model = "gpt-4o", 
+                      temperature = 0.8,
+                      max_tokens = 1000,
+                      max_retries = 3,
+                      retry_delay = 1,
+                      validate = TRUE) {
+  
+  # Input validation
+  if (!is.character(prompt) || length(prompt) != 1 || nchar(prompt) == 0) {
+    stop("'prompt' must be a non-empty character string")
+  }
+  if (!is.character(cell) || length(cell) != 1) {
+    stop("'cell' must be a character string")
+  }
+  if (!is.numeric(temperature) || temperature < 0 || temperature > 2) {
+    stop("'temperature' must be between 0 and 2")
+  }
+  
+  # Check for API key
+  if (Sys.getenv("OPENAI_API_KEY") == "") {
+    stop("OPENAI_API_KEY environment variable not set. Please set it with Sys.setenv(OPENAI_API_KEY = 'your-key')")
+  }
+  
+  # Prepare messages
+  messages <- list(
+    list(role = "system", content = sysprompt),
+    list(role = "user", content = paste0(prompt, ":\n\n", cell))
   )
-
-  return(response$choices$message.content[1])
+  
+  # Try with retries
+  for (i in 1:max_retries) {
+    tryCatch({
+      response <- openai::create_chat_completion(
+        model = model,
+        messages = messages,
+        temperature = temperature,
+        max_tokens = max_tokens
+      )
+      
+      # Validate response
+      if (is.null(response$choices) || length(response$choices) == 0) {
+        stop("Empty response from API")
+      }
+      
+      transformed <- response$choices[[1]]$message$content
+      
+      # Optional validation
+      if (validate) {
+        valid <- nchar(transformed) > 0 && 
+                 nchar(transformed) < (nchar(cell) * 10) &&
+                 !grepl("sorry|error|cannot", transformed, ignore.case = TRUE)
+        if (!valid) {
+          warning("GPT returned potentially invalid response")
+          return(NA_character_)
+        }
+      }
+      return(transformed)
+    }, error = function(e) {
+      if (i == max_retries) {
+        warning(paste("GPT recoding failed after", max_retries, "attempts:", e$message))
+        return(NA_character_)
+      }
+      Sys.sleep(retry_delay)
+    })
+  }
 }

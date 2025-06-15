@@ -2,31 +2,28 @@
 % Please edit documentation in R/listurl.R
 \name{urlist_Duck}
 \alias{urlist_Duck}
-\title{Retrieve URLs with SerpAPI DuckDuckGo Search}
+\title{Retrieve URLs from DuckDuckGo Search Using SerpAPI}
 \usage{
 urlist_Duck(query, filename = NULL, sleep_seconds = 1, lang = "fr")
 }
 \arguments{
-\item{query}{A character string representing the search query.}
+\item{query}{A character string representing the search query to be sent to DuckDuckGo.}
 
-\item{filename}{A character string representing the name of the file where the results will be saved.
-If NULL, a filename will be generated based on the query (default is NULL).}
+\item{filename}{A character string specifying the name of the file where the search results will be saved. If NULL, a filename is automatically generated based on the query.}
 
-\item{sleep_seconds}{A numeric value representing the sleep time between API requests to avoid rate-limiting (default is 1).}
+\item{sleep_seconds}{A numeric value specifying the delay in seconds between API requests to prevent rate limiting. Default is 1 second.}
 
-\item{lang}{A character string representing the language for the search (default is "fr").}
+\item{lang}{A character string specifying the language code for the search. Default is "fr" (French).}
 }
 \value{
-This function does not return a value. It writes the search results to a text file.
+This function does not return a value. It writes the retrieved URLs from DuckDuckGo search results to a text file.
 }
 \description{
-This function retrieves URLs from DuckDuckGo search results using the SerpAPI service.
-It constructs API requests based on the provided query and language parameters,
-then processes the response to extract and save the URLs in a text file.
+This function uses the SerpAPI service to perform a DuckDuckGo search with the specified query and language. It processes the API response to extract URLs from the search results and saves them into a text file for further use.
 }
 \examples{
 \dontrun{
+# Retrieve URLs for the query "data science" and save to a file
 urlist_Duck("data science", filename = "data_science_results.txt", sleep_seconds = 2, lang = "en")
 }
-
 }

@@ -2,30 +2,25 @@
 % Please edit documentation in R/crawl.R, R/land.R
 \name{phrase_tokenizer}
 \alias{phrase_tokenizer}
-\title{Tokenize phrases}
+\title{Tokenize Phrases by Splitting on Commas}
 \usage{
-phrase_tokenizer(text)
-
 phrase_tokenizer(text)
 }
 \arguments{
-\item{text}{A string specifying the phrase to tokenize.}
+\item{text}{A character string containing the phrase or text to be tokenized.}
 }
 \value{
-A character vector of tokenized phrases.
-
-A vector of tokens.
+Returns a character vector containing the individual tokens obtained by splitting the input text on commas.
 }
 \description{
-This function splits a text into phrases based on commas.
-
-This function tokenizes a phrase by splitting it into tokens based on commas.
+This function takes a phrase or text string and splits it into individual tokens based on commas. It is useful for parsing lists or comma-separated values into discrete elements for further processing.
 }
 \details{
-The function splits the input text into tokens using commas as delimiters.
+The function processes the input text by using commas as delimiters to separate and extract tokens. Whitespace around tokens is typically trimmed.
 }
 \examples{
 \dontrun{
+# Tokenize a comma-separated phrase
 phrase_tokenizer("term1, term2, term3")
 }
 }

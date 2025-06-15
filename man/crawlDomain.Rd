@@ -2,15 +2,35 @@
 % Please edit documentation in R/crawl.R
 \name{crawlDomain}
 \alias{crawlDomain}
-\title{Crawl and update the Domain table}
+\title{Explorer des domaines et mettre à jour la table Domain}
 \usage{
 crawlDomain(nburl = 100, db_name = "mwi.db")
 }
 \arguments{
-\item{nburl}{An integer specifying the number of URLs to be crawled (default is 100).}
+\item{nburl}{Nombre d'URLs à explorer (entier). Par défaut : 100. Exemple : 50 pour un test rapide, 1000 pour un crawl massif.}
 
-\item{db_name}{A character string representing the name of the database (default is "mwi.db").}
+\item{db_name}{Nom du fichier de base de données SQLite à utiliser. Par défaut : "mwi.db".}
 }
 \description{
-This function crawls domains and updates the Domain table with the fetched data.
+Cette fonction explore ("crawl") automatiquement un ensemble de domaines web et met à jour la table Domain de la base de données avec les informations collectées.
+\strong{Utilité :} enrichir la base de connaissances sur les domaines présents dans le corpus, suivre leur évolution, ou préparer des analyses de réseaux.
+}
+\details{
+\subsection{Fonctionnement}{
+- Sélectionne un nombre donné d'URLs à explorer (jusqu'à \code{nburl}).
+- Pour chaque URL, récupère les informations sur le domaine (nom, statut, métadonnées, etc.).
+- Met à jour ou ajoute les entrées correspondantes dans la table Domain de la base.
+}
+\subsection{Conseils d'utilisation}{
+- Adaptez \code{nburl} selon la taille de votre corpus et la puissance de votre machine.
+- Pratique pour maintenir à jour la liste des domaines actifs dans un projet de veille ou d'analyse web.
+- Vérifiez la cohérence de la base après un crawl massif.
+}
+}
+\examples{
+# Exemple : Crawler 50 domaines et mettre à jour la base
+crawlDomain(nburl = 50)
+
+# Exemple : Utiliser une base de données alternative
+crawlDomain(nburl = 200, db_name = "autre_base.db")
 }

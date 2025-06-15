@@ -2,17 +2,16 @@
 % Please edit documentation in R/crawl.R
 \name{PDFtoText}
 \alias{PDFtoText}
-\title{Extract text from a PDF URL}
+\title{Extract Text Content from a PDF URL}
 \usage{
 PDFtoText(url)
 }
 \arguments{
-\item{url}{A character string representing the URL of the PDF.}
+\item{url}{A character string representing the URL where the PDF file is located.}
 }
 \value{
-A character string containing the extracted text from the PDF.
+Returns a character string containing the extracted text content from the PDF file.
 }
 \description{
-This function downloads a PDF from a given URL and attempts to extract
-the text using `pdftools` and OCR if necessary.
+This function downloads a PDF document from the specified URL and attempts to extract its textual content. It primarily uses the `pdftools` package for text extraction and falls back to Optical Character Recognition (OCR) if the text extraction fails or is incomplete.
 }

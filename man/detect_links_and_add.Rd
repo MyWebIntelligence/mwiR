@@ -2,22 +2,42 @@
 % Please edit documentation in R/crawl.R
 \name{detect_links_and_add}
 \alias{detect_links_and_add}
-\title{Detect links in content and add to database}
+\title{Détecter les liens dans un contenu et les ajouter à la base de données}
 \usage{
 detect_links_and_add(con, content, parent_id, land_id, urlmax = 50)
 }
 \arguments{
-\item{con}{A database connection object.}
+\item{con}{Objet de connexion à la base de données (généralement obtenu avec \code{connect_db()}).}
 
-\item{content}{A character string containing the content to be parsed for links.}
+\item{content}{Chaîne de caractères contenant le texte ou le code HTML à analyser pour extraire les liens. Exemple : le contenu d'une page web.}
 
-\item{parent_id}{An integer representing the ID of the parent record in the database.}
+\item{parent_id}{Identifiant (entier) de l'enregistrement parent dans la base (ex : ID de la page source).}
 
-\item{land_id}{An integer representing the ID of the land associated with the links.}
+\item{land_id}{Identifiant (entier) du projet ("land") auquel associer les liens détectés.}
 
-\item{urlmax}{An integer specifying the maximum number of URLs to be processed.}
+\item{urlmax}{Nombre maximal d'URLs à traiter (entier, par défaut 50).}
 }
 \description{
-This function extracts links from content, cleans them, and adds them to the database.
-It handles both media and non-media links.
+Cette fonction extrait tous les liens (URLs) présents dans un contenu textuel ou HTML, les nettoie, puis les ajoute à la base de données. Elle gère à la fois les liens médias (images, vidéos, etc.) et les liens classiques (pages, documents).
+\strong{Utilité :} cartographier automatiquement les liens sortants d'une page, enrichir le graphe de liens, ou préparer des analyses de réseaux.
+}
+\details{
+\subsection{Fonctionnement}{
+- Analyse le contenu pour détecter toutes les URLs (href, src, etc.).
+- Nettoie chaque URL (suppression des fragments, caractères invalides).
+- Ajoute chaque lien à la base, en l'associant au parent et au projet ("land").
+- Gère séparément les liens médias (images, vidéos) et non-médias.
+- Limite le nombre d'URLs traitées à \code{urlmax} pour éviter les surcharges.
+}
+\subsection{Conseils d'utilisation}{
+- Pratique pour enrichir dynamiquement le graphe de liens lors du crawl de pages web.
+- Utilisez un \code{urlmax} adapté à la taille des pages pour éviter d'inonder la base.
+- Vérifiez la cohérence des identifiants parent et land pour une bonne structuration des données.
+}
+}
+\examples{
+# Exemple : Détecter et ajouter les liens d'une page web à la base
+con <- connect_db()
+content <- "<html><body><a href='http://exemple.com'>Lien</a></body></html>"
+detect_links_and_add(con, content, parent_id = 1, land_id = 2, urlmax = 10)
 }

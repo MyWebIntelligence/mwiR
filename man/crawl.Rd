@@ -2,18 +2,39 @@
 % Please edit documentation in R/crawl.R
 \name{crawl}
 \alias{crawl}
-\title{Crawl a URL and extract content}
+\title{Explorer une URL et extraire son contenu (web crawling)}
 \usage{
 crawl(url)
 }
 \arguments{
-\item{url}{A character string representing the URL to be crawled.}
+\item{url}{Chaîne de caractères représentant l'URL à explorer. Exemple : "https://exemple.com/article".}
 }
 \value{
-A data frame containing the extracted content from the URL.
+Un data frame contenant le contenu extrait de l'URL (texte principal, métadonnées, etc.).
 }
 \description{
-This function attempts to crawl a given URL using various methods, including
-mercury-parser, trafilatura, and alternative methods to extract content.
-It handles different content types, including PDFs.
+Cette fonction tente d'explorer ("crawler") une URL donnée pour en extraire le contenu pertinent (texte, titre, auteur, etc.), en utilisant plusieurs méthodes adaptées au type de page (HTML, PDF, etc.).
+\strong{Utilité :} automatiser la collecte de contenus web pour l'analyse, la veille, la constitution de corpus, etc.
+}
+\details{
+\subsection{Méthodes utilisées}{
+- Utilise successivement mercury-parser, trafilatura et d'autres méthodes alternatives pour maximiser les chances d'extraction.
+- Gère différents types de contenus : pages web classiques (HTML), articles, et fichiers PDF.
+- Retourne un data frame structuré avec le texte principal, les métadonnées (titre, auteur, date, etc.), et éventuellement des informations sur le format.
+}
+\subsection{Conseils d'utilisation}{
+- Pratique pour constituer automatiquement un corpus à partir d'une liste d'URLs.
+- En cas d'échec d'une méthode, la fonction tente d'autres alternatives.
+- Vérifiez le contenu extrait (certaines pages complexes ou protégées peuvent ne pas être correctement analysées).
+- Respectez les conditions d'utilisation des sites web (robots.txt, droits d'auteur).
+}
+}
+\examples{
+# Exemple : Extraire le contenu d'un article web
+resultat <- crawl("https://exemple.com/article")
+print(resultat$texte)
+
+# Exemple : Gérer un PDF en ligne
+resultat_pdf <- crawl("https://exemple.com/rapport.pdf")
+print(resultat_pdf$texte)
 }

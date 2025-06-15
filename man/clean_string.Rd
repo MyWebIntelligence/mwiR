@@ -2,16 +2,30 @@
 % Please edit documentation in R/export.R
 \name{clean_string}
 \alias{clean_string}
-\title{Clean String}
+\title{Nettoyer une chaîne de caractères (suppression des caractères de contrôle)}
 \usage{
 clean_string(str)
 }
 \arguments{
-\item{str}{A character string to be cleaned.}
+\item{str}{Chaîne de caractères à nettoyer. Exemple : "Texte\navec\tdes\tretours\na\rligne et\tdes\ttabs".}
 }
 \value{
-A cleaned character string.
+Une chaîne de caractères nettoyée, sans caractères de contrôle, retours à la ligne ni tabulations.
 }
 \description{
-This function removes control characters, newlines, and tabs from a string.
+Cette fonction supprime les caractères de contrôle, les retours à la ligne (\code{\n}, \code{\r}) et les tabulations (\code{\t}) d'une chaîne de caractères.
+\strong{Utilité :} préparer des textes pour l'export, le stockage en base de données, ou l'affichage sans mise en forme indésirable.
+}
+\details{
+\subsection{Conseils d'utilisation}{
+- Pratique pour nettoyer des textes issus de saisies libres, de fichiers ou d'extractions web.
+- Permet d'éviter des problèmes lors de l'export CSV, JSON, ou l'affichage dans des interfaces.
+- Ne modifie pas le contenu sémantique, uniquement la forme.
+}
+}
+\examples{
+# Exemple : Nettoyer une chaîne contenant des retours à la ligne et des tabulations
+texte_brut <- "Ligne 1\nLigne 2\tavec tabulation\rRetour chariot"
+texte_nettoye <- clean_string(texte_brut)
+print(texte_nettoye)
 }

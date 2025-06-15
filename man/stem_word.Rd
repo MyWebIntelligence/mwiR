@@ -2,32 +2,27 @@
 % Please edit documentation in R/crawl.R, R/land.R
 \name{stem_word}
 \alias{stem_word}
-\title{Stem a word}
+\title{Perform Stemming on a Word}
 \usage{
-stem_word(word, language = "en")
-
 stem_word(word, language = "en")
 }
 \arguments{
-\item{word}{A string specifying the word to stem.}
+\item{word}{A character string representing the word to be stemmed.}
 
-\item{language}{A string specifying the language for stemming. Default is "en".}
+\item{language}{A character string specifying the language to use for stemming. Default is "en" (English).}
 }
 \value{
-The stemmed version of the word.
-
-The stemmed word.
+Returns the stemmed version of the input word as a character string.
 }
 \description{
-This function performs stemming on a given word using the specified language.
-
-This function stems a word using the specified language.
+This function applies a stemming algorithm to the input word, reducing it to its root or base form based on the specified language. Stemming helps in normalizing words for text analysis by grouping different forms of a word under a common base.
 }
 \details{
-The function converts the word to lowercase and then applies a stemming algorithm based on the specified language.
+The function first converts the input word to lowercase, then applies the stemming process according to the language rules. This improves matching and comparison in natural language processing tasks.
 }
 \examples{
 \dontrun{
+# Stem the word "running" in English
 stem_word("running", "en")
 }
 }

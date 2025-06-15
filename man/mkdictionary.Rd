@@ -2,18 +2,18 @@
 % Please edit documentation in R/crawl.R
 \name{mkdictionary}
 \alias{mkdictionary}
-\title{Create a dictionary from text}
+\title{Create a Stemmed Dictionary from Text}
 \usage{
-mkdictionary(text, language = "en")
+mkdictionary(text, language = "fr")
 }
 \arguments{
-\item{text}{A character string representing the input text.}
+\item{text}{A character string containing the input text from which the dictionary will be created.}
 
-\item{language}{A character string specifying the language for stemming (default is "en").}
+\item{language}{A character string specifying the language used for stemming and tokenization. The default is "fr" (French), which affects how words are reduced to their root forms.}
 }
 \value{
-A data frame containing the stemmed phrases as the dictionary.
+Returns a data frame containing the stemmed phrases extracted from the input text, forming the dictionary. This dictionary can be used for text analysis and relevance calculations.
 }
 \description{
-This function creates a dictionary by tokenizing and stemming phrases from the input text.
+This function generates a dictionary by tokenizing the input text into phrases and applying stemming based on the specified language. The resulting stemmed phrases serve as the dictionary entries, useful for various natural language processing tasks.
 }

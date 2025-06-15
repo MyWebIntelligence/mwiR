@@ -2,33 +2,46 @@
 % Please edit documentation in R/land.R
 \name{addterm}
 \alias{addterm}
-\title{Add terms to a research project (land)}
+\title{Ajouter des termes à un projet de recherche ("land")}
 \usage{
 addterm(land_name, terms)
 }
 \arguments{
-\item{land_name}{A string specifying the name of the land.}
+\item{land_name}{Nom du projet ("land") auquel vous souhaitez associer des termes. Il s'agit d'une chaîne de caractères, par exemple "Climat" ou "Santé publique".}
 
-\item{terms}{A comma-separated string of terms to add.}
+\item{terms}{Une chaîne de caractères contenant un ou plusieurs termes à ajouter, séparés par des virgules. Par exemple : "réchauffement climatique, climat, changement".}
 }
 \value{
-Integer 1 if successful, 0 otherwise.
+Un entier : 1 si l'opération a réussi, 0 sinon.
 }
 \description{
-This function adds one or more terms to a specified land in the SQLite database.
-If the terms do not already exist in the Word table, they are added along with their stemmed lemmas.
-If the terms already exist, they are simply associated with the specified land in the LandDictionary table.
+Cette fonction permet d'ajouter un ou plusieurs termes-clés à un projet de recherche (appelé "land") dans la base de données SQLite. 
+\strong{Utilité :} enrichir le vocabulaire associé à un projet pour améliorer l'analyse, la recherche ou la catégorisation des contenus.
 }
 \details{
-The function performs the following steps:
-1. Checks if the specified land exists in the Land table.
-2. Splits the terms string into individual terms.
-3. Converts each term to lowercase and checks if it already exists in the Word table.
-4. If a term does not exist, it is stemmed and added to the Word table along with its lemma.
-5. Each term is then associated with the specified land in the LandDictionary table.
+\subsection{Fonctionnement étape par étape}{
+\itemize{
+  \item Vérifie que le projet ("land") existe dans la base de données.
+  \item Sépare la chaîne de termes en mots individuels.
+  \item Pour chaque terme :
+    \itemize{
+      \item Convertit le terme en minuscules.
+      \item Vérifie s'il existe déjà dans la table des mots ("Word").
+      \item Si le terme n'existe pas, il est "lemmatisé" (réduit à sa racine) et ajouté à la table.
+      \item Associe chaque terme au projet dans la table "LandDictionary".
+    }
+}
+}
+\subsection{Conseils d'utilisation}{
+- Utilisez cette fonction pour enrichir dynamiquement le vocabulaire d'un projet, par exemple lors de l'exploration de nouveaux thèmes.
+- Les termes déjà présents ne seront pas dupliqués, mais simplement associés au projet.
+- Privilégiez des termes simples et pertinents pour faciliter l'analyse ultérieure.
+}
 }
 \examples{
-\dontrun{
-addterm("Climate Research", "global warming", "climate", "change")
-}
+# Exemple : Ajouter plusieurs termes à un projet de recherche
+addterm("Climat", "réchauffement climatique, climat, changement")
+
+# Exemple : Ajouter un seul terme
+addterm("Santé publique", "vaccination")
 }

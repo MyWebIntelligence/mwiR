@@ -2,33 +2,42 @@
 % Please edit documentation in R/land.R
 \name{deleteland}
 \alias{deleteland}
-\title{Delete a research project (land)}
+\title{Supprimer un projet de recherche ("land") et ses données associées}
 \usage{
 deleteland(land_name, maxrel = NULL, db_name = "mwi.db")
 }
 \arguments{
-\item{land_name}{A string specifying the name of the land to delete.}
+\item{land_name}{Nom du projet ("land") à supprimer (chaîne de caractères). Exemple : "Climat".}
 
-\item{maxrel}{An integer specifying the maximum relevance for expressions to delete. Default is NULL.}
+\item{maxrel}{Valeur maximale de pertinence (entier) pour supprimer uniquement les expressions (pages) dont la pertinence est inférieure ou égale à ce seuil. Par défaut : NULL (supprime tout le land et ses données).}
 
-\item{db_name}{A string specifying the name of the SQLite database file. Default is "mwi.db".}
+\item{db_name}{Nom du fichier de base de données SQLite à utiliser. Par défaut : "mwi.db".}
 }
 \value{
-Integer 1 if successful, 0 otherwise.
+Un entier : 1 si l'opération a réussi, 0 sinon.
 }
 \description{
-This function deletes a specified land and its associated records from the SQLite database.
-If a maximum relevance is specified, only the expressions with relevance less than or equal to this value are deleted.
+Cette fonction supprime un projet de recherche ("land") et toutes ses données associées de la base de données SQLite.
+\strong{Utilité :} nettoyer la base, réinitialiser un corpus, ou supprimer des données obsolètes.
 }
 \details{
-The function performs the following steps:
-1. Checks if the specified land exists in the Land table.
-2. If a maximum relevance is specified, deletes expressions with relevance less than or equal to this value.
-3. If no maximum relevance is specified, deletes the land and all its associated records.
+\subsection{Fonctionnement étape par étape}{
+- Vérifie l'existence du projet dans la table Land.
+- Si \code{maxrel} est spécifié, supprime uniquement les expressions (pages) du land dont la pertinence est inférieure ou égale à ce seuil.
+- Si \code{maxrel} n'est pas spécifié, supprime le land et toutes ses données associées (expressions, liens, dictionnaire, etc.).
+- Met à jour la base pour garantir la cohérence des relations.
+}
+\subsection{Conseils d'utilisation}{
+- Sauvegardez la base avant toute suppression massive.
+- Utilisez \code{maxrel} pour un nettoyage sélectif sans supprimer tout le projet.
+- Vérifiez les dépendances (liens, dictionnaire, médias) avant suppression totale.
+- Opération irréversible : à utiliser avec précaution.
+}
 }
 \examples{
-\dontrun{
-deleteland("Climate Research")
-deleteland("Climate Research", maxrel = 2)
-}
+# Exemple : Supprimer totalement le projet "Climat"
+deleteland("Climat")
+
+# Exemple : Supprimer uniquement les pages de pertinence faible (<=2)
+deleteland("Climat", maxrel = 2)
 }

@@ -2,16 +2,16 @@
 % Please edit documentation in R/crawl.R
 \name{word_tokenizer}
 \alias{word_tokenizer}
-\title{Tokenize words}
+\title{Tokenize Text into Words}
 \usage{
 word_tokenizer(text)
 }
 \arguments{
-\item{text}{A character string representing the text to be tokenized.}
+\item{text}{A character string containing the text to be tokenized into words.}
 }
 \value{
-A character vector of tokenized words.
+Returns a character vector containing the individual words extracted from the input text.
 }
 \description{
-This function splits a text into words.
+This function processes the input text by splitting it into individual words (tokens). It is useful for text analysis tasks that require word-level tokenization.
 }

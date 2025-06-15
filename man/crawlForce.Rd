@@ -2,15 +2,35 @@
 % Please edit documentation in R/crawl.R
 \name{crawlForce}
 \alias{crawlForce}
-\title{Force crawl for a specific land}
+\title{Forcer le crawl pour un projet ("land") donné}
 \usage{
 crawlForce(land_name, db_name = "mwi.db")
 }
 \arguments{
-\item{land_name}{A character string representing the name of the land.}
+\item{land_name}{Nom du projet ("land") pour lequel vous souhaitez forcer le crawl (chaîne de caractères). Exemple : "Climat".}
 
-\item{db_name}{A character string representing the name of the database (default is "mwi.db").}
+\item{db_name}{Nom du fichier de base de données SQLite à utiliser. Par défaut : "mwi.db".}
 }
 \description{
-This function forces a crawl by resetting the fetched status for URLs that have not been approved. So next time the crawl will rework on this url.
+Cette fonction force la ré-exploration ("crawl") des URLs associées à un projet ("land") donné, en réinitialisant le statut "fetched" pour toutes les URLs qui n'ont pas été validées. 
+\strong{Utilité :} relancer l'extraction de contenus pour des URLs problématiques, non traitées ou après une mise à jour de la méthode de crawl.
+}
+\details{
+\subsection{Fonctionnement}{
+- Identifie toutes les URLs du projet dont le statut "fetched" n'est pas validé.
+- Réinitialise ce statut pour que ces URLs soient à nouveau traitées lors du prochain crawl.
+- Permet de corriger ou compléter un corpus sans supprimer les URLs existantes.
+}
+\subsection{Conseils d'utilisation}{
+- Pratique après une correction de bug, une amélioration de l'extraction, ou pour relancer un crawl interrompu.
+- Utiliser avec précaution sur de grands corpus (peut entraîner un crawl massif).
+- Vérifiez l'état de la base avant et après l'opération.
+}
+}
+\examples{
+# Exemple : Forcer le crawl pour le projet "Climat"
+crawlForce("Climat")
+
+# Exemple : Utiliser une base alternative
+crawlForce("Santé publique", db_name = "autre_base.db")
 }

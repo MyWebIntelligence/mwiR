@@ -2,7 +2,7 @@
 % Please edit documentation in R/recode.R
 \name{mwiR_detectLang}
 \alias{mwiR_detectLang}
-\title{Detect Language of Text in Data Frame Columns}
+\title{Detect Language of Text in Data Frame Columns Using cld3}
 \usage{
 mwiR_detectLang(df, variables)
 }
@@ -13,22 +13,22 @@ mwiR_detectLang(df, variables)
 that contain the text to be analyzed.}
 }
 \value{
-A character vector of the same length as the number of rows in `df`,
-  where each element represents the detected language code for the corresponding row.
+Returns a character vector with the same length as the number of rows in `df`,
+where each element is the detected language code for the corresponding row.
 }
 \description{
 This function detects the language of text contained in specified columns of a data frame.
-It combines the text from multiple columns and uses the 'cld3' package to perform
-language detection on the combined text for each row.
+It concatenates the text from the specified columns for each row and uses the 'cld3' package
+to perform language detection on the combined text.
 }
 \details{
-The function performs the following steps:
-1. Checks if all specified variables exist in the data frame.
-2. Combines the text from the specified columns for each row.
-3. Uses the 'cld3' package to detect the language of the combined text.
+The function workflow includes:
+1. Verifying that all specified columns exist in the data frame.
+2. Concatenating the text from the specified columns for each row.
+3. Using the 'cld3' package to detect the language of the concatenated text.
 
-Language codes are returned according to the ISO 639-1 standard (e.g., "en" for English,
-"fr" for French, etc.).
+The detected language codes follow the ISO 639-1 standard (e.g., "en" for English,
+"fr" for French).
 }
 \note{
 This function requires the 'cld3' package to be installed and loaded.

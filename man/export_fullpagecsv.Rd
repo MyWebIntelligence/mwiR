@@ -2,22 +2,21 @@
 % Please edit documentation in R/export.R
 \name{export_fullpagecsv}
 \alias{export_fullpagecsv}
-\title{Export Full Page CSV}
+\title{Exporter les données complètes d'une page au format CSV}
 \usage{
 export_fullpagecsv(con, land_name, minimum_relevance, filename)
 }
 \arguments{
-\item{con}{A database connection object.}
-
-\item{land_name}{A character string specifying the name of the land.}
-
-\item{minimum_relevance}{A numeric value specifying the minimum relevance score for inclusion in the export.}
-
-\item{filename}{A character string specifying the name of the output CSV file.}
+\item{con}{Objet de connexion à la base de données permettant d'accéder aux données du territoire.}
+\item{land_name}{Chaîne de caractères indiquant le nom du territoire (land) dont on souhaite exporter les données.}
+\item{minimum_relevance}{Valeur numérique définissant le seuil minimal de pertinence pour inclure une page dans l'export. Seules les pages avec une pertinence égale ou supérieure seront exportées.}
+\item{filename}{Nom du fichier CSV de sortie dans lequel les données seront enregistrées.}
 }
 \value{
-An integer indicating the number of rows written to the CSV file.
+Un entier indiquant le nombre de lignes (pages) écrites dans le fichier CSV.
 }
 \description{
-This function exports detailed data from the specified land to a CSV file based on a minimum relevance score.
+Cette fonction permet d'exporter les données détaillées des pages d'un territoire donné au format CSV. 
+Les données sont extraites de la base via la connexion \code{con}, filtrées selon le seuil de pertinence \code{minimum_relevance}, puis sauvegardées dans un fichier CSV nommé \code{filename}.
+Cette exportation facilite l'analyse externe, le partage ou l'archivage des données complètes des pages.
 }

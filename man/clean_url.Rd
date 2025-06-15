@@ -2,16 +2,30 @@
 % Please edit documentation in R/crawl.R
 \name{clean_url}
 \alias{clean_url}
-\title{Clean the extracted URL}
+\title{Nettoyer une URL extraite (suppression des fragments et caractères invalides)}
 \usage{
 clean_url(url)
 }
 \arguments{
-\item{url}{A character string representing the URL to be cleaned.}
+\item{url}{Chaîne de caractères représentant l'URL à nettoyer. Exemple : "http://exemple.com/page#section".}
 }
 \value{
-A cleaned URL as a character string.
+Une URL nettoyée, sous forme de chaîne de caractères, sans fragment (\code{#...}) ni caractères non valides.
 }
 \description{
-This function removes fragment identifiers and keeps only valid URL characters.
+Cette fonction supprime les fragments d'URL (partie après \code{#}) et conserve uniquement les caractères valides d'une URL.
+\strong{Utilité :} garantir l'unicité des liens, faciliter l'indexation, éviter les doublons lors de l'analyse ou de l'archivage.
+}
+\details{
+\subsection{Conseils d'utilisation}{
+- Pratique pour nettoyer des URLs extraites de pages web ou de bases de données.
+- Permet d'éviter les doublons dus à des fragments ou à des caractères parasites.
+- Idéal avant l'archivage, l'analyse de réseaux ou la création d'index de liens.
+}
+}
+\examples{
+# Exemple : Nettoyer une URL contenant un fragment
+url_brute <- "http://exemple.com/page#section"
+url_propre <- clean_url(url_brute)
+print(url_propre)
 }
