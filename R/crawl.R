@@ -7,10 +7,12 @@
 #' @param url A character string representing the URL to be crawled.
 #' @return A data frame containing the extracted content from the URL.
 #' @import httr jsonlite rvest
+#' @import reticulate
+.trafilatura_mod <- reticulate::import("trafilatura", delay_load = FALSE)
 #' @export
 crawl <- function(url) {
   # Importation de Trafilatura
-  trafilatura <- reticulate::import("trafilatura")
+  trafilatura <- .trafilatura_mod
 
   # Fonction pour extraire le contenu
   readFull <- tryCatch({
@@ -41,25 +43,34 @@ crawl <- function(url) {
   # Si l'extraction principale échoue, essayer avec Archive.org
   if (is.null(readFull$title)) {
     message("Tentative avec Archive.org")
-    urlarchive <- get_last_memento_url(url) # Fonction personnalisée pour Archive.org
-    tryCatch({
-      downloaded <- trafilatura$fetch_url(urlarchive)
-      if (!is.null(downloaded)) {
-        extracted_content <- trafilatura$extract(
-          filecontent = downloaded,
-          url = urlarchive,
-          include_links = TRUE,
-          output_format = "json",
-          with_metadata = TRUE
-        )
-        if (!is.null(extracted_content) && extracted_content != "") {
-          message("Extraction avec Archive.org")
-          readFull <- jsonlite::fromJSON(extracted_content, simplifyVector = TRUE)
+    urlarchive <- get_last_memento_url(url)
+    if (!is.null(urlarchive)) {
+      tryCatch({
+        message("Extraction fallback avec Archive.org")
+        downloaded <- trafilatura$fetch_url(urlarchive)
+        if (!is.null(downloaded)) {
+          extracted_content <- trafilatura$extract(
+            filecontent = downloaded,
+            url = urlarchive,
+            include_links = TRUE,
+            output_format = "json",
+            with_metadata = TRUE
+          )
+          if (!is.null(extracted_content) && extracted_content != "") {
+            message("Extraction avec Archive.org")
+            readFull <- jsonlite::fromJSON(extracted_content, simplifyVector = TRUE)
+          } else {
+            stop("Extraction échouée ou contenu vide pour le memento.")
+          }
+        } else {
+          stop("Téléchargement du memento échoué ou URL invalide.")
         }
-      }
-    }, error = function(e) {
-      message("Erreur lors de la récupération avec Archive.org : ", e$message)
-    })
+      }, error = function(e) {
+        message("Erreur lors de la récupération avec Archive.org : ", e$message)
+      })
+    } else {
+      message("Aucun memento disponible pour l'URL originale")
+    }
   }
 
   # Gestion des métadonnées et renvoi sous forme de DataFrame
@@ -379,11 +390,12 @@ expression_relevance <- function(dictionary, expression, language = "fr") {
 crawlurls <- function(land_name, urlmax=50, limit = NULL, http_status = NULL, db_name = "mwi.db") {
 
   con <- dbConnect(SQLite(), dbname = db_name)
+  dbBegin(con)
 
   res <- dbGetQuery(con, "SELECT id, lang FROM Land WHERE name = ?", params = list(land_name))
 
   if (nrow(res) == 0) {
-    print(paste("Land", land_name, "not found"))
+    message("Land ", land_name, " not found")
     dbDisconnect(con)
     return(0)
   }
@@ -418,10 +430,11 @@ crawlurls <- function(land_name, urlmax=50, limit = NULL, http_status = NULL, db
 
   urls_to_crawl <- dbGetQuery(con, sql_query, params = params)
 
+  timestamp_now <- format(Sys.time(), format = "%Y-%m-%dT%H:%M:%OS3Z")
   for (i in 1:nrow(urls_to_crawl)) {
     tryCatch({
-      print(paste("start : ", urls_to_crawl$url[i], sep=" "))
-      dbExecute(con, "UPDATE Expression SET fetched_at = ? WHERE id = ?", params = list(format(Sys.time(), format = "%Y-%m-%dT%H:%M:%OS3Z"), urls_to_crawl$id[i]))
+      message("start : ", urls_to_crawl$url[i])
+      dbExecute(con, "UPDATE Expression SET fetched_at = ? WHERE id = ?", params = list(timestamp_now, urls_to_crawl$id[i]))
 
       url_data <- crawl(urls_to_crawl$url[i])
 
@@ -439,25 +452,26 @@ crawlurls <- function(land_name, urlmax=50, limit = NULL, http_status = NULL, db
             domain_id <- existing_domain$id[1]
           }
 
-          dbExecute(con, "UPDATE Expression SET title = ?, readable = ?, domain_id = ?, description = ?, published_at = ?, approved_at = ?, lang = ?, relevance = ? WHERE id = ?", params = list(url_data$title, url_data$text[1], domain_id, url_data$excerpt, url_data$date, format(Sys.time(), format = "%Y-%m-%dT%H:%M:%OS3Z"), detected_lang, relevance_score, urls_to_crawl$id[i]))
+          dbExecute(con, "UPDATE Expression SET title = ?, readable = ?, domain_id = ?, description = ?, published_at = ?, approved_at = ?, lang = ?, relevance = ? WHERE id = ?", params = list(url_data$title, url_data$text[1], domain_id, url_data$excerpt, url_data$date, timestamp_now, detected_lang, relevance_score, urls_to_crawl$id[i]))
 
           # add links to data base
           detect_links_and_add(con, url_data$text[1], urls_to_crawl$id[i], land_id, urlmax)
 
           # Placeholder for the detect_links_and_add function
-          print(paste("Crawled URL:", urls_to_crawl$url[i]))
+          message("Crawled URL: ", urls_to_crawl$url[i])
         } else {
-          print(paste("Both primary and fallback crawls failed for URL:", urls_to_crawl$url[i]))
+          message("Both primary and fallback crawls failed for URL: ", urls_to_crawl$url[i])
         }
       }
     }, error = function(e) {
-      print(paste("Error processing URL:", urls_to_crawl$url[i], "Error:", e))
+      message("Error processing URL: ", urls_to_crawl$url[i], " Error: ", e)
     })
   }
 
+  dbCommit(con)
   dbDisconnect(con)
 
-  print(paste("Crawling completed for land", land_name))
+  message("Crawling completed for land ", land_name)
   return(1)
 }
 
@@ -547,6 +561,7 @@ crawlDetails <- function(url) {
 crawlDomain <- function(nburl = 100, db_name = "mwi.db") {
   # connexion to Data Base SQLite
   con <- dbConnect(SQLite(), dbname = db_name)
+  dbBegin(con)
 
   # Extract nburl URLs from Domain table of DB
   sql_query <- paste0("SELECT * FROM Domain WHERE fetched_at IS NULL LIMIT ", nburl)
@@ -595,6 +610,7 @@ crawlDomain <- function(nburl = 100, db_name = "mwi.db") {
   }
 
   # Never forget to close connexion
+  dbCommit(con)
   dbDisconnect(con)
 
   message("The update of Domain table is succed. ")

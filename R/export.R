@@ -5,10 +5,32 @@
 #' @param db_name A character string specifying the name of the database file. Default is "mwi.db".
 #' @return A database connection object.
 #' @import RSQLite
+#' @import data.table
 #' @export
+
 connect_db <- function(db_name = "mwi.db") {
   con <- dbConnect(RSQLite::SQLite(), dbname = db_name)
   return(con)
+}
+
+#' Get Land ID
+#'
+#' Utility function returning the numeric id of a land, or stops with an explicit error
+#' if the land name does not exist in the database.
+#'
+#' @param con A database connection object.
+#' @param land_name A character string specifying the land name.
+#' @return An integer scalar containing the land id.
+#' @keywords internal
+#' @import DBI
+get_land_id <- function(con, land_name) {
+  land_id <- dbGetQuery(con,
+                        "SELECT id FROM Land WHERE name = ?",
+                        params = list(land_name))$id
+  if (length(land_id) == 0 || is.na(land_id)) {
+    stop("The specified land does not exist.")
+  }
+  return(land_id)
 }
 
 #' Export Page CSV
@@ -24,12 +46,7 @@ connect_db <- function(db_name = "mwi.db") {
 #' @export
 export_pagecsv <- function(con, land_name, minimum_relevance, filename) {
   # Retrieve the land ID from the name
-  land_query <- "SELECT id FROM Land WHERE name = ?"
-  land_id <- dbGetQuery(con, land_query, params = list(land_name))$id
-
-  if (is.null(land_id)) {
-    stop("The specified land does not exist.")
-  }
+  land_id <- get_land_id(con, land_name)
 
   # Define the column mapping and SQL query
   pagecsv_col_map <- list(
@@ -64,7 +81,7 @@ export_pagecsv <- function(con, land_name, minimum_relevance, filename) {
   full_sql <- sprintf(pagecsv_sql, cols)
   result <- dbGetQuery(con, full_sql, params = list(land_id, minimum_relevance))
 
-  write.csv(result, file = filename, row.names = FALSE)
+  data.table::fwrite(result, file = filename)
 
   return(nrow(result))
 }
@@ -84,12 +101,7 @@ export_pagecsv <- function(con, land_name, minimum_relevance, filename) {
 #' @export
 export_fullpagecsv <- function(con, land_name, minimum_relevance, filename) {
   # Retrieve the land ID from the name
-  land_query <- "SELECT id FROM Land WHERE name = ?"
-  land_id <- dbGetQuery(con, land_query, params = list(land_name))$id
-
-  if (is.null(land_id)) {
-    stop("The specified land does not exist.")
-  }
+  land_id <- get_land_id(con, land_name)
 
   # Define the column mapping and SQL query
   fullpagecsv_col_map <- list(
@@ -125,7 +137,7 @@ export_fullpagecsv <- function(con, land_name, minimum_relevance, filename) {
   full_sql <- sprintf(fullpagecsv_sql, cols)
   result <- dbGetQuery(con, full_sql, params = list(land_id, minimum_relevance))
 
-  write.csv(result, file = filename, row.names = FALSE)
+  data.table::fwrite(result, file = filename)
 
   return(nrow(result))
 }
@@ -144,12 +156,7 @@ export_fullpagecsv <- function(con, land_name, minimum_relevance, filename) {
 #' @export
 export_nodecsv <- function(con, land_name, minimum_relevance, filename) {
   # Retrieve the land ID from the name
-  land_query <- "SELECT id FROM Land WHERE name = ?"
-  land_id <- dbGetQuery(con, land_query, params = list(land_name))$id
-
-  if (is.null(land_id)) {
-    stop("The specified land does not exist.")
-  }
+  land_id <- get_land_id(con, land_name)
 
   # Define the column mapping and SQL query
   nodecsv_col_map <- list(
@@ -176,7 +183,7 @@ export_nodecsv <- function(con, land_name, minimum_relevance, filename) {
   full_sql <- sprintf(nodecsv_sql, cols)
   result <- dbGetQuery(con, full_sql, params = list(land_id, minimum_relevance))
 
-  write.csv(result, file = filename, row.names = FALSE)
+  data.table::fwrite(result, file = filename)
 
   return(nrow(result))
 }
@@ -195,12 +202,7 @@ export_nodecsv <- function(con, land_name, minimum_relevance, filename) {
 #' @export
 export_mediacsv <- function(con, land_name, minimum_relevance, filename) {
   # Retrieve the land ID from the name
-  land_query <- "SELECT id FROM Land WHERE name = ?"
-  land_id <- dbGetQuery(con, land_query, params = list(land_name))$id
-
-  if (is.null(land_id)) {
-    stop("The specified land does not exist.")
-  }
+  land_id <- get_land_id(con, land_name)
 
   # Define the column mapping and SQL query
   mediacsv_col_map <- list(
@@ -224,7 +226,7 @@ export_mediacsv <- function(con, land_name, minimum_relevance, filename) {
   full_sql <- sprintf(mediacsv_sql, cols)
   result <- dbGetQuery(con, full_sql, params = list(land_id, minimum_relevance))
 
-  write.csv(result, file = filename, row.names = FALSE)
+  data.table::fwrite(result, file = filename)
 
   return(nrow(result))
 }
@@ -257,12 +259,7 @@ clean_string <- function(str) {
 #' @export
 export_pagegexf <- function(con, land_name, minimum_relevance, filename) {
   # Retrieve the land ID from the name
-  land_query <- "SELECT id FROM Land WHERE name = ?"
-  land_id <- dbGetQuery(con, land_query, params = list(land_name))$id
-
-  if (is.null(land_id)) {
-    stop("The specified land does not exist.")
-  }
+  land_id <- get_land_id(con, land_name)
 
   # Define GEXF attributes without undesired fields
   gexf_attributes <- c(
@@ -375,12 +372,7 @@ convert_date <- function(date_str) {
 #' @export
 export_nodegexf <- function(con, land_name, minimum_relevance, filename) {
   # Retrieve the land ID from the name
-  land_query <- "SELECT id FROM Land WHERE name = ?"
-  land_id <- dbGetQuery(con, land_query, params = list(land_name))$id
-
-  if (is.null(land_id)) {
-    stop("The specified land does not exist.")
-  }
+  land_id <- get_land_id(con, land_name)
 
   # Define GEXF attributes
   gexf_attributes <- list(
@@ -521,16 +513,11 @@ Source: \"%s\"\n
 #' @export
 export_corpus <- function(con, land_name, minimum_relevance) {
   # Retrieve the land ID from the name
-  land_query <- "SELECT id FROM Land WHERE name = ?"
-  land_id <- dbGetQuery(con, land_query, params = list(land_name))$id
-
-  if (is.null(land_id)) {
-    stop("The specified land does not exist.")
-  }
+  land_id <- get_land_id(con, land_name)
 
   # Create a directory to store the corpus files
   dir_name <- paste0(land_name, "_corpus")
-  dir.create(dir_name)
+  dir.create(dir_name, recursive = TRUE, showWarnings = FALSE)
 
   # SQL query to retrieve data
   col_map <- list(
