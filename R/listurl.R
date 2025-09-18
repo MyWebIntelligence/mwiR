@@ -1,3 +1,22 @@
+##' @import httr jsonlite lubridate data.table
+##' Retrieve SerpAPI key
+##'
+##' Internal helper returning the key from the global variable or
+##' environment; if missing, prompts the user.
+##' @return Character scalar containing the API key.
+##' @keywords internal
+get_serp_key <- function() {
+  key <- get0("serp_key",
+              ifnotfound = Sys.getenv("SERPAPI_KEY", unset = NA_character_),
+              envir = .GlobalEnv)
+  if (is.na(key) || key == "") {
+    key <- readline(prompt = "SerpAPI key is not set. Please enter your API key: ")
+    if (key == "") stop("Error: SerpAPI key is required.")
+    assign("serp_key", gsub("\"", "", key, fixed = TRUE), envir = .GlobalEnv)
+  }
+  key
+}
+
 #' Retrieve Related Search Queries from Google using SerpAPI
 #'
 #' This function retrieves related search queries from Google using the SerpAPI service.
@@ -24,16 +43,7 @@
 #'
 #' @export
 related_query <- function(query, lang = "fr", country = "France") {
-
-  # Check if serp_key is NULL
-  if (is.null(api_key) || api_key == "") {
-    serp_key <- readline(prompt = "SerpAPI key is not set. Please enter your API key: ")
-    # If the user does not provide an API key, display an alert message and exit the function
-    if (is.null(serp_key) || serp_key == "") {
-      stop("Error: SerpAPI key is required to execute this function.")
-    }
-    assign("serp_key", gsub("\"", "", serp_key), envir = .GlobalEnv)
-  }
+  api_key <- get_serp_key()
 
   # Convert the query to lowercase and replace spaces with '+'
   query <- tolower(query)
@@ -42,7 +52,6 @@ related_query <- function(query, lang = "fr", country = "France") {
   related_searches_df <- data.frame(block_position = integer(), query = character(), link = character(), serpapi_link = character(), stringsAsFactors = FALSE)
 
   # Basic parameters
-  api_key <- serp_key
   google_domain <- paste("google.", lang, sep = "")
   gl <- lang
   hl <- lang
@@ -107,17 +116,10 @@ related_query <- function(query, lang = "fr", country = "France") {
 #' }
 #'
 #' @export
-urlist_Google <- function(query, datestart, dateend, timestep = "week") {
+urlist_Google <- function(query, datestart, dateend,
+                          timestep = "week", sleep_seconds = 1, lang = "fr") {
 
-  # Check if serp_key is NULL
-  if (is.null(api_key) || api_key == "") {
-    serp_key <- readline(prompt = "SerpAPI key is not set. Please enter your API key: ")
-    # If the user does not provide an API key, display an alert message and exit the function
-    if (is.null(serp_key) || serp_key == "") {
-      stop("Error: SerpAPI key is required to execute this function.")
-    }
-    assign("serp_key", gsub("\"", "", serp_key), envir = .GlobalEnv)
-  }
+  api_key <- get_serp_key()
 
   # Convert the query to lowercase and replace spaces with '+'
   query <- tolower(query)
@@ -138,8 +140,7 @@ urlist_Google <- function(query, datestart, dateend, timestep = "week") {
     dateend_str <- format(datesearch$dateend[i], "%m/%d/%Y")
 
     # Basic parameters
-    api_key <- serp_key
-    google_domain <- "google.fr"
+    google_domain <- paste0("google.", lang)
     gl <- lang
     hl <- lang
     lr <- paste("lang_", lang, sep = "")
@@ -248,15 +249,7 @@ urlist_Google <- function(query, datestart, dateend, timestep = "week") {
 #' @export
 urlist_Duck <- function(query, filename = NULL, sleep_seconds = 1, lang = "fr") {
 
-  # Check if serp_key is NULL
-  if (is.null(api_key) || api_key == "") {
-    serp_key <- readline(prompt = "SerpAPI key is not set. Please enter your API key: ")
-    # If the user does not provide an API key, display an alert message and exit the function
-    if (is.null(serp_key) || serp_key == "") {
-      stop("Error: SerpAPI key is required to execute this function.")
-    }
-    assign("serp_key", gsub("\"", "", serp_key), envir = .GlobalEnv)
-  }
+  api_key <- get_serp_key()
 
   # Create a filename based on the query
   if (is.null(filename)) {
@@ -354,15 +347,7 @@ urlist_Duck <- function(query, filename = NULL, sleep_seconds = 1, lang = "fr") 
 #' @export
 urlist_Bing <- function(query, filename = NULL, sleep_seconds = 1, lang = "fr") {
 
-  # Check if serp_key is NULL
-  if (is.null(api_key) || api_key == "") {
-    serp_key <- readline(prompt = "SerpAPI key is not set. Please enter your API key: ")
-    # If the user does not provide an API key, display an alert message and exit the function
-    if (is.null(serp_key) || serp_key == "") {
-      stop("Error: SerpAPI key is required to execute this function.")
-    }
-    assign("serp_key", gsub("\"", "", serp_key), envir = .GlobalEnv)
-  }
+  api_key <- get_serp_key()
 
   # Create a filename based on the query
   if (is.null(filename)) {
@@ -439,4 +424,3 @@ urlist_Bing <- function(query, filename = NULL, sleep_seconds = 1, lang = "fr") 
 
   }
 }
-

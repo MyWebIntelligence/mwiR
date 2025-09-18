@@ -20,36 +20,52 @@
 #' \dontrun{
 #' initmwi()
 #' }
-#' @import DBI cld3 httr lubridate jsonlite pdftools readr reticulate RSQLite SnowballC stringr tesseract tools urltools zip mockery
+#' @import DBI cld3 ggplot2 gridExtra httr lubridate jsonlite mclust openai pdftools readr reticulate RSQLite rvest SnowballC stringr stringi tesseract tools urltools XML zip mockery
 #' @export
 initmwi <- function() {
   required_packages <- c("DBI", "cld3", "ggplot2", "gridExtra","httr", "lubridate", "jsonlite", "mclust","openai","pdftools", "readr","reticulate", "RSQLite", "rvest","SnowballC",  "stringr", "stats","tesseract", "tools", "urltools", "XML", "zip", "mockery", "stringi")
+  installed_packages <- rownames(installed.packages())
 
-  # Check and install missing packages
-  for (pkg in required_packages) {
-    if (!requireNamespace(pkg, quietly = TRUE)) {
-      tryCatch({
-        install.packages(pkg, repos = "https://cloud.r-project.org")
-      }, error = function(e) {
-        stop(paste("Failed to install package:", pkg))
-      })
-    }
-    suppressMessages(suppressWarnings(library(pkg, character.only = TRUE)))
+  # Check and install missing packages ------------------------------------------------------------
+  missing_pkgs <- setdiff(required_packages, installed_packages)
+  if (length(missing_pkgs)) {
+    message("Installing missing packages: ", paste(missing_pkgs, collapse = ", "))
+    tryCatch({
+      options(repos = c(CRAN = "https://cloud.r-project.org"))
+      install.packages(missing_pkgs, dependencies = TRUE)
+    }, error = function(e) {
+      stop("Failed to install one or more packages: ", e$message)
+    })
   }
+  # Load packages quietly
+  invisible(
+    vapply(required_packages, function(pkg) {
+      suppressPackageStartupMessages(require(pkg, character.only = TRUE, quietly = TRUE))
+      TRUE
+    }, logical(1L))
+  )
 
-
-  # Check if the 'trafilatura' module is available
+  # Check if the 'trafilatura' module is available -----------------------------------------------
   if (reticulate::py_module_available("trafilatura")) {
     message("Trafilatura is installed and available.")
-    trafilatura <- reticulate::import("trafilatura")
+    assign(".trafilatura_mod",
+           reticulate::import("trafilatura", delay_load = FALSE),
+           envir = .GlobalEnv)
   } else {
     warning("Trafilatura is not installed. Run 'pip install trafilatura' in your Python environment.")
   }
 
-  # Prompt the user for the SERP API key
-  serp_key <- readline(prompt = "Enter your SERP API key or press Enter: ")
-
-  # Store the API key in the global environment
-  assign("serp_key", gsub("\"", "", serp_key), envir = .GlobalEnv)
+  # Retrieve or prompt for SERP API key -----------------------------------------------------------
+  serp_key <- Sys.getenv("SERPAPI_KEY", unset = NA_character_)
+  if (is.na(serp_key) || serp_key == "") {
+    if (interactive()) {
+      serp_key <- readline(prompt = "Enter your SERP API key or press Enter: ")
+    } else {
+      warning("SERPAPI_KEY environment variable not set and session is non‑interactive.")
+      serp_key <- ""
+    }
+  }
+  serp_key <- gsub("\"", "", serp_key, fixed = TRUE)
+  assign("serp_key", serp_key, envir = .GlobalEnv)
 
 }

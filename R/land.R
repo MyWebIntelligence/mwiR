@@ -123,21 +123,26 @@ db_setup <- function(db_name = "mwi.db") {
      )"
   )
 
-  # Start a transaction
-  dbBegin(con)
-
-  # Execute the SQL commands to create the tables
-  for (command in sql_commands) {
-    dbExecute(con, command)
-  }
-
-  # Commit the transaction
-  dbCommit(con)
-
-  # Close the connection
+  # Execute all table-creation commands atomically
+  dbWithTransaction(con, {
+    lapply(sql_commands, function(cmd) dbExecute(con, cmd))
+  })
   dbDisconnect(con)
-
   message("Database setup completed.")
+}
+
+#' Return the id of a land (helper)
+#'
+#' Internal utility returning the numeric id of a land, stops if it does not exist.
+#' @param con A DBI connection.
+#' @param land_name Character scalar.
+#' @return Integer id.
+#' @keywords internal
+#' @import DBI
+.get_land_id <- function(con, land_name) {
+  res <- dbGetQuery(con, "SELECT id FROM Land WHERE name = ?", params = list(land_name))$id
+  if (length(res) == 0 || is.na(res)) stop(sprintf("Land '%s' not found.", land_name))
+  res[1]
 }
 
 #' Create a new research project (land)
@@ -174,8 +179,10 @@ create_land <- function(name, desc, lang = "en", db_name = "mwi.db") {
   if (nrow(existing_land) > 0) {
     message("A land with this name already exists.")
   } else {
-    # Insert the new land into the Land table
-    dbExecute(con, query_insert, params = list(name, desc, lang, Sys.time()))
+    dbWithTransaction(con, {
+      dbExecute(con, query_insert,
+                params = list(name, desc, lang, format(Sys.time(), "%Y-%m-%d %H:%M:%S")))
+    })
     message(sprintf("Land '%s' created", name))
   }
 
@@ -316,7 +323,7 @@ addterm <- function(land_name, terms) {
   res <- dbGetQuery(con, query_check_land, params = list(land_name))
 
   if (nrow(res) == 0) {
-    print(paste("Land", land_name, "not found"))
+    message("Land ", land_name, " not found")
     dbDisconnect(con)
     return(0)
   }
@@ -328,41 +335,37 @@ addterm <- function(land_name, terms) {
   term_list <- strsplit(terms, ",")[[1]]
   term_list <- trimws(term_list)
 
-  # Start a transaction
-  dbBegin(con)
+  dbWithTransaction(con, {
+    for (term in term_list) {
+      # Convert the term to lowercase
+      term <- tolower(term)
 
-  for (term in term_list) {
-    # Convert the term to lowercase
-    term <- tolower(term)
+      # Check if the term already exists
+      existing_term <- dbGetQuery(con, query_check_term, params = list(term))
 
-    # Check if the term already exists
-    existing_term <- dbGetQuery(con, query_check_term, params = list(term))
+      if (nrow(existing_term) == 0) {
+        # Stem each word in the term
+        words <- unlist(strsplit(term, " "))
+        stemmed_words <- sapply(words, stem_word, language = land_lang)
+        lemma <- paste(stemmed_words, collapse = " ")
 
-    if (nrow(existing_term) == 0) {
-      # Stem each word in the term
-      words <- unlist(strsplit(term, " "))
-      stemmed_words <- sapply(words, stem_word, language = land_lang)
-      lemma <- paste(stemmed_words, collapse = " ")
+        # Insert into the Word table
+        dbExecute(con, query_insert_term, params = list(term, lemma))
+        word_id <- dbGetQuery(con, "SELECT last_insert_rowid()")[1, 1]  # Get the ID of the last inserted row
+      } else {
+        word_id <- existing_term$id[1]  # Get the ID of the existing word
+      }
 
-      # Insert into the Word table
-      dbExecute(con, query_insert_term, params = list(term, lemma))
-      word_id <- dbGetQuery(con, "SELECT last_insert_rowid()")[1, 1]  # Get the ID of the last inserted row
-    } else {
-      word_id <- existing_term$id[1]  # Get the ID of the existing word
+      # Check if the combination of land_id and word_id already exists in LandDictionary
+      existing_entry <- dbGetQuery(con, query_check_entry, params = list(land_id, word_id))
+
+      if (nrow(existing_entry) == 0) {
+        # Insert into the LandDictionary table
+        dbExecute(con, query_insert_entry, params = list(land_id, word_id))
+        message("Term added to land ", land_name)
+      }
     }
-
-    # Check if the combination of land_id and word_id already exists in LandDictionary
-    existing_entry <- dbGetQuery(con, query_check_entry, params = list(land_id, word_id))
-
-    if (nrow(existing_entry) == 0) {
-      # Insert into the LandDictionary table
-      dbExecute(con, query_insert_entry, params = list(land_id, word_id))
-      print(paste("Term added to land", land_name))
-    }
-  }
-
-  # Commit the transaction
-  dbCommit(con)
+  })
 
   # Close the connection to the database
   dbDisconnect(con)
@@ -401,7 +404,7 @@ addurl <- function(land_name, urls = NULL, path = NULL, db_name = "mwi.db") {
   res <- dbGetQuery(con, query, params = list(land_name))
 
   if (nrow(res) == 0) {
-    print(paste("Land", land_name, "not found"))
+    message("Land ", land_name, " not found")
     dbDisconnect(con)
     return(0)
   }
@@ -424,33 +427,29 @@ addurl <- function(land_name, urls = NULL, path = NULL, db_name = "mwi.db") {
   # Initialize the counter for new URLs
   new_urls_count <- 0
 
-  # Start a transaction
-  dbBegin(con)
+  dbWithTransaction(con, {
+    for (url in url_list) {
+      # Check if the URL already exists for this land
+      query <- "SELECT 1 FROM Expression WHERE land_id = ? AND url = ?"
+      existing_url <- dbGetQuery(con, query, params = list(land_id, url))
 
-  for (url in url_list) {
-    # Check if the URL already exists for this land
-    query <- "SELECT 1 FROM Expression WHERE land_id = ? AND url = ?"
-    existing_url <- dbGetQuery(con, query, params = list(land_id, url))
-
-    if (nrow(existing_url) == 0) {
-      dbExecute(con, "INSERT INTO Expression (land_id, url, created_at, depth) VALUES (?, ?, ?, 1)",
-                params = list(land_id, url, current_time))
-      # Increment the counter for new URLs
-      new_urls_count <- new_urls_count + 1
-      # Print the message for the new URL
-      print(paste("URL added:", url))
+      if (nrow(existing_url) == 0) {
+        dbExecute(con, "INSERT INTO Expression (land_id, url, created_at, depth) VALUES (?, ?, ?, 1)",
+                  params = list(land_id, url, current_time))
+        # Increment the counter for new URLs
+        new_urls_count <- new_urls_count + 1
+        # Print the message for the new URL
+        message("URL added: ", url)
+      }
     }
-  }
-
-  # Commit the transaction
-  dbCommit(con)
+  })
 
   # Close the connection
   dbDisconnect(con)
 
   # Print the total number of new URLs added
-  print(paste("Total number of new URLs added:", new_urls_count))
-  print(paste("URLs added to land", land_name))
+  message("Total number of new URLs added: ", new_urls_count)
+  message("URLs added to land ", land_name)
   return(1)
 }
 
@@ -536,7 +535,7 @@ deleteland <- function(land_name, maxrel = NULL, db_name = "mwi.db") {
   res <- dbGetQuery(con, query_land, params = list(land_name))
 
   if (nrow(res) == 0) {
-    print(paste("Land", land_name, "not found"))
+    message("Land ", land_name, " not found")
     return(0)
   }
 
@@ -554,14 +553,14 @@ deleteland <- function(land_name, maxrel = NULL, db_name = "mwi.db") {
       dbExecute(con, "DELETE FROM LandDictionary WHERE land_id = ?", params = list(land_id))
       dbExecute(con, "DELETE FROM Tag WHERE land_id = ?", params = list(land_id))
       dbExecute(con, "DELETE FROM Land WHERE id = ?", params = list(land_id))
-      print(paste("Land", land_name, "and all its associated records have been deleted"))
+      message("Land ", land_name, " and all its associated records have been deleted")
     } else {
       # Delete only expressions with relevance <= maxrel and their associated records
       dbExecute(con, "DELETE FROM ExpressionLink WHERE source_id IN (SELECT id FROM Expression WHERE land_id = ? AND relevance <= ?)", params = list(land_id, maxrel))
       dbExecute(con, "DELETE FROM Media WHERE expression_id IN (SELECT id FROM Expression WHERE land_id = ? AND relevance <= ?)", params = list(land_id, maxrel))
       dbExecute(con, "DELETE FROM TaggedContent WHERE expression_id IN (SELECT id FROM Expression WHERE land_id = ? AND relevance <= ?)", params = list(land_id, maxrel))
       dbExecute(con, "DELETE FROM Expression WHERE land_id = ? AND relevance <= ?", params = list(land_id, maxrel))
-      print(paste("Expressions with relevance <=", maxrel, "and all their associated records have been deleted from land", land_name))
+      message("Expressions with relevance <=", maxrel, " and all their associated records have been deleted from land ", land_name)
     }
 
     dbCommit(con)
@@ -633,13 +632,13 @@ list_domain <- function(land_name, db_name="mwi.db") {
   conn <- dbConnect(RSQLite::SQLite(), db_name)
 
   # Construct the SQL query taking into account the table structure
-  query <- sprintf("SELECT DISTINCT Domain.name FROM Domain
-                    JOIN Expression ON Domain.id = Expression.domain_id
-                    JOIN Land ON Expression.land_id = Land.id
-                    WHERE Land.name = '%s'", land_name)
+  query <- "SELECT DISTINCT Domain.name FROM Domain
+            JOIN Expression ON Domain.id = Expression.domain_id
+            JOIN Land ON Expression.land_id = Land.id
+            WHERE Land.name = ?"
 
   # Execute the query and retrieve the results
-  results <- dbGetQuery(conn, query)
+  results <- dbGetQuery(conn, query, params = list(land_name))
 
   # Close the connection
   dbDisconnect(conn)
