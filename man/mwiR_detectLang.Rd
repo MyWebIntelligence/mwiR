@@ -2,55 +2,73 @@
 % Please edit documentation in R/recode.R
 \name{mwiR_detectLang}
 \alias{mwiR_detectLang}
-\title{Detect Language of Text in Data Frame Columns Using cld3}
+\title{Detect Language of Text in Data Frame Columns}
 \usage{
-mwiR_detectLang(df, variables)
+mwiR_detectLang(
+  df,
+  variables,
+  engine = c("cld3", "fasttext"),
+  min_chars = 25L,
+  min_prob = 0.7,
+  conservative = TRUE,
+  chunk_size = 5000L,
+  fasttext_model = NULL,
+  return_scores = FALSE
+)
 }
 \arguments{
-\item{df}{A data frame containing the text columns to analyze.}
+\item{df}{A data frame containing the text columns to analyse.}
 
-\item{variables}{A character vector specifying the names of the columns in `df`
-that contain the text to be analyzed.}
+\item{variables}{Character vector naming the columns to combine before detection.}
+
+\item{engine}{Detection backend to use; currently `"cld3"` (default) or `"fasttext"`.}
+
+\item{min_chars}{Minimum number of characters required after cleaning to attempt detection.}
+
+\item{min_prob}{Minimum posterior probability required to accept a language prediction when
+`conservative = TRUE`. Set to `NULL` to disable the threshold.}
+
+\item{conservative}{Logical; when `TRUE` (default) reject low-probability or ambiguous
+detections and return `NA`.}
+
+\item{chunk_size}{Optional integer size for processing rows in batches; defaults to 5000.}
+
+\item{fasttext_model}{Either a path to a `.bin` model readable by `fastrtext::load_model()`
+or a pre-loaded fastText model object when `engine = "fasttext"`.}
+
+\item{return_scores}{Logical; when `TRUE`, return a data frame with language codes and their
+associated probabilities instead of a bare character vector.}
 }
 \value{
-Returns a character vector with the same length as the number of rows in `df`,
-where each element is the detected language code for the corresponding row.
+A character vector of language codes (ISO 639-1) matching the number of rows in `df`.
+  When `return_scores = TRUE`, returns a data frame with `language` and `probability` columns.
+  When returning a vector, the probabilities are also attached as the `"probability"` attribute.
 }
 \description{
-This function detects the language of text contained in specified columns of a data frame.
-It concatenates the text from the specified columns for each row and uses the 'cld3' package
-to perform language detection on the combined text.
+Detects the language of concatenated text coming from one or more columns of a data frame.
+Text is normalised (Unicode NFC), cleaned from HTML and URLs, short snippets are filtered
+out, and CLD3 probabilities are inspected so low-confidence guesses can be rejected.
+An optional fastText backend can be used when a pre-trained model is supplied.
 }
 \details{
-The function workflow includes:
-1. Verifying that all specified columns exist in the data frame.
-2. Concatenating the text from the specified columns for each row.
-3. Using the 'cld3' package to detect the language of the concatenated text.
-
-The detected language codes follow the ISO 639-1 standard (e.g., "en" for English,
-"fr" for French).
-}
-\note{
-This function requires the 'cld3' package to be installed and loaded.
-If 'cld3' is not available, the function will throw an error.
+1. Validates inputs and required packages.
+2. Normalises and cleans text (Unicode NFC, remove HTML tags/URLs, collapse whitespace).
+3. Filters out rows whose combined text is too short to yield reliable detection.
+4. Runs the selected backend (`cld3` or `fasttext`) in configurable chunks.
+5. Applies probability thresholds to avoid low-confidence labels.
 }
 \examples{
 \dontrun{
-library(cld3)
-
-# Create a sample data frame
 df <- data.frame(
   title = c("Hello world", "Bonjour le monde", "Hola mundo"),
   description = c("This is a test", "Ceci est un test", "Esto es una prueba")
 )
 
-# Detect language using both title and description columns
-languages <- mwiR_detectLang(df, c("title", "description"))
-print(languages)
+# Default CLD3 backend with conservative thresholding
+mwiR_detectLang(df, c("title", "description"))
 
-# Detect language using only the title column
-languages_title <- mwiR_detectLang(df, "title")
-print(languages_title)
+# Return probabilities and disable conservative filtering
+mwiR_detectLang(df, "title", conservative = FALSE, return_scores = TRUE)
 }
 
 }

@@ -1,41 +1,125 @@
-test_that("mwiR_detectLang detects languages correctly", {
+test_that("mwiR_detectLang returns languages and probability attribute", {
+  skip_if_not_installed("cld3")
+  skip_if_not_installed("stringi")
+
   df <- data.frame(
-    title = c("Hello world", "Bonjour le monde", "Hola mundo"),
-    description = c("This is a test", "Ceci est un test", "Esto es una prueba")
+    title = c(
+      "Hello world this sentence is deliberately long enough for detection.",
+      "Bonjour le monde ceci est une phrase suffisamment longue pour la détection.",
+      "Hola mundo esta oración es lo bastante larga para la detección."
+    ),
+    description = c(
+      "This is an additional English description.",
+      "Ceci est une description française supplémentaire.",
+      "Esta es una descripción adicional en español."
+    ),
+    stringsAsFactors = FALSE
   )
-  languages <- mwiR_detectLang(df, c("title", "description"))
-  expect_equal(languages, c("en", "fr", "es"))
-  languages_title <- mwiR_detectLang(df, "title")
-  expect_equal(languages_title, c("en", "fr", "es"))
-  languages_description <- mwiR_detectLang(df, "description")
-  expect_equal(languages_description, c("en", "fr", "es"))
-  expect_error(mwiR_detectLang(df, c("title", "non_existent_column")),
-               "Some specified variables do not exist in the data frame.")
-})
 
-test_that("mwiR_detectLang handles non-installed cld3 package", {
-  unloadNamespace("cld3")
-  expect_error(mwiR_detectLang(data.frame(title = "test"), "title"),
-               "Package 'cld3' is required but not installed.")
-  library(cld3)
-})
+  res <- mwiR_detectLang(df, c("title", "description"), min_chars = 10L, chunk_size = 2L)
+  expect_equal(res, c("en", "fr", "es"))
 
-test_that("mwiR_detectLang works with empty data frame", {
-  df_empty <- data.frame(title = character(0), description = character(0))
-  languages_empty <- mwiR_detectLang(df_empty, c("title", "description"))
-  expect_equal(length(languages_empty), 0)
-})
+  probs <- attr(res, "probability")
+  expect_type(probs, "double")
+  expect_equal(length(probs), nrow(df))
+  expect_true(all(probs >= 0 & probs <= 1, na.rm = TRUE))
 
-test_that("plotlog functions correctly", {
-  df_test <- data.frame(
-    numeric1 = c(1, 2, 3, 4, 5),
-    numeric2 = c(10, 100, 1000, 10000, 100000),
-    character = c("a", "b", "c", "d", "e")
+  # Single column path
+  res_title <- mwiR_detectLang(df, "title", min_chars = 10L, chunk_size = 1L)
+  expect_equal(res_title, c("en", "fr", "es"))
+
+  # Variable existence error
+  expect_error(
+    mwiR_detectLang(df, c("title", "missing_col")),
+    "The following variables do not exist in 'df': missing_col"
   )
-  expect_error(plotlog(df_test), NA)
-  expect_error(plotlog(df_test, c("numeric1", "numeric2")), NA)
-  expect_error(plotlog(df_test, c("numeric1", "character")))
-  expect_error(plotlog(df_test, c("numeric1", "non_existent")))
+})
+
+test_that("mwiR_detectLang enforces min_chars and preserves long-form detection", {
+  skip_if_not_installed("cld3")
+  skip_if_not_installed("stringi")
+
+  df <- data.frame(
+    text = c(
+      "Hi",  # too short for default threshold
+      paste(rep("Bonjour le monde", 6), collapse = " ")
+    ),
+    stringsAsFactors = FALSE
+  )
+
+  res <- mwiR_detectLang(df, "text")
+  expect_true(is.na(res[1]))
+  expect_equal(res[2], "fr")
+})
+
+test_that("mwiR_detectLang drops low-confidence predictions when conservative", {
+  skip_if_not_installed("mockery")
+  skip_if_not_installed("stringi")
+
+  fake_detect <- function(texts) {
+    replicate(
+      length(texts),
+      data.frame(language = "en", probability = 0.25, stringsAsFactors = FALSE),
+      simplify = FALSE
+    )
+  }
+
+  mockery::stub(mwiR_detectLang, "cld3::detect_language_probabilities", fake_detect)
+  mockery::stub(mwiR_detectLang, "requireNamespace", function(pkg, quietly) TRUE)
+
+  df <- data.frame(
+    text = "This is an English sentence that is long enough for detection.",
+    stringsAsFactors = FALSE
+  )
+
+  res <- mwiR_detectLang(df, "text", min_chars = 10L, min_prob = 0.8, chunk_size = 1L)
+  expect_true(all(is.na(res)))
+})
+
+test_that("mwiR_detectLang can return probability data frames", {
+  skip_if_not_installed("cld3")
+  skip_if_not_installed("stringi")
+
+  df <- data.frame(
+    text = c(
+      "This is a long piece of English text intended for language detection.",
+      "Ceci est un long texte français pour la détection de langue."
+    ),
+    stringsAsFactors = FALSE
+  )
+
+  scored <- mwiR_detectLang(df, "text", return_scores = TRUE, min_chars = 10L)
+  expect_s3_class(scored, "data.frame")
+  expect_named(scored, c("language", "probability"))
+  expect_equal(nrow(scored), nrow(df))
+  expect_true(all(scored$probability >= 0 & scored$probability <= 1, na.rm = TRUE))
+})
+
+test_that("mwiR_detectLang reports missing cld3 dependency", {
+  skip_if_not_installed("mockery")
+
+  mockery::stub(mwiR_detectLang, "requireNamespace", function(pkg, quietly) pkg != "cld3")
+
+  df <- data.frame(text = "Fallback sentence.", stringsAsFactors = FALSE)
+  expect_error(
+    mwiR_detectLang(df, "text"),
+    "Package 'cld3' is required but not installed."
+  )
+})
+
+test_that("mwiR_detectLang requires a fastText model when requested", {
+  skip_if_not_installed("fastrtext")
+  skip_if_not_installed("stringi")
+
+  df <- data.frame(
+    text = "Yet another sufficiently long English sentence for testing.",
+    stringsAsFactors = FALSE
+  )
+
+  expect_error(
+    mwiR_detectLang(df, "text", engine = "fasttext"),
+    "Provide 'fasttext_model' \\(path or loaded model\\) when engine = 'fasttext'."
+  )
 })
 
 # --- Additional tests for recode.R major functions ---

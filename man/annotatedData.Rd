@@ -2,52 +2,58 @@
 % Please edit documentation in R/recode.R
 \name{annotatedData}
 \alias{annotatedData}
-\title{Mettre à jour une table de la base de données avec des données modifiées à l'extérieur du projet}
+\title{Update Database Table with Externally Modified Data}
 \usage{
 annotatedData(dataplus, table, champ, by, labase = "mwi.db")
 }
 \arguments{
-\item{dataplus}{Un data frame contenant les données modifiées à réintégrer dans la base. Par exemple, un tableau exporté, annoté ou corrigé dans un tableur, puis réimporté dans R.}
+\item{dataplus}{A data frame containing the modified data to be inserted into the database.}
 
-\item{table}{Nom de la table à mettre à jour dans la base de données (chaîne de caractères). Exemple : "expression".}
+\item{table}{A character string specifying the name of the table to be updated in the database.}
 
-\item{champ}{Nom du champ (colonne) à mettre à jour (chaîne de caractères). Exemple : "description".}
+\item{champ}{A character string specifying the name of the field (column) to be updated.}
 
-\item{by}{Nom du champ clé (colonne identifiant unique) utilisé pour faire la correspondance entre les lignes du data frame et celles de la base. Exemple : "id".}
+\item{by}{A character string specifying the name of the key field used to match rows for updating.}
 
-\item{labase}{Nom du fichier de base de données SQLite à utiliser. Par défaut : "mwi.db".}
+\item{labase}{A character string specifying the name of the SQLite database file. Default is "mwi.db".}
 }
 \value{
-Cette fonction ne retourne pas de valeur. Elle met à jour la table spécifiée dans la base de données et affiche un message de succès à la fin.
+This function does not return a value. It updates the specified table in the database
+and prints a success message upon completion.
 }
 \description{
-Cette fonction permet de réintégrer dans la base de données du projet des données qui ont été modifiées à l'extérieur de l'environnement R (par exemple, par des collaborateurs ou via un tableur). 
-\strong>Utilité :</strong> faciliter les workflows collaboratifs ou open science où les données sont exportées, annotées, puis réimportées pour mise à jour centralisée.
+This function allows reinsertion of externally modified data into the project's database.
+It's particularly useful in collaborative or open science workflows where data might be
+modified outside the main project environment, such as by collaborators or in open science initiatives.
 }
 \details{
-\subsection{Fonctionnement étape par étape}{
-\itemize{
-  \item Établit une connexion à la base de données SQLite spécifiée.
-  \item Vérifie l'existence de la table et des champs concernés.
-  \item Prépare une requête SQL UPDATE pour chaque ligne à mettre à jour.
-  \item Exécute les mises à jour dans une transaction (sécurité et performance).
-  \item Valide les changements si tout s'est bien passé, sinon annule (rollback).
+The function performs the following steps:
+1. Establishes a connection to the specified SQLite database.
+2. Verifies the existence of the specified table and fields.
+3. Prepares an SQL UPDATE statement.
+4. Executes the update in a transaction for improved performance and data integrity.
+5. Commits the changes if successful, or rolls back if an error occurs.
+
+This function is designed to facilitate workflows where data might be exported, modified
+externally (e.g., by collaborators or in spreadsheet software), and then reintegrated
+into the main project database. It ensures that externally processed data can be
+seamlessly incorporated back into the project's central data store.
 }
-}
-\subsection{Conseils et bonnes pratiques}{
-- Vérifiez que la structure de \code{dataplus} correspond bien à la table cible, notamment les colonnes \code{champ} et \code{by}.
-- La fonction applique le principe "tout ou rien" : en cas d'erreur, aucune modification n'est enregistrée (transaction).
-- Sauvegardez votre base avant toute opération massive.
-- Pratique pour intégrer des corrections, annotations ou enrichissements faits par des tiers.
-}
+\note{
+- Ensure that the structure of `dataplus` matches the database table, particularly
+  the columns specified by `champ` and `by`.
+- The function uses transactions, so either all updates are applied, or none are
+  (in case of an error), maintaining database consistency.
+- It's recommended to backup your database before performing large-scale updates.
 }
 \examples{
-# Exemple : Mettre à jour la colonne "description" de la table "expression"
-# à partir d'un data frame modifié dans un tableur puis réimporté dans R
-modifs <- data.frame(id = c(1, 2), description = c("Nouveau texte 1", "Nouveau texte 2"))
-annotatedData(dataplus = modifs,
+\dontrun{
+# Assuming 'modified_data' is a data frame with updated information
+AnnotatedData(dataplus = modified_data,
               table = "expression",
               champ = "description",
               by = "id",
               labase = "mwi.db")
+}
+
 }

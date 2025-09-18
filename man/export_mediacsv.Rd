@@ -2,22 +2,22 @@
 % Please edit documentation in R/export.R
 \name{export_mediacsv}
 \alias{export_mediacsv}
-\title{Export Media CSV with Relevance Filtering}
+\title{Export Media CSV}
 \usage{
 export_mediacsv(con, land_name, minimum_relevance, filename)
 }
 \arguments{
-\item{con}{A database connection object. This connection is used to access the database containing media and expression data.}
+\item{con}{A database connection object.}
 
-\item{land_name}{A character string specifying the name of the land (dataset or domain) from which media data will be exported. This helps filter the relevant subset of data.}
+\item{land_name}{A character string specifying the name of the land.}
 
-\item{minimum_relevance}{A numeric value specifying the minimum relevance score threshold. Only media entries with a relevance score equal to or above this threshold will be included in the export. This allows focusing on the most significant media related to expressions.}
+\item{minimum_relevance}{A numeric value specifying the minimum relevance score for inclusion in the export.}
 
-\item{filename}{A character string specifying the name (and path) of the output CSV file where the exported media data will be saved.}
+\item{filename}{A character string specifying the name of the output CSV file.}
 }
 \value{
-Returns an integer indicating the number of rows successfully written to the CSV file. This helps verify the amount of data exported.
+An integer indicating the number of rows written to the CSV file.
 }
 \description{
-This function exports media data associated with expressions from a specified land (dataset) to a CSV file. It filters the media entries based on a minimum relevance score, ensuring that only media with sufficient relevance are included. This is useful for extracting focused media datasets for further analysis or reporting.
+This function exports media data related to expressions in the specified land to a CSV file based on a minimum relevance score.
 }

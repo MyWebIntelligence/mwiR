@@ -46,7 +46,6 @@
 #' }
 #'
 #' @export
-#' @importFrom cld3 detect_language_probabilities
 #' @importFrom stringi stri_trans_general stri_replace_all_regex stri_trim_both stri_length stri_join
 mwiR_detectLang <- function(df,
                             variables,
@@ -255,7 +254,6 @@ mwiR_detectLang <- function(df,
 #'    extreme values of the dependent variable*. Journal of the American Statistical Association.
 #'
 #' @import ggplot2
-#' @importFrom gridExtra arrangeGrob grid.draw
 #' @importFrom stats IQR sd
 #' @export
 plotlog <- function(df,
@@ -742,7 +740,7 @@ plotlog <- function(df,
 #'   (doit retourner un vecteur numérique de même longueur).
 #' @param winsorize Proportion (0–0.5) utilisée pour winsoriser les extrêmes
 #'   avant la transformation. Exemple : `winsorize = 0.01` tronque au quantile
-#'   1 % et 99 %. `NULL` (défaut) désactive l'opération.
+#'   1 \% et 99 \%. `NULL` (défaut) désactive l'opération.
 #' @param shift_constant Constante strictement positive ajoutée lorsque l'on
 #'   doit décaler une série vers le domaine de définition (log, sqrt, log1p).
 #' @param handle_na Comment traiter les valeurs manquantes : `"keep"` (défaut)
@@ -752,12 +750,15 @@ plotlog <- function(df,
 #'   `bestNormalize::boxcox`, `bestNormalize::yeojohnson` ou `bestNormalize::orderNorm`
 #'   selon le cas.
 #'
-#' @return Un objet de classe `mwi_transform` contenant :
-#'   * `$val` : vecteur transformé (longueur identique à `x`);
-#'   * `$param` : objet paramètres/transformer (utile pour `predict` ou inversion);
-#'   * `$info` : liste de métadonnées (méthode retenue, décalage appliqué, winsorisation, etc.);
-#'   * `$functions` : liste de deux fermetures `forward(new_x)` et `inverse(new_z)` alignées sur la transformation.
-#'
+#' @return
+#' An object of class `mwi_transform` containing:
+#' \describe{
+#'   \item{val}{numeric vector, transformed version of `x`.}
+#'   \item{param}{transformer object or parameters needed to invert the transform.}
+#'   \item{info}{list of metadata (method applied, shifts, winsorisation, etc.).}
+#'   \item{functions}{list of closures `forward(new_x)` and `inverse(new_z)`.}
+#' }
+#' 
 #' @details
 #' - L’option `method = "auto"` délègue à `bestNormalize` la sélection de la
 #'   meilleure transformation parmi Box-Cox, Yeo-Johnson, normalisation par rang
@@ -1051,7 +1052,7 @@ transform_variable <- function(x,
 #' @param weights Optionnel, pondérations positives (longueur identique à `x`)
 #'   utilisées pour les quantiles ou Jenks pondérés.
 #' @param winsorize Proportion (0–0.5) utilisée pour tronquer les extrêmes avant
-#'   calcul des bornes. Exemple : `winsorize = 0.01` coupe aux quantiles 1 % et 99 %.
+#'   calcul des bornes. Exemple : `winsorize = 0.01` coupe aux quantiles 1 \% et 99 \%.
 #' @param min_unique Nombre minimal de valeurs distinctes nécessaires pour
 #'   tenter la discrétisation.
 #' @param right,include.lowest Paramètres transmis à `cut()`.
@@ -1063,9 +1064,16 @@ transform_variable <- function(x,
 #' @param ... Arguments additionnels transmis aux fonctions internes (`stats::kmeans`,
 #'   `classInt::classIntervals`, `find_clusters`, etc.).
 #'
-#' @return Par défaut un facteur ordonné; l'attribut `discretize_meta` contient
-#'   un tibble/list de synthèse (bornes, tailles de classes, méthode, warnings). En
-#'   mode `return_factor = FALSE`, la liste de métadonnées est retournée.
+#' @return
+#' By default an ordered factor; the attribute `discretize_meta` stores summary
+#' information. When `return_factor = FALSE`, a list is returned with:
+#' \describe{
+#'   \item{method_applied}{method finally used.}
+#'   \item{breaks}{numeric vector of bin edges.}
+#'   \item{counts}{class frequencies.}
+#'   \item{warnings}{character vector of notes emitted during discretisation.}
+#' }
+#' 
 #' @export
 discretize_variable <- function(x,
                                 method = c("equal_freq", "equal_width", "quantile",

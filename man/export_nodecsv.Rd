@@ -2,22 +2,22 @@
 % Please edit documentation in R/export.R
 \name{export_nodecsv}
 \alias{export_nodecsv}
-\title{Export Domain Node Data to CSV with Relevance Filtering}
+\title{Export Node CSV}
 \usage{
 export_nodecsv(con, land_name, minimum_relevance, filename)
 }
 \arguments{
-\item{con}{A database connection object. This connection is used to access the database containing domain and expression data.}
+\item{con}{A database connection object.}
 
-\item{land_name}{A character string specifying the name of the land (dataset or domain) from which node data will be exported. This helps filter the relevant subset of data.}
+\item{land_name}{A character string specifying the name of the land.}
 
-\item{minimum_relevance}{A numeric value specifying the minimum relevance score threshold. Only nodes with an average relevance score equal to or above this threshold will be included in the export. This allows focusing on the most significant nodes.}
+\item{minimum_relevance}{A numeric value specifying the minimum relevance score for inclusion in the export.}
 
-\item{filename}{A character string specifying the name (and path) of the output CSV file where the exported node data will be saved.}
+\item{filename}{A character string specifying the name of the output CSV file.}
 }
 \value{
-Returns an integer indicating the number of rows successfully written to the CSV file. This helps verify the amount of data exported.
+An integer indicating the number of rows written to the CSV file.
 }
 \description{
-This function exports domain node data from a specified land (dataset) to a CSV file. The exported data includes the number of expressions associated with each node and their average relevance scores. The function filters nodes based on a minimum relevance score threshold, ensuring that only nodes meeting the relevance criteria are included. This is useful for extracting focused domain data for further analysis or reporting.
+This function exports domain data to a CSV file, including the number of expressions and average relevance score.
 }

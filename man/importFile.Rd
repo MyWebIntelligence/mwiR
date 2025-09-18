@@ -2,26 +2,26 @@
 % Please edit documentation in R/land.R
 \name{importFile}
 \alias{importFile}
-\title{Import URLs from a File with Interactive Selection}
+\title{Import URLs from a file}
 \usage{
 importFile()
 }
 \value{
-Returns a data frame containing the URLs imported from the selected file.
+Data frame containing the imported URLs.
 }
 \description{
-This function enables the user to interactively select a file from their system and import URLs contained within it. The function supports files in CSV or TXT format, automatically detecting the file type and reading the content accordingly.
+This function allows the user to choose a file and import URLs from it.
+The file can be in CSV or TXT format.
 }
 \details{
-The function workflow includes:
-1. Prompting the user to choose a file interactively via a file selection dialog.
-2. Detecting the file extension to determine the appropriate reading method.
-3. Reading the file content based on its format (CSV or TXT).
-4. Returning a data frame containing the imported URLs for further processing.
+The function performs the following steps:
+1. Allows the user to choose a file interactively.
+2. Detects the file extension.
+3. Reads the file based on the extension (CSV or TXT).
+4. Returns the data frame containing the imported URLs.
 }
 \examples{
 \dontrun{
-# Import URLs by selecting a file interactively
 urls <- importFile()
 }
 }

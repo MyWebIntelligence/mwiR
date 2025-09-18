@@ -2,36 +2,17 @@
 % Please edit documentation in R/crawl.R
 \name{crawlDetails}
 \alias{crawlDetails}
-\title{Explorer une URL et extraire ses métadonnées détaillées}
+\title{Crawl and extract details from a URL}
 \usage{
 crawlDetails(url)
 }
 \arguments{
-\item{url}{Chaîne de caractères représentant l'URL à explorer. Exemple : "https://exemple.com/page".}
+\item{url}{A character string representing the URL to be crawled.}
 }
 \value{
-Une chaîne de caractères contenant les détails extraits : meta description, Open Graph, Twitter description, mots-clés, balises de titre (headers), etc.
+A character string containing the extracted details.
 }
 \description{
-Cette fonction explore une page web et en extrait les principales métadonnées et informations structurées :
-\itemize{
-  \item Meta description (balise \code{<meta name="description">})
-  \item Description Open Graph (\code{<meta property="og:description">})
-  \item Description Twitter (\code{<meta name="twitter:description">})
-  \item Mots-clés (\code{<meta name="keywords">})
-  \item Balises de titre (headers : \code{<h1>}, \code{<h2>}, ...)
-}
-\strong{Utilité :} analyse de contenu, veille, SEO, constitution de corpus enrichis.
-}
-\details{
-\subsection{Conseils d'utilisation}{
-- Pratique pour extraire rapidement les résumés, mots-clés et titres d'une page web.
-- Utile pour l'analyse SEO, la veille thématique, ou l'enrichissement de bases de données documentaires.
-- Le résultat est une chaîne de caractères structurée, à parser ou à stocker selon les besoins.
-}
-}
-\examples{
-# Exemple : Extraire les métadonnées d'une page web
-details <- crawlDetails("https://exemple.com/page")
-cat(details)
+This function crawls a URL and extracts detailed information such as meta descriptions,
+Open Graph descriptions, Twitter descriptions, keywords, and header tags.
 }

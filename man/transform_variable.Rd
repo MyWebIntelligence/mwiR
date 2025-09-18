@@ -2,22 +2,73 @@
 % Please edit documentation in R/recode.R
 \name{transform_variable}
 \alias{transform_variable}
-\title{Transform a Numeric Vector for Variance Stabilization or Normalization}
+\title{Transformer un vecteur numérique}
 \usage{
-transform_variable(x, method = "yeojohnson", ...)
+transform_variable(
+  x,
+  method = c("auto", "none", "center", "zscore", "robust_z", "log1p", "log", "sqrt",
+    "boxcox", "yeojohnson", "ranknorm"),
+  winsorize = NULL,
+  shift_constant = 1,
+  handle_na = c("keep", "omit"),
+  ...
+)
 }
 \arguments{
-\item{x}{A numeric vector to be transformed.}
+\item{x}{Vecteur numérique (NA, Inf, -Inf autorisés).}
 
-\item{method}{A character string specifying the transformation method to apply. Options include "none", "log1p", "log", "boxcox", and "yeojohnson".}
+\item{method}{Choix de transformation : `"auto"` (par défaut, via
+`bestNormalize`), `"none"`, `"center"`, `"zscore"`, `"robust_z"`,
+`"log1p"`, `"log"`, `"sqrt"`, `"boxcox"`, `"yeojohnson"`, `"ranknorm"`.
+Un objet fonctionnel peut être fourni pour une transformation custom
+(doit retourner un vecteur numérique de même longueur).}
 
-\item{...}{Additional arguments passed to the `bestNormalize` package functions (e.g., `standardize = FALSE`).}
+\item{winsorize}{Proportion (0–0.5) utilisée pour winsoriser les extrêmes
+avant la transformation. Exemple : `winsorize = 0.01` tronque au quantile
+1 \% et 99 \%. `NULL` (défaut) désactive l'opération.}
+
+\item{shift_constant}{Constante strictement positive ajoutée lorsque l'on
+doit décaler une série vers le domaine de définition (log, sqrt, log1p).}
+
+\item{handle_na}{Comment traiter les valeurs manquantes : `"keep"` (défaut)
+conserve les NA dans `val`, `"omit"` les supprime avant estimation des
+paramètres (recommandé quand on alimente un modèle qui gère lui-même les NA).}
+
+\item{...}{Arguments additionnels passés à `bestNormalize::bestNormalize`,
+`bestNormalize::boxcox`, `bestNormalize::yeojohnson` ou `bestNormalize::orderNorm`
+selon le cas.}
 }
 \value{
-Returns a list containing:
-- `$val`: The transformed numeric vector.
-- `$param`: An object containing the parameters of the transformation fit, useful for applying the same transformation to new data via `predict`.
+An object of class `mwi_transform` containing:
+\describe{
+  \item{val}{numeric vector, transformed version of `x`.}
+  \item{param}{transformer object or parameters needed to invert the transform.}
+  \item{info}{list of metadata (method applied, shifts, winsorisation, etc.).}
+  \item{functions}{list of closures `forward(new_x)` and `inverse(new_z)`.}
+}
 }
 \description{
-This function applies a specified transformation to a numeric vector to stabilize variance or normalize its distribution. It supports multiple transformation methods and allows additional customization through extra arguments.
+Applique des transformations usuelles en data science pour
+  stabiliser la variance, rapprocher une distribution de la normalité ou
+  contrôler les valeurs extrêmes. La fonction embarque un backend
+  `bestNormalize` pour une sélection data-driven ainsi que des transformations
+  classiques (centre/réduction, Box-Cox, Yeo-Johnson, normalisation par rang,
+  logs avec décalage automatique, etc.). Les sorties incluent une fonction
+  d'inversion afin d'opérer des prédictions/cohortes dans le même espace.
+}
+\details{
+- L’option `method = "auto"` délègue à `bestNormalize` la sélection de la
+  meilleure transformation parmi Box-Cox, Yeo-Johnson, normalisation par rang
+  et centre/réduction (Petersen, 2021).  
+- Les transformations de type log/sqrt adoptent la stratégie de décalage
+  recommandée par Burbidge, Magee & Robb (1988) pour garantir la validité
+  du domaine lorsque la série contient des valeurs non positives.  
+- Le calcul `winsorize` s’inspire des pratiques robustes en sciences sociales
+  pour limiter l’influence d’observations extrêmes (Wilcox, 2017).
+}
+\references{
+Petersen, M. (2021). *bestNormalize: Normalizing transformation functions*.  
+Burbidge, J. B., Magee, L., & Robb, A. L. (1988). *Alternative transformations
+to handle extreme values of the dependent variable*. JASA.  
+Wilcox, R. R. (2017). *Introduction to robust estimation and hypothesis testing*.
 }

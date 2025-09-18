@@ -1,10 +1,11 @@
-##' @import httr jsonlite lubridate data.table
-##' Retrieve SerpAPI key
-##'
-##' Internal helper returning the key from the global variable or
-##' environment; if missing, prompts the user.
-##' @return Character scalar containing the API key.
-##' @keywords internal
+#' Retrieve SerpAPI key
+#'
+#' @description
+#' Internal helper returning the key from the global variable or environment; if
+#' missing, prompts the user.
+#'
+#' @return Character scalar containing the API key.
+#' @keywords internal
 get_serp_key <- function() {
   key <- get0("serp_key",
               ifnotfound = Sys.getenv("SERPAPI_KEY", unset = NA_character_),
@@ -63,7 +64,7 @@ related_query <- function(query, lang = "fr", country = "France") {
   location <- country
 
   # Construct the API URL
-  api_url <- modify_url("https://serpapi.com/search",
+  api_url <- httr::modify_url("https://serpapi.com/search",
                         query = list(api_key = api_key,
                                      engine = "google",
                                      q = query,
@@ -77,15 +78,15 @@ related_query <- function(query, lang = "fr", country = "France") {
                                      start = start))
 
   # Perform the API request
-  response <- GET(api_url)
+  response <- httr::GET(api_url)
 
   # Check if an error is returned
-  if (http_status(response)$category != "Success") {
-    stop("Error: Failed to retrieve data from SerpAPI: ", http_status(response)$message)
+  if (httr::http_status(response)$category != "Success") {
+    stop("Error: Failed to retrieve data from SerpAPI: ", httr::http_status(response)$message)
   }
 
   # Extract and process JSON data
-  json_content <- fromJSON(content(response, "text"))
+  json_content <- jsonlite::fromJSON(httr::content(response, "text"))
 
   # Check if related_searches is empty
   if (length(json_content$related_searches) == 0) {
@@ -130,7 +131,7 @@ urlist_Google <- function(query, datestart, dateend,
 
   # Create a dataframe for the search dates
   date_seq <- seq(from = as.Date(datestart), to = as.Date(dateend), by = timestep)
-  datesearch <- data.frame(datestart = date_seq, dateend = date_seq + period(1, units = timestep) - days(1))
+  datesearch <- data.frame(datestart = date_seq, dateend = date_seq + lubridate::period(1, units = timestep) - lubridate::days(1))
 
   # Loop through all dates in the datesearch dataframe
   for (i in 1:nrow(datesearch)) {
@@ -154,7 +155,7 @@ urlist_Google <- function(query, datestart, dateend,
     while (TRUE) {
 
       # Construct the API URL
-      api_url <- modify_url("https://serpapi.com/search",
+      api_url <- httr::modify_url("https://serpapi.com/search",
                             query = list(api_key = api_key,
                                          engine = "google",
                                          q = query,
@@ -169,15 +170,15 @@ urlist_Google <- function(query, datestart, dateend,
                                          sort_by = sort_by))
 
       # Perform the API request
-      response <- GET(api_url)
+      response <- httr::GET(api_url)
 
       # Check if an error is returned
-      if (http_status(response)$category != "Success") {
+      if (httr::http_status(response)$category != "Success") {
         break
       }
 
       # Extract and process JSON data
-      json_content <- fromJSON(content(response, "text"))
+      json_content <- jsonlite::fromJSON(httr::content(response, "text"))
 
       # Check if organic_results is empty
       if (length(json_content$organic_results) == 0) {
@@ -269,19 +270,19 @@ urlist_Duck <- function(query, filename = NULL, sleep_seconds = 1, lang = "fr") 
                      no_cache = "true")
 
     # Construct the API URL
-    api_url <- modify_url("https://serpapi.com/search.json",
+    api_url <- httr::modify_url("https://serpapi.com/search.json",
                           query = querylist)
 
     # Perform the API request
-    response <- GET(api_url)
+    response <- httr::GET(api_url)
 
     # Check if an error is returned
-    if (http_status(response)$category != "Success") {
+    if (httr::http_status(response)$category != "Success") {
       break
     }
 
     # Extract and process JSON data
-    json_content <- fromJSON(content(response, "text"))
+    json_content <- jsonlite::fromJSON(httr::content(response, "text"))
 
     # Check if organic_results is empty
     if ("error" %in% names(json_content)) {
@@ -370,18 +371,18 @@ urlist_Bing <- function(query, filename = NULL, sleep_seconds = 1, lang = "fr") 
                       no_cache = "true")
 
     # Construct the API URL
-    api_url <- modify_url("https://serpapi.com/search.json", query = querylist)
+    api_url <- httr::modify_url("https://serpapi.com/search.json", query = querylist)
 
     # Perform the API request
-    response <- GET(api_url)
+    response <- httr::GET(api_url)
 
     # Check if an error is returned
-    if (http_status(response)$category != "Success") {
+    if (httr::http_status(response)$category != "Success") {
       break
     }
 
     # Extract and process JSON data
-    json_content <- fromJSON(content(response, "text"))
+    json_content <- jsonlite::fromJSON(httr::content(response, "text"))
 
     # Check if organic_results is empty
     if ("error" %in% names(json_content)) {

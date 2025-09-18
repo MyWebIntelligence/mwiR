@@ -2,33 +2,16 @@
 % Please edit documentation in R/crawl.R
 \name{archive_available}
 \alias{archive_available}
-\title{Vérifier la présence d'une URL dans Archive.org (Wayback Machine)}
+\title{Check URL availability in Archive.org}
 \usage{
 archive_available(url)
 }
 \arguments{
-\item{url}{Chaîne de caractères représentant l'URL à vérifier. Exemple : "http://exemple.com".}
+\item{url}{A character string representing the URL to be checked.}
 }
 \value{
-Une liste contenant les informations du snapshot (capture d'archive) le plus proche si disponible, sinon \code{NULL}.
+A list containing the closest snapshot details if available, otherwise NULL.
 }
 \description{
-Cette fonction permet de vérifier si une URL a été archivée sur Archive.org (Wayback Machine).
-\strong{Utilité :} retrouver une version antérieure d'une page web disparue, garantir la reproductibilité scientifique, ou documenter l'évolution d'un site.
-}
-\details{
-\subsection{Conseils d'utilisation}{
-- Pratique pour vérifier la disponibilité historique d'une ressource web (veille, recherche, audit).
-- Si la page n'est plus en ligne, Archive.org peut fournir une copie d'archive.
-- Le résultat contient les détails du snapshot le plus proche (date, URL d'archive, etc.).
-}
-}
-\examples{
-# Exemple : Vérifier si une page a été archivée
-resultat <- archive_available("http://exemple.com")
-if (!is.null(resultat)) {
-  print(paste("Snapshot trouvé :", resultat$url))
-} else {
-  print("Aucune archive trouvée pour cette URL.")
-}
+This function checks if a given URL is available in Archive.org.
 }

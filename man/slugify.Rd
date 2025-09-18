@@ -2,16 +2,16 @@
 % Please edit documentation in R/export.R
 \name{slugify}
 \alias{slugify}
-\title{Convert a String into a URL-Friendly Slug}
+\title{Slugify a String}
 \usage{
 slugify(string)
 }
 \arguments{
-\item{string}{A character string that will be transformed into a slug.}
+\item{string}{A character string to be slugified.}
 }
 \value{
-Returns a character string that is a URL-friendly slug version of the input string. This typically involves converting to lowercase, replacing spaces with hyphens, and removing special characters.
+A slugified character string.
 }
 \description{
-This function transforms an input string into a slug suitable for use in URLs. It ensures the resulting string is lowercase, contains only URL-safe characters, and replaces spaces and other delimiters with hyphens to improve readability and SEO.
+This function creates a URL-friendly slug from a given string.
 }

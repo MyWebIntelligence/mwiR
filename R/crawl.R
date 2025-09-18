@@ -6,7 +6,6 @@
 #'
 #' @param url A character string representing the URL to be crawled.
 #' @return A data frame containing the extracted content from the URL.
-#' @import httr jsonlite rvest
 #' @import reticulate
 .trafilatura_mod <- reticulate::import("trafilatura", delay_load = FALSE)
 #' @export
@@ -144,25 +143,24 @@ crawl <- function(url) {
 #'
 #' @param url A character string representing the URL of the PDF.
 #' @return A character string containing the extracted text from the PDF.
-#' @import httr pdftools tesseract
 #' @export
 # Fonction pour extraire le texte d'un PDF à partir d'une URL
 PDFtoText <- function(url) {
   # Download the PDF
   temp_file <- tempfile(fileext = ".pdf")
-  download <- GET(url, write_disk(temp_file))
+  download <- httr::GET(url, httr::write_disk(temp_file))
 
-  if (http_status(download)$category != "Success") {
-    return(paste("Download error: ", http_status(download)$message))
+  if (httr::http_status(download)$category != "Success") {
+    return(paste("Download error: ", httr::http_status(download)$message))
   }
 
   # Attempt to extract text with pdftools
-  text <- pdf_text(temp_file)
+  text <- pdftools::pdf_text(temp_file)
 
   # If the text is empty or contains non-printable characters,
   # use OCR to extract the text
   if (length(text) == 0) {
-    ocr_text <- ocr(temp_file)
+    ocr_text <- tesseract::ocr(temp_file)
     return(ocr_text)
   } else {
     return(paste(text, collapse = "\n"))
@@ -176,7 +174,7 @@ PDFtoText <- function(url) {
 #'
 #' @param url A character string representing the URL to be cleaned.
 #' @return A cleaned URL as a character string.
-#' @import stringr
+#' @importFrom stringr str_replace str_extract
 #' @export
 clean_url <- function(url) {
   # Remove fragment identifiers (anything after a #)
@@ -194,7 +192,7 @@ clean_url <- function(url) {
 #'
 #' @param link A character string representing the link to be checked.
 #' @return A logical value indicating whether the link is a media link.
-#' @import stringr
+#' @importFrom stringr str_detect
 #' @export
 is_media_link <- function(link) {
   if (is.na(link)) {
@@ -220,7 +218,8 @@ is_media_link <- function(link) {
 #' @param parent_id An integer representing the ID of the parent record in the database.
 #' @param land_id An integer representing the ID of the land associated with the links.
 #' @param urlmax An integer specifying the maximum number of URLs to be processed.
-#' @import DBI stringr
+#' @import DBI
+#' @importFrom stringr str_extract_all str_extract
 #' @export
 detect_links_and_add <- function(con, content, parent_id, land_id, urlmax=50) {
   # Refined regex pattern for URL extraction
@@ -303,7 +302,6 @@ phrase_tokenizer <- function(text) {
 #' @param text A character string representing the input text.
 #' @param language A character string specifying the language for stemming (default is "fr").
 #' @return A data frame containing the stemmed phrases as the dictionary.
-#' @import dplyr stringr
 #' @export
 mkdictionary <- function(text, language = "fr") {
   phrases <- phrase_tokenizer(text)
@@ -321,7 +319,7 @@ mkdictionary <- function(text, language = "fr") {
 #'
 #' @param text A character string representing the text to be tokenized.
 #' @return A character vector of tokenized words.
-#' @import stringr
+#' @importFrom stringr str_split boundary
 #' @export
 word_tokenizer <- function(text) {
   unlist(str_split(text, boundary("word")))
@@ -336,7 +334,7 @@ word_tokenizer <- function(text) {
 #' @param dictionary A character vector of terms to be used for relevance calculation.
 #' @param language A character string specifying the language for stemming (default is "fr").
 #' @return A numeric vector of relevance scores.
-#' @import stringr
+#' @importFrom stringr str_count
 #' @export
 get_relevance <- function(text, weight, dictionary, language = "fr") {
   stems <- unlist(lapply(word_tokenizer(text), function(w) stem_word(w, language)))
@@ -355,7 +353,6 @@ get_relevance <- function(text, weight, dictionary, language = "fr") {
 #' @param expression A data frame containing the title and text of the expression.
 #' @param language A character string specifying the language for stemming (default is "fr").
 #' @return A numeric value representing the relevance score.
-#' @import stringr
 #' @export
 expression_relevance <- function(dictionary, expression, language = "fr") {
   # Convert title and text to lowercase
@@ -482,26 +479,25 @@ crawlurls <- function(land_name, urlmax=50, limit = NULL, http_status = NULL, db
 #'
 #' @param url A character string representing the URL to be crawled.
 #' @return A character string containing the extracted details.
-#' @import httr XML
 #' @export
 crawlDetails <- function(url) {
   if (is.null(url) || url == "") {
     return("")
   }
 
-  response <- try(GET(url), silent = TRUE)
+  response <- try(httr::GET(url), silent = TRUE)
   if (inherits(response, "try-error")) {
     return(paste("Get URL Domain make an error:", url))
   }
 
-  content <- content(response, as = "text")
-  doc <- htmlParse(content, asText = TRUE)
+  content <- httr::content(response, as = "text")
+  doc <- XML::htmlParse(content, asText = TRUE)
 
   result <- ""
 
   # Get text from HTML
   get_nodes_text <- function(xpath) {
-    nodes <- xpathSApply(doc, xpath, xmlValue)
+    nodes <- XML::xpathSApply(doc, xpath, XML::xmlValue)
     if (!is.null(nodes)) {
       return(paste(nodes, collapse = " "))
     }
@@ -510,7 +506,7 @@ crawlDetails <- function(url) {
 
   # Get text from attributes nodes form HTML
   get_attribute_value <- function(xpath) {
-    attributes <- xpathSApply(doc, xpath, xmlGetAttr, "content")
+    attributes <- XML::xpathSApply(doc, xpath, XML::xmlGetAttr, "content")
     if (!is.null(attributes)) {
       return(paste(attributes, collapse = " "))
     }
@@ -645,7 +641,6 @@ crawlForce <- function(land_name, db_name = "mwi.db") {
 #'
 #' @param url A character string representing the URL to be checked.
 #' @return A list containing the closest snapshot details if available, otherwise NULL.
-#' @import httr jsonlite
 #' @export
 archive_available <- function(url) {
   # Construct the API URL to check availability
@@ -653,9 +648,9 @@ archive_available <- function(url) {
 
   # Try the GET request with error handling
   tryCatch({
-    response <- GET(api_url)
-    if (status_code(response) == 200) {
-      content <- content(response, as = "text", encoding = "UTF-8")
+    response <- httr::GET(api_url)
+    if (httr::status_code(response) == 200) {
+      content <- httr::content(response, as = "text", encoding = "UTF-8")
       json_content <- jsonlite::fromJSON(content)
       return(json_content$archived_snapshots$closest)
     } else {
@@ -674,7 +669,6 @@ archive_available <- function(url) {
 #'
 #' @param url A character string representing the URL to be archived.
 #' @return A character string containing the most recent archived URL, or NULL if not available.
-#' @import httr jsonlite
 #' @export
 get_last_memento_url <- function(url) {
   isAvailable <- archive_available(url)

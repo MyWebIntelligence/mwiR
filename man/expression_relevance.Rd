@@ -2,20 +2,20 @@
 % Please edit documentation in R/crawl.R
 \name{expression_relevance}
 \alias{expression_relevance}
-\title{Calculate Relevance Score for an Expression}
+\title{Calculate expression relevance}
 \usage{
 expression_relevance(dictionary, expression, language = "fr")
 }
 \arguments{
-\item{dictionary}{A character vector of terms that serve as the reference for calculating relevance. These terms are used to assess how closely the expression matches the desired concepts.}
+\item{dictionary}{A character vector of terms to be used for relevance calculation.}
 
-\item{expression}{A data frame containing the title and text fields of the expression to be evaluated. The content of these fields is analyzed to compute the relevance score.}
+\item{expression}{A data frame containing the title and text of the expression.}
 
-\item{language}{A character string specifying the language used for stemming and text processing. The default is "fr" (French), which affects how words are reduced to their root forms for comparison.}
+\item{language}{A character string specifying the language for stemming (default is "fr").}
 }
 \value{
-Returns a numeric value representing the calculated relevance score of the expression. This score quantifies how relevant the expression is with respect to the provided dictionary terms.
+A numeric value representing the relevance score.
 }
 \description{
-This function computes a relevance score for a given expression by analyzing its title and text content. It uses the provided dictionary of terms to determine how closely the expression matches the key concepts. The language parameter controls the stemming process, which reduces words to their base forms to improve matching accuracy. This relevance score can be used to filter or rank expressions based on their importance or pertinence.
+This function calculates the relevance of an expression based on its title and text.
 }

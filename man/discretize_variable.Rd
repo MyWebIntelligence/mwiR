@@ -2,63 +2,79 @@
 % Please edit documentation in R/recode.R
 \name{discretize_variable}
 \alias{discretize_variable}
-\title{Discrétiser un vecteur numérique en classes interprétables}
+\title{Discrétiser un vecteur numérique}
 \usage{
-discretize_variable(x, method = "equal_freq", bins = 5, breaks = NULL)
+discretize_variable(
+  x,
+  method = c("equal_freq", "equal_width", "quantile", "jenks", "kmeans", "gmm", "manual"),
+  bins = 5L,
+  breaks = NULL,
+  labels = NULL,
+  weights = NULL,
+  winsorize = NULL,
+  min_unique = 3L,
+  right = FALSE,
+  include.lowest = TRUE,
+  na.rm = TRUE,
+  verbose = interactive(),
+  return_factor = TRUE,
+  ...
+)
 }
 \arguments{
-\item{x}{Un vecteur numérique continu à transformer en classes. Par exemple, une variable quantitative telle que l'âge, un score, une durée, etc.}
-\item{method}{Méthode de discrétisation à appliquer. Trois options sont disponibles :
-\describe{
-  \item{"equal_width"}{Divise l'intervalle des valeurs en classes de largeur égale, c'est-à-dire des intervalles réguliers sur l'axe des valeurs. Utile pour obtenir des intervalles fixes, mais peut créer des classes déséquilibrées si la distribution est très asymétrique.}
-  \item{"equal_freq"}{Crée des classes contenant chacune un nombre égal d'observations (égal effectif), aussi appelé quantiles. Cette méthode équilibre les effectifs dans chaque classe, mais les bornes des classes peuvent être irrégulières.}
-  \item{"manual"}{Permet de définir manuellement les bornes des classes via l'argument \code{breaks}, pour un contrôle précis selon des critères métiers ou seuils connus.}
-}
-Par défaut : "equal_freq".}
-\item{bins}{Nombre de classes à créer (par exemple, 4 pour des quartiles, 5 pour des quintiles, etc.). Ce paramètre est ignoré si \code{method = "manual"}. Par défaut : 5.}
-\item{breaks}{Un vecteur numérique croissant définissant les bornes des classes (par exemple, \code{c(0, 10, 20, 50)}). Utilisé uniquement si \code{method = "manual"}.}
+\item{x}{Vecteur numérique.}
+
+\item{method}{Méthode de découpage : `"equal_freq"` (quantiles, défaut),
+`"equal_width"`, `"quantile"` (synonyme d’`equal_freq`), `"jenks"`,
+`"kmeans"`, `"gmm"`, `"manual"`.}
+
+\item{bins}{Nombre de classes souhaité (ignoré si `method = "manual"`). Doit
+être >= 2.}
+
+\item{breaks}{Bornes explicites si `method = "manual"`. Seront triées et
+dédupliquées.}
+
+\item{labels}{Libellés à associer aux classes. Si `NULL`, des libellés
+`"[a, b)"` sont générés automatiquement.}
+
+\item{weights}{Optionnel, pondérations positives (longueur identique à `x`)
+utilisées pour les quantiles ou Jenks pondérés.}
+
+\item{winsorize}{Proportion (0–0.5) utilisée pour tronquer les extrêmes avant
+calcul des bornes. Exemple : `winsorize = 0.01` coupe aux quantiles 1 \% et 99 \%.}
+
+\item{min_unique}{Nombre minimal de valeurs distinctes nécessaires pour
+tenter la discrétisation.}
+
+\item{right, include.lowest}{Paramètres transmis à `cut()`.}
+
+\item{na.rm}{Si `TRUE`, les valeurs non finies sont exclues du calcul des
+bornes; elles restent `NA` dans le facteur retourné.}
+
+\item{verbose}{Logical ; contrôle l’affichage des messages (utile pour Jenks/GMM).}
+
+\item{return_factor}{Lorsque `TRUE` (défaut), renvoie un facteur avec métadonnées
+attachées; `FALSE` renvoie uniquement la liste de métadonnées.}
+
+\item{...}{Arguments additionnels transmis aux fonctions internes (`stats::kmeans`,
+`classInt::classIntervals`, `find_clusters`, etc.).}
 }
 \value{
-La fonction retourne un vecteur de type \strong{facteur}, où chaque niveau correspond à une classe (intervalle) de la variable d'origine. Ce facteur facilite l'utilisation des classes dans les analyses statistiques et graphiques.
+By default an ordered factor; the attribute `discretize_meta` stores summary
+information. When `return_factor = FALSE`, a list is returned with:
+\describe{
+  \item{method_applied}{method finally used.}
+  \item{breaks}{numeric vector of bin edges.}
+  \item{counts}{class frequencies.}
+  \item{warnings}{character vector of notes emitted during discretisation.}
+}
 }
 \description{
-La discrétisation consiste à transformer une variable numérique continue en une variable catégorielle en regroupant les valeurs en classes. Cette opération est particulièrement utile pour :
-\itemize{
-  \item Simplifier l'interprétation des variables continues, par exemple en regroupant des âges en tranches d'âge.
-  \item Préparer les données pour des analyses qui nécessitent des variables qualitatives, comme les tableaux croisés ou les arbres de décision.
-  \item Faciliter la visualisation des distributions via des histogrammes ou des heatmaps.
-}
-\emph{Il est conseillé d'appliquer cette fonction sur la variable brute, non transformée, afin d'assurer la cohérence des classes créées.}
-}
-\details{
-\subsection{Méthodes de discrétisation}{
-\itemize{
-  \item \strong{equal_width} : Les classes ont toutes la même largeur sur l'axe des valeurs. Cette méthode est simple et intuitive, mais peut produire des classes avec des effectifs très différents si la distribution est asymétrique.
-  \item \strong{equal_freq} : Les classes contiennent chacune le même nombre d'observations (quantiles). Cette méthode équilibre les effectifs, ce qui est souvent souhaitable pour certaines analyses, mais les bornes des classes peuvent être irrégulières.
-  \item \strong{manual} : Permet de définir précisément les bornes des classes selon des critères spécifiques ou des seuils métiers, offrant un contrôle total sur la discrétisation.
-}
-}
-\subsection{Conseils d'utilisation}{
-\itemize{
-  \item Avant de choisir une méthode, examinez la distribution de la variable pour comprendre sa forme.
-  \item Gardez à l'esprit que la discrétisation peut entraîner une perte d'information, notamment en réduisant la précision des données.
-  \item Le résultat est un facteur, ce qui facilite son intégration dans les modèles statistiques et les graphiques.
-}
-}
-}
-\examples{
-# Exemple 1 : Discrétisation en quartiles (4 classes avec effectifs égaux)
-x <- rnorm(100)
-quartiles <- discretize_variable(x, method = "equal_freq", bins = 4)
-table(quartiles)
-
-# Exemple 2 : Discrétisation en intervalles réguliers (5 classes de largeur égale)
-x <- runif(100, min = 0, max = 100)
-classes_egales <- discretize_variable(x, method = "equal_width", bins = 5)
-table(classes_egales)
-
-# Exemple 3 : Discrétisation manuelle avec des seuils définis par l'utilisateur
-revenu <- c(800, 1200, 2500, 4000, 6000)
-tranches <- discretize_variable(revenu, method = "manual", breaks = c(0, 1000, 3000, 10000))
-tranches
+Crée une variable catégorielle ordinale à partir d'un vecteur
+  numérique. Les stratégies proposées couvrent les usages classiques en data
+  science et en sciences sociales : classes à effectifs identiques (quantiles),
+  intervalles réguliers, coupures manuelles, natural breaks de Jenks, clustering
+  k-means ou GMM (mixtures gaussiennes). Des métadonnées exhaustives (bornes,
+  effectifs, avertissements) sont attachées à la sortie pour alimenter diagnostics
+  ou dictionnaires.
 }

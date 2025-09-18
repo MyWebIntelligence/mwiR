@@ -2,37 +2,37 @@
 % Please edit documentation in R/land.R
 \name{listlands}
 \alias{listlands}
-\title{List Research Projects (Lands) with Detailed Information}
+\title{List research projects (lands)}
 \usage{
 listlands(land_name = NULL, db_name = "mwi.db")
 }
 \arguments{
-\item{land_name}{A string specifying the name of a specific land to list. If NULL, the function lists all lands. Default is NULL.}
+\item{land_name}{A string specifying the name of the land to list. If NULL, all lands are listed. Default is NULL.}
 
-\item{db_name}{A string specifying the filename of the SQLite database to query. Default is "mwi.db".}
+\item{db_name}{A string specifying the name of the SQLite database file. Default is "mwi.db".}
 }
 \value{
-This function is called for its side effects and does not return a value.
+None. This function is called for its side effects.
 }
 \description{
-This function retrieves and displays detailed information about research projects (lands) stored in the specified SQLite database. It can list all lands or a specific land, providing insights into each project's metadata and status.
+This function lists all lands or a specific land from the SQLite database.
+It retrieves and displays information such as the name, creation date, description,
+terms in the dictionary, total number of expressions, number of expressions remaining to be fetched,
+and HTTP status codes of the expressions.
 }
 \details{
-For each land, the function retrieves and displays the following information:
-- Name of the land (research project)
-- Creation date of the land
-- Description of the land
-- Terms included in the land's dictionary
-- Total number of expressions associated with the land
-- Number of expressions still to be fetched
-- HTTP status codes of the expressions, indicating their retrieval status
+The function retrieves and displays the following information for each land:
+- Name of the land
+- Creation date
+- Description
+- Terms in the dictionary
+- Total number of expressions
+- Number of expressions remaining to be fetched
+- HTTP status codes of the expressions
 }
 \examples{
 \dontrun{
-# List all lands
 listlands()
-
-# List details for a specific land
 listlands("Climate Research", "my_database.db")
 }
 }

@@ -20,7 +20,6 @@
 #' \dontrun{
 #' initmwi()
 #' }
-#' @import DBI cld3 ggplot2 gridExtra httr lubridate jsonlite mclust openai pdftools readr reticulate RSQLite rvest SnowballC stringr stringi tesseract tools urltools XML zip mockery
 #' @export
 initmwi <- function() {
   required_packages <- c("DBI", "cld3", "ggplot2", "gridExtra","httr", "lubridate", "jsonlite", "mclust","openai","pdftools", "readr","reticulate", "RSQLite", "rvest","SnowballC",  "stringr", "stats","tesseract", "tools", "urltools", "XML", "zip", "mockery", "stringi")

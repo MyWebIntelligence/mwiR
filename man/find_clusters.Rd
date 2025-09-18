@@ -2,29 +2,61 @@
 % Please edit documentation in R/recode.R
 \name{find_clusters}
 \alias{find_clusters}
-\title{Identifier des clusters dans un vecteur numérique avec modèles de mélange gaussiens}
+\title{Identifier des clusters latents dans un vecteur numérique (1D)}
 \usage{
-find_clusters(x, max_G = 9, auto_select_model = TRUE, modelNames = "V")
+find_clusters(
+  x,
+  max_G = 6,
+  criterion = c("bic", "icl"),
+  min_cluster_prop = 0.05,
+  transform = c("none", "log1p", "yeojohnson", "zscore", "auto"),
+  winsorize = NULL,
+  seed = NULL,
+  return_breaks = TRUE,
+  verbose = interactive(),
+  ...
+)
 }
 \arguments{
-\item{x}{Un vecteur numérique représentant les données à segmenter en clusters.}
+\item{x}{Numérique.}
 
-\item{max_G}{Un entier spécifiant le nombre maximum de clusters à tester lors de la modélisation.}
+\item{max_G}{Maximum de composantes testées (défaut 6).}
 
-\item{auto_select_model}{Un booléen (TRUE/FALSE). Si TRUE, la fonction utilise le critère BIC pour laisser Mclust choisir automatiquement le meilleur modèle de structure de covariance. Si FALSE, le modèle est forcé à celui spécifié dans `modelNames`.}
+\item{criterion}{Critère d’ajustement : `"bic"` (défaut) ou `"icl"`.}
 
-\item{modelNames}{Une chaîne de caractères ou un vecteur de modèles à tester si `auto_select_model` est FALSE. Ces modèles définissent la structure de covariance utilisée dans le clustering.}
+\item{min_cluster_prop}{Proportion minimale d’effectifs par cluster (défaut 0.05).}
+
+\item{transform}{Transformation appliquée avant clustering : `"none"`,
+`"log1p"`, `"yeojohnson"`, `"zscore"`, `"auto"` (via `transform_variable`),
+ou fonction utilisateur.}
+
+\item{winsorize}{Proportion de winsorisation (0–0.5).}
+
+\item{seed}{Graine optionnelle.}
+
+\item{return_breaks}{Lorsque `TRUE`, inclut un vecteur de coupures optimales
+(midpoints entre centres ordonnés) pour alimenter `discretize_variable`.}
+
+\item{verbose}{Messages informatifs.}
+
+\item{...}{Paramètres additionnels transmis à `mclust::Mclust`.}
 }
 \value{
-Retourne une liste contenant plusieurs éléments importants :
-- `$fit_object` : L'objet complet retourné par Mclust, utile pour visualisations et diagnostics.
-- `$best_model` : Le nom du modèle de covariance sélectionné comme meilleur.
-- `$n_clusters` : Le nombre optimal de clusters détectés.
-- `$classification` : Un vecteur indiquant l'appartenance de chaque observation à un cluster.
+Liste avec `fit_object`, `best_model`, `criterion_value`, `n_clusters`,
+  `classification` (facteur sur l’ensemble des observations, NA inclus pour
+  valeurs manquantes), `posterior` (probabilités), `transform_info`, `breaks`
+  (si demandé) et `diagnostics`.
 }
 \description{
-Cette fonction utilise des modèles de mélange gaussiens pour identifier des groupes latents (clusters) dans un vecteur numérique. Elle teste plusieurs modèles et nombres de clusters pour trouver la meilleure segmentation selon le critère BIC.
+Modèles de mélanges gaussiens 1D avec sélection automatique
+  du nombre de composantes, transformations préalables, et diagnostics
+  complets retour. Pensé pour la segmentation socio-économique, la création
+  de typologies, ou la génération de coupures intelligentes pour la
+  discrétisation.
 }
-\details{
-Il est souvent recommandé d'appliquer le clustering sur une variable transformée (par exemple, normalisée ou log-transformée) afin d'atténuer l'influence des valeurs aberrantes (outliers) qui pourraient fausser la segmentation.
+\references{
+Fraley, C., & Raftery, A. E. (2002). Model-based clustering, discriminant
+  analysis, and density estimation. *JASA*.  
+  McLachlan, G., & Peel, D. (2000). *Finite Mixture Models*. Wiley.  
+  Celeux, G., & Soromenho, G. (1996). The ICL criterion. *Computational Statistics & Data Analysis*.
 }

@@ -2,49 +2,82 @@
 % Please edit documentation in R/recode.R
 \name{analyse_powerlaw}
 \alias{analyse_powerlaw}
-\title{Tester si une distribution suit une loi de puissance (power law)}
+\title{Sélectionner et valider un modèle de queue lourde}
 \usage{
-analyse_powerlaw(x, type = "discrete")
+analyse_powerlaw(
+  x,
+  type = c("discrete", "continuous"),
+  candidate_models = NULL,
+  xmin = NULL,
+  bootstrap_sims = 300L,
+  bootstrap_models = c("powerlaw", "best"),
+  threads = 1L,
+  winsorize = NULL,
+  min_n = 50L,
+  verbose = interactive(),
+  ...
+)
 }
 \arguments{
-\item{x}{Vecteur de données numériques positives à analyser. Par exemple, des tailles de groupes, des degrés de sommets dans un réseau, des fréquences d’occurrence, etc.}
+\item{x}{Vecteur numérique (valeurs positives uniquement seront retenues).}
 
-\item{type}{Type de données à analyser :
-\describe{
-  \item{"discrete"}{Pour des données de type compte (entiers, ex : nombre de liens, nombre d’occurrences).}
-  \item{"continuous"}{Pour des mesures continues (ex : tailles, durées, valeurs réelles).}
-}
-Le choix du type est crucial car il détermine la méthode d’estimation statistique utilisée.}
+\item{type}{`"discrete"` (défaut) ou `"continuous"`, selon la nature de `x`.}
+
+\item{candidate_models}{Ensemble de modèles à tester. Par défaut :
+`c("powerlaw", "lognormal", "exponential", "weibull")` pour les données
+continues, et `c("powerlaw", "lognormal", "exponential")` pour les données
+discrètes (les modèles indisponibles sont ignorés).}
+
+\item{xmin}{Valeur minimale fixée pour l'ajustement (sinon estimée par
+`poweRlaw::estimate_xmin`).}
+
+\item{bootstrap_sims}{Nombre de replicats bootstrap pour le test de
+goodness-of-fit (défaut 300).}
+
+\item{bootstrap_models}{Modèles sur lesquels exécuter le bootstrap : par
+défaut `c("powerlaw", "best")`.}
+
+\item{threads}{Nombre de threads (passé à `bootstrap_p`). Par défaut 1.}
+
+\item{winsorize}{Proportion optionnelle (0–0.5) pour winsoriser les extrêmes
+avant estimation (utile en présence de valeurs aberrantes).}
+
+\item{min_n}{Taille minimale d'échantillon (après nettoyage) pour lancer
+l'analyse (défaut 50).}
+
+\item{verbose}{Afficher les messages d'étapes importantes.}
+
+\item{...}{Arguments additionnels transmis à `poweRlaw::Mpl` internes si besoin.}
 }
 \value{
 Une liste contenant :
-\itemize{
-  \item \code{xmin} : Valeur minimale à partir de laquelle la loi de puissance est ajustée.
-  \item \code{alpha} : Exposant estimé de la loi de puissance.
-  \item \code{gof_p} : p-value du test de bootstrap (goodness-of-fit) indiquant la qualité de l’ajustement.
-  \item \code{poweRlaw} : L’objet complet retourné par le package poweRlaw, pour analyses avancées.
-}
+  * `data_summary` : effectifs, résumés descriptifs de `x`.
+  * `best_model` : nom du modèle retenu (BIC minimal).
+  * `best_fit` : informations détaillées (paramètres, BIC/AIC, objet poweRlaw).
+  * `candidates` : liste avec diagnostics pour chaque modèle testé.
+  * `comparisons` : tableau des ratios de log-vraisemblance (Clauset et al.).
+  * `bootstrap` : résultats du bootstrap goodness-of-fit exécuté.
+  * `call` : appel original.
 }
 \description{
-Cette fonction permet de tester si la queue (partie extrême) d’une distribution de données suit une loi de puissance (power law), ce qui est fréquent dans de nombreux phénomènes naturels et sociaux (ex : réseaux, tailles de villes, distribution de richesses).
-\strong{Attention :} il ne s’agit pas d’une fonction de transformation, mais d’un outil d’analyse statistique.
+Analyse la queue d'une distribution positive (comptages ou mesures continues)
+en comparant plusieurs modèles candidats : loi de puissance, log-normale,
+exponentielle, et (si disponible) Weibull/stretched-exponential. Un résumé
+exhaustif est retourné : paramètres estimés, critères d'information (AIC/BIC),
+p-values de bootstrap goodness-of-fit, comparaisons de vraisemblance et
+diagnostics de queue. Implémente les recommandations de Clauset, Shalizi &
+Newman (2009) et de la littérature récente sur les lois de puissance.
 }
 \details{
-\subsection{Conseils d’utilisation}{
-- Utilisez cette fonction pour explorer la présence de lois de puissance dans vos données, notamment pour les distributions très asymétriques.
-- Vérifiez la nature de vos données (comptes ou mesures continues) avant de choisir le type.
-- Une p-value élevée (\code{gof_p} > 0.1) indique que l’hypothèse de loi de puissance n’est pas rejetée.
-- Pour des analyses avancées, exploitez l’objet \code{poweRlaw} retourné.
+Chaque modèle est ajusté via `poweRlaw`, avec estimation conjointe de `xmin`
+(sauf si fixé) et des paramètres. Le meilleur modèle est choisi par BIC, puis
+évalué via bootstrap. Les comparaisons pairées de log-vraisemblance sont
+fournies lorsqu'au moins deux modèles sont valides.
 }
-}
-\examples{
-# Exemple : Tester une loi de puissance sur des degrés de réseau (entiers)
-degres <- c(1, 2, 2, 3, 5, 8, 13, 21, 34)
-resultat <- analyse_powerlaw(degres, type = "discrete")
-print(resultat$alpha)
-print(resultat$gof_p)
-
-# Exemple : Tester sur des tailles continues
-tailles <- rexp(100, rate = 0.1)
-analyse_powerlaw(tailles, type = "continuous")
+\references{
+Clauset, A., Shalizi, C. R., & Newman, M. E. J. (2009). *Power-law distributions in
+empirical data*. SIAM Review.  
+Clauset, A., & Woodard, R. (2013). *Estimating the historical and future probabilities
+of large terrorist events*. Annals of Applied Statistics.  
+Newman, M. E. J. (2005). *Power laws, Pareto distributions and Zipf's law*. Contemporary Physics.
 }

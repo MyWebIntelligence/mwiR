@@ -2,16 +2,16 @@
 % Please edit documentation in R/crawl.R
 \name{get_last_memento_url}
 \alias{get_last_memento_url}
-\title{Retrieve the Most Recent Archived URL from Archive.org}
+\title{Get the most recent archived URL from Archive.org}
 \usage{
 get_last_memento_url(url)
 }
 \arguments{
-\item{url}{A character string representing the original URL for which the archived version is sought. This should be a valid web address.}
+\item{url}{A character string representing the URL to be archived.}
 }
 \value{
-Returns a character string containing the URL of the most recent archived snapshot from Archive.org. If no archived version is available, the function returns NULL.
+A character string containing the most recent archived URL, or NULL if not available.
 }
 \description{
-This function queries the Internet Archive (Archive.org) to find and retrieve the most recent archived snapshot URL for a given original URL. This is useful for accessing historical versions of web pages or verifying past content.
+This function retrieves the most recent archived URL from Archive.org for a given URL.
 }

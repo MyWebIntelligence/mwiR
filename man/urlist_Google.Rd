@@ -2,32 +2,41 @@
 % Please edit documentation in R/listurl.R
 \name{urlist_Google}
 \alias{urlist_Google}
-\title{Retrieve URLs from Google Search Using SerpAPI with Date Filtering}
+\title{Query to URLs with SerpAPI Google Search}
 \usage{
-urlist_Google(query, datestart, dateend, timestep = "week", sleep_seconds = 1, lang = "fr")
+urlist_Google(
+  query,
+  datestart,
+  dateend,
+  timestep = "week",
+  sleep_seconds = 1,
+  lang = "fr"
+)
 }
 \arguments{
-\item{query}{A character string representing the search query to be sent to Google.}
+\item{query}{A character string representing the search query.}
 
-\item{datestart}{A character string specifying the start date for the search in "yyyy-mm-dd" format.}
+\item{datestart}{A character string representing the start date for the search in "yyyy-mm-dd" format.}
 
-\item{dateend}{A character string specifying the end date for the search in "yyyy-mm-dd" format.}
+\item{dateend}{A character string representing the end date for the search in "yyyy-mm-dd" format.}
 
-\item{timestep}{A character string specifying the time interval for the date sequence. Default is "week".}
+\item{timestep}{A character string representing the time step for the date sequence (default is "week").}
 
-\item{sleep_seconds}{A numeric value specifying the delay in seconds between API requests to prevent rate limiting. Default is 1 second.}
+\item{sleep_seconds}{A numeric value representing the sleep time between API requests to avoid rate-limiting (default is 1).}
 
-\item{lang}{A character string specifying the language code for the search. Default is "fr" (French).}
+\item{lang}{A character string representing the language for the search (default is "fr").}
 }
 \value{
-This function does not return a value. It writes the retrieved URLs from Google search results to a text file.
+This function does not return a value. It writes the search results to a text file.
 }
 \description{
-This function uses the SerpAPI service to perform a Google search with the specified query, date range, and language. It processes the API response to extract URLs from the search results and saves them into a text file for further use.
+This function retrieves URLs from Google search results using the SerpAPI service.
+It constructs API requests based on the provided query, date range, and language parameters,
+then processes the response to extract and save the URLs in a text file.
 }
 \examples{
 \dontrun{
-# Retrieve URLs for the query "data science" between January and March 2023
 urlist_Google("data science", "2023-01-01", "2023-03-01", timestep = "month", sleep_seconds = 2, lang = "en")
 }
+
 }

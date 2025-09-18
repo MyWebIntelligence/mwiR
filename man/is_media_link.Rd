@@ -2,16 +2,16 @@
 % Please edit documentation in R/crawl.R
 \name{is_media_link}
 \alias{is_media_link}
-\title{Determine if a Link Points to a Media File}
+\title{Check if a link is a media link}
 \usage{
 is_media_link(link)
 }
 \arguments{
-\item{link}{A character string representing the URL or link to be evaluated.}
+\item{link}{A character string representing the link to be checked.}
 }
 \value{
-Returns a logical value (TRUE or FALSE) indicating whether the provided link points to a media file, based on its file extension.
+A logical value indicating whether the link is a media link.
 }
 \description{
-This function evaluates a given link to determine if it refers to a media file, such as images, videos, or audio, by inspecting the file extension. It helps in filtering or categorizing links based on media content.
+This function checks if a given link points to a media file based on its extension.
 }

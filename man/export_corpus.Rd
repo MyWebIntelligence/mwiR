@@ -2,18 +2,17 @@
 % Please edit documentation in R/export.R
 \name{export_corpus}
 \alias{export_corpus}
-\title{Exporter le corpus d'un territoire}
+\title{Export Corpus}
 \usage{
 export_corpus(con, land_name, minimum_relevance)
 }
 \arguments{
-\item{con}{Objet de connexion à la base de données. Il permet d'accéder aux données stockées du territoire.}
-\item{land_name}{Chaîne de caractères indiquant le nom du territoire (land) dont on souhaite exporter le corpus.}
-\item{minimum_relevance}{Valeur numérique définissant le seuil minimal de pertinence pour inclure un document dans l'export. Seuls les documents avec une pertinence égale ou supérieure seront exportés.}
+\item{con}{A database connection object.}
+
+\item{land_name}{A character string specifying the name of the land.}
+
+\item{minimum_relevance}{A numeric value specifying the minimum relevance score for inclusion in the export.}
 }
 \description{
-Cette fonction permet d'exporter le corpus textuel associé à un territoire donné, en incluant les métadonnées associées. 
-Le corpus est extrait de la base de données via la connexion \code{con}, filtré selon le seuil de pertinence \code{minimum_relevance}, puis sauvegardé dans des fichiers texte. 
-Enfin, ces fichiers sont compressés dans une archive zip pour faciliter leur transfert ou archivage.
-Cette opération est utile pour partager, analyser ou sauvegarder localement les données textuelles d'un territoire.
+This function exports the corpus data from the specified land, including metadata, to text files and compresses them into a zip file.
 }

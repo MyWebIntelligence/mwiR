@@ -2,69 +2,99 @@
 % Please edit documentation in R/recode.R
 \name{plotlog}
 \alias{plotlog}
-\title{Visualize Original and Transformed Distributions of Numeric Variables}
+\title{Visualise Original and Transformed Distributions}
 \usage{
 plotlog(
   df,
   variables = NULL,
   trans_type = "log1p",
-  bins = NULL,
+  bins = "sturges",
   colors = c("#1f77b4", "#ff7f0e"),
-  alpha = 0.7,
+  alpha = 0.6,
   theme = ggplot2::theme_minimal(),
+  density = TRUE,
+  show_rug = FALSE,
+  na_rm = TRUE,
+  min_non_missing = 5L,
+  shift_constant = 1,
+  display = TRUE,
   save = FALSE,
   save_dir = "plotlog_output",
-  save_format = "png",
-  save_dpi = 300
+  save_format = c("png", "pdf", "jpg"),
+  save_dpi = 300,
+  device_width = 9,
+  device_height = 4.5,
+  verbose = interactive()
 )
 }
 \arguments{
-\item{df}{A data frame containing the numeric variables to visualize.}
+\item{df}{Data frame containing the variables to explore.}
 
-\item{variables}{An optional character vector specifying the names of variables to analyze.
-If NULL (default), all numeric variables in the data frame are analyzed.}
+\item{variables}{Optional character vector of column names. When `NULL`, every numeric
+column is used.}
 
-\item{trans_type}{A character string specifying the type of transformation to apply to the data before plotting. Options include "log1p" (default), "log", "sqrt", or "none".}
+\item{trans_type}{Transformation to apply. Supply a single name (default `"log1p"`),
+one value per variable, a named list (optionally with `default`), or a custom
+function. Supported names: `"none"`, `"log1p"`, `"log"`, `"sqrt"`, `"zscore"`,
+`"rank"`.}
 
-\item{bins}{An integer specifying the number of bins to use in the histograms. If NULL (default), Sturges' rule is used to determine the number of bins.}
+\item{bins}{Either a single integer (fixed bin count) or one of `"sturges"`,
+`"fd"`/`"freedman-diaconis"`, `"scott"`, `"sqrt"`, `"rice"`, `"doane"`, or `"auto"`
+(max of Sturges & F-D, per Freedman & Diaconis, 1981).}
 
-\item{colors}{A character vector of length 2 specifying the colors to use for the original and transformed histograms. Default is c("#1f77b4", "#ff7f0e").}
+\item{colors}{Length-two character vector used for original and transformed fills.}
 
-\item{alpha}{A numeric value between 0 and 1 specifying the transparency level of the histograms. Default is 0.7.}
+\item{alpha}{Histogram fill transparency (0–1).}
 
-\item{theme}{A ggplot2 theme object to apply to the plots. Default is ggplot2::theme_minimal().}
+\item{theme}{ggplot2 theme applied to every panel.}
 
-\item{save}{A logical value indicating whether to save the generated plots to files. Default is FALSE.}
+\item{density}{Logical flag adding a kernel density overlay (on the same density scale).}
 
-\item{save_dir}{A character string specifying the directory where plots will be saved if save=TRUE. Default is "plotlog_output".}
+\item{show_rug}{Logical; when `TRUE`, draws a rug to highlight individual values.}
 
-\item{save_format}{A character string specifying the file format for saved plots. Options are "png", "pdf", or "jpg". Default is "png".}
+\item{na_rm}{Remove `NA`/`NaN`/`Inf` before drawing. When `FALSE`, they are retained
+but still excluded from the geoms.}
 
-\item{save_dpi}{An integer specifying the resolution (dots per inch) for saved plot images. Default is 300.}
+\item{min_non_missing}{Minimum number of finite observations required to attempt a plot.}
+
+\item{shift_constant}{Positive offset used when a transform needs shifting into its
+domain (e.g. log of non-positive data).}
+
+\item{display}{Draw plots to the active graphics device (`TRUE` by default).}
+
+\item{save}{Persist paired panels with `ggplot2::ggsave()`.}
+
+\item{save_dir}{Directory for saved graphics (created on demand).}
+
+\item{save_format}{File format (`"png"`, `"pdf"`, or `"jpg"`).}
+
+\item{save_dpi}{Resolution when the format supports it.}
+
+\item{device_width, device_height}{Dimensions (inches) used for saved layouts.}
+
+\item{verbose}{Emit informational messages (defaults to `interactive()`).}
 }
 \value{
-Invisibly returns a list of ggplot objects representing the generated histograms. The primary effect of the function is to produce visual plots.
+Invisibly returns a list with two elements:
+  * `plots`: per-variable lists containing the original panel, transformed panel, and
+    the combined grob.
+  * `metadata`: data frame describing data hygiene, transform shifts, and binning.
 }
 \description{
-This function generates side-by-side histograms comparing the original and transformed distributions of numeric variables in a data frame. It supports multiple transformation types and offers extensive customization options for colors, transparency, themes, and saving output.
+Builds paired density-scaled histograms comparing original numeric variables with a
+transformed version. Textbook binning rules (Sturges, Freedman–Diaconis, Scott, etc.)
+are implemented for adaptive resolution, potentially shifted transforms respect the
+domain constraints of log/sqrt families (cf. Burbidge, Magee & Robb, 1988), and plots
+can be saved or returned for further composition.
 }
 \details{
-The function workflow includes:
-1. Validating all input parameters.
-2. Identifying numeric variables to plot.
-3. Creating comparison histograms for each variable.
-4. Handling missing or infinite values gracefully.
-5. Providing options to save the generated plots to files.
+- Binning rules follow the literature on histogram estimation (Freedman & Diaconis,
+  1981; Scott, 1979; Doane, 1976) and fall back to Sturges when a rule is ill-conditioned.
+- Domain corrections for log-like transforms follow the additive constant strategy
+  recommended by Burbidge, Magee & Robb (1988).
 }
-\examples{
-\dontrun{
-# Basic usage with all numeric variables
-plotlog(mtcars)
-
-# Specific variables with custom colors
-plotlog(mtcars, c("mpg", "wt"), colors = c("darkgreen", "purple"))
-
-# Save plots as PDF
-plotlog(iris, save = TRUE, save_format = "pdf")
-}
+\references{
+Freedman, D., & Diaconis, P. (1981). *On the histogram as a density estimator: L2 theory*.
+Burbidge, J. B., Magee, L., & Robb, A. L. (1988). *Alternative transformations to handle
+   extreme values of the dependent variable*. Journal of the American Statistical Association.
 }

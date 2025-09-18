@@ -2,38 +2,39 @@
 % Please edit documentation in R/recode.R
 \name{mwir_seorank}
 \alias{mwir_seorank}
-\title{Fetch SEO Rank Data for URLs with Progress Reporting}
+\title{Fetch SEO Rank Data for URLs}
 \usage{
 mwir_seorank(filename = NULL, urls = NULL, api_key = NULL)
 }
 \arguments{
 \item{filename}{A character string specifying the name of the output CSV file
-(without extension). If NULL, the function will stop and prompt the user for input.}
+(without extension). If NULL, the function will stop and prompt for input.}
 
-\item{urls}{A character vector of URLs for which to fetch SEO rank data. If NULL,
-the function will stop and prompt the user for input.}
+\item{urls}{A character vector of URLs to fetch SEO rank data for. If NULL,
+the function will stop and prompt for input.}
 
 \item{api_key}{A character string containing the API key for the SEO Rank API.
-If NULL, the function will stop and prompt the user for input.}
+If NULL, the function will stop and prompt for input.}
 }
 \value{
-This function does not return a value. It writes the fetched SEO rank data to a CSV file
-and prints progress messages to the console.
+This function does not return a value. It writes the fetched data to a CSV file
+  and prints messages to the console about the progress.
 }
 \description{
-This function retrieves SEO rank data for a list of URLs by querying the SEO Rank API.
-It dynamically creates columns based on the API response and writes the data to a CSV file.
+This function retrieves SEO rank data for a list of URLs using the SEO Rank API
+and writes the results to a CSV file.
 }
 \details{
-The function workflow includes:
-1. Validating the input parameters to ensure they are provided.
-2. Initializing an empty data frame to store the column names dynamically.
-3. Iterating over each URL to fetch SEO rank data from the API.
-4. Dynamically creating columns in the data frame based on the API response.
-5. Writing each row of data to the specified CSV file.
-6. Introducing a small delay between API calls to avoid overwhelming the server.
+The function performs the following steps:
+1. Validates input parameters.
+2. Initializes an empty data frame to store column names.
+3. For each URL, it fetches data from the SEO Rank API.
+4. Dynamically creates columns based on the API response.
+5. Writes each row of data to the specified CSV file.
+6. Adds a small delay between API calls to avoid overwhelming the server.
 
-If an API call fails for a URL, the function prints a warning message and continues processing the remaining URLs.
+If the API call fails for a URL, a warning message is printed, and the function
+continues with the next URL.
 }
 \note{
 This function requires an active internet connection and a valid API key from
@@ -41,10 +42,11 @@ https://seo-rank.my-addr.com/.
 }
 \examples{
 \dontrun{
-# Fetch SEO rank data for multiple URLs
+# Fetch data for two URLs
 mwir_seorank("my_seo_data", c("example.com", "example.org"), "YOUR_API_KEY")
 
-# Fetch SEO rank data for a single URL
+# Fetch data for a single URL
 mwir_seorank("single_url_data", "example.net", "YOUR_API_KEY")
 }
+
 }

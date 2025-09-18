@@ -2,49 +2,36 @@
 % Please edit documentation in R/land.R
 \name{db_setup}
 \alias{db_setup}
-\title{Initialiser la base de données SQLite du projet}
+\title{Set up the SQLite database}
 \usage{
 db_setup(db_name = "mwi.db")
 }
 \arguments{
-\item{db_name}{Nom du fichier de base de données SQLite à créer ou initialiser (chaîne de caractères). Par défaut : "mwi.db". Exemple : "ma_base.db".}
+\item{db_name}{A string specifying the name of the SQLite database file. Default is "mwi.db".}
 }
 \value{
-Aucune valeur retournée. La fonction est appelée pour son effet de bord (création/initialisation de la base et des tables).
+None. This function is called for its side effects.
 }
 \description{
-Cette fonction initialise la base de données du projet en créant toutes les tables nécessaires si elles n'existent pas déjà.
-\strong{Utilité :} préparer l'environnement de travail avant toute importation, analyse ou manipulation de données.
+This function establishes a connection to the specified SQLite database
+and creates the necessary tables if they do not already exist. The tables
+created are: Land, Domain, Expression, ExpressionLink, Word, LandDictionary,
+Media, Tag, and TaggedContent.
 }
 \details{
-\subsection{Fonctionnement étape par étape}{
-- Établit une connexion à la base de données SQLite spécifiée.
-- Vérifie l'existence de chaque table requise ; crée la table si elle est absente.
-- Les tables créées sont :
-  \itemize{
-    \item \strong{Land} : Projets de recherche ("lands").
-    \item \strong{Domain} : Métadonnées sur les domaines web.
-    \item \strong{Expression} : URLs et leurs métadonnées.
-    \item \strong{ExpressionLink} : Liens entre expressions (pages).
-    \item \strong{Word} : Termes et lemmes associés.
-    \item \strong{LandDictionary} : Associations entre lands et termes.
-    \item \strong{Media} : Médias liés aux expressions.
-    \item \strong{Tag} : Étiquettes de catégorisation.
-    \item \strong{TaggedContent} : Contenus annotés/tagués.
-  }
-- Ferme la connexion à la base à la fin.
-}
-\subsection{Conseils d'utilisation}{
-- À utiliser en début de projet ou lors de la création d'une nouvelle base.
-- Pratique pour réinitialiser un environnement de test (attention : ne supprime pas les données existantes).
-- Sauvegardez votre base avant toute opération de réinitialisation.
-- Vérifiez les droits d'écriture sur le dossier cible.
-}
+The function creates the following tables:
+- Land: Stores information about research projects.
+- Domain: Stores domain-related metadata.
+- Expression: Stores URLs and associated metadata.
+- ExpressionLink: Stores links between expressions.
+- Word: Stores terms and their lemmas.
+- LandDictionary: Stores associations between lands and terms.
+- Media: Stores media associated with expressions.
+- Tag: Stores tags for categorizing expressions.
+- TaggedContent: Stores tagged content within expressions.
 }
 \examples{
-# Exemple : Initialiser la base par défaut
-db_setup()
-
-# Exemple : Créer une nouvelle base pour un projet spécifique
-db_setup("projet_sante.db")
+\dontrun{
+db_setup("my_database.db")
+}
 }

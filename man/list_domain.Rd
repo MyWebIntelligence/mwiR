@@ -2,30 +2,29 @@
 % Please edit documentation in R/land.R
 \name{list_domain}
 \alias{list_domain}
-\title{List Unique Domains for a Research Project (Land)}
+\title{List domains for a research project (land)}
 \usage{
 list_domain(land_name, db_name = "mwi.db")
 }
 \arguments{
-\item{land_name}{A string specifying the name of the land (research project or dataset) for which domains are to be listed.}
+\item{land_name}{A string specifying the name of the land.}
 
-\item{db_name}{A string specifying the filename of the SQLite database to query. Default is "mwi.db".}
+\item{db_name}{A string specifying the name of the SQLite database file. Default is "mwi.db".}
 }
 \value{
-Returns a character vector containing the unique domain names associated with the specified land.
+A vector of domain names.
 }
 \description{
-This function retrieves all unique domain names linked to a given research project (land) from the specified SQLite database. It helps users identify the scope of domains covered within a particular land.
+This function lists all unique domains associated with a specified land in the SQLite database.
 }
 \details{
-The function workflow includes:
-1. Establishing a connection to the specified SQLite database.
-2. Constructing and executing an SQL query to fetch distinct domain names associated with the provided land name.
-3. Returning the resulting vector of unique domain names for further use or analysis.
+The function performs the following steps:
+1. Establishes a connection to the SQLite database.
+2. Constructs and executes an SQL query to retrieve distinct domain names associated with the specified land.
+3. Returns a vector of domain names.
 }
 \examples{
 \dontrun{
-# List domains for the "Climate Research" land
 list_domain("Climate Research")
 }
 }

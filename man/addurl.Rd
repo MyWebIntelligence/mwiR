@@ -2,49 +2,36 @@
 % Please edit documentation in R/land.R
 \name{addurl}
 \alias{addurl}
-\title{Ajouter des URLs à un projet de recherche ("land")}
+\title{Add URLs to a research project (land)}
 \usage{
 addurl(land_name, urls = NULL, path = NULL, db_name = "mwi.db")
 }
 \arguments{
-\item{land_name}{Nom du projet ("land") auquel vous souhaitez associer des URLs. Il s'agit d'une chaîne de caractères, par exemple "Climat" ou "Santé publique".}
+\item{land_name}{A string specifying the name of the land.}
 
-\item{urls}{Une chaîne de caractères contenant une ou plusieurs URLs à ajouter, séparées par des virgules. Exemple : "http://exemple.com, http://exemple.org". Par défaut : NULL.}
+\item{urls}{A comma-separated string of URLs to add. Default is NULL.}
 
-\item{path}{Chemin vers un fichier texte contenant une liste d'URLs (une par ligne). Pratique pour importer un grand nombre d'URLs. Par défaut : NULL.}
+\item{path}{A string specifying the path to a file containing URLs. Default is NULL.}
 
-\item{db_name}{Nom du fichier de base de données SQLite à utiliser. Par défaut : "mwi.db".}
+\item{db_name}{A string specifying the name of the SQLite database file. Default is "mwi.db".}
 }
 \value{
-Un entier : 1 si l'opération a réussi, 0 sinon.
+Integer 1 if successful, 0 otherwise.
 }
 \description{
-Cette fonction permet d'ajouter une ou plusieurs URLs à un projet de recherche (appelé "land") dans la base de données SQLite.
-\strong{Utilité :} centraliser et organiser les sources web associées à un projet pour faciliter leur analyse, leur suivi ou leur annotation.
+This function adds one or more URLs to a specified land in the SQLite database.
+URLs can be provided directly as a comma-separated string, read from a file, or imported interactively.
 }
 \details{
-\subsection{Fonctionnement étape par étape}{
-\itemize{
-  \item Vérifie que le projet ("land") existe dans la base de données.
-  \item Récupère la date et l'heure courantes pour l'archivage.
-  \item Ajoute chaque URL (provenant de la liste ou du fichier) à la table "Expression" si elle n'existe pas déjà.
-  \item Incrémente un compteur pour chaque nouvelle URL ajoutée et affiche un message récapitulatif.
-}
-}
-\subsection{Conseils d'utilisation}{
-- Utilisez l'argument \code{urls} pour ajouter rapidement quelques liens.
-- Utilisez l'argument \code{path} pour importer un grand nombre d'URLs depuis un fichier.
-- Les doublons sont automatiquement évités : une URL déjà présente ne sera pas ajoutée une seconde fois.
-- Vérifiez la validité des URLs avant import pour éviter les erreurs.
-}
+The function performs the following steps:
+1. Checks if the specified land exists in the Land table.
+2. Retrieves the current date and time.
+3. Adds the URLs from the provided list or file to the Expression table if they do not already exist.
+4. Increments a counter for each new URL added and displays a message.
 }
 \examples{
-# Exemple 1 : Ajouter plusieurs URLs directement
-addurl("Climat", urls = "http://exemple.com, http://exemple.org")
-
-# Exemple 2 : Importer des URLs depuis un fichier texte
-addurl("Climat", path = "urls.txt")
-
-# Exemple 3 : Ajouter une seule URL
-addurl("Santé publique", urls = "http://sante.fr")
+\dontrun{
+addurl("Climate Research", "http://example.com, http://example.org")
+addurl("Climate Research", path = "urls.txt")
+}
 }

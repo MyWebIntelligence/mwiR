@@ -2,33 +2,35 @@
 % Please edit documentation in R/listurl.R
 \name{related_query}
 \alias{related_query}
-\title{Retrieve Related Search Queries from Google Using SerpAPI}
+\title{Retrieve Related Search Queries from Google using SerpAPI}
 \usage{
 related_query(query, lang = "fr", country = "France")
 }
 \arguments{
-\item{query}{A character string representing the main search query for which related queries are sought.}
+\item{query}{A character string representing the search query.}
 
-\item{lang}{A character string specifying the language code for the search. Default is "fr" (French).}
+\item{lang}{A character string representing the language for the search (default is "fr").}
 
-\item{country}{A character string specifying the country name for the search context. Default is "France".}
+\item{country}{A character string representing the country for the search (default is "France").}
 }
 \value{
-Returns a data frame containing related search queries with the following columns:
+A data frame containing the related searches, with columns:
 \describe{
-  \item{block_position}{An integer indicating the position of the related query block in the search results.}
-  \item{query}{A character string representing the related search query.}
-  \item{link}{A character string containing the URL link to the related query.}
-  \item{serpapi_link}{A character string containing the SerpAPI URL for the related query.}
+  \item{block_position}{Integer indicating the position of the block in the search results.}
+  \item{query}{Character string of the related query.}
+  \item{link}{Character string of the link to the related query.}
+  \item{serpapi_link}{Character string of the SerpAPI link for the related query.}
 }
 If no related searches are found, the function returns NULL.
 }
 \description{
-This function uses the SerpAPI service to retrieve related search queries from Google based on a given main query. It constructs an API request using the specified query, language, and country parameters, then processes the API response to extract and return related search queries in a structured data frame.
+This function retrieves related search queries from Google using the SerpAPI service.
+It constructs an API request based on the provided query, language, and country parameters,
+then processes the response to extract and return the related searches.
 }
 \examples{
 \dontrun{
-# Retrieve related search queries for "data science" in English and United States context
 related_searches <- related_query("data science", lang = "en", country = "United States")
 }
+
 }

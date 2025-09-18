@@ -2,35 +2,16 @@
 % Please edit documentation in R/export.R
 \name{convert_date}
 \alias{convert_date}
-\title{Convertir une chaîne de caractères en objet Date}
+\title{Convert Date String to Date Object}
 \usage{
 convert_date(date_str)
 }
 \arguments{
-\item{date_str}{Chaîne de caractères représentant une date. Exemples : "2023-05-01", "01/05/2023", "May 1, 2023".}
+\item{date_str}{A character string representing the date.}
 }
 \value{
-Un objet de type Date si la conversion réussit, sinon \code{NA}.
+A Date object, or NA if conversion fails.
 }
 \description{
-Cette fonction tente de convertir une chaîne de caractères représentant une date en un objet Date R, en testant plusieurs formats courants.
-\strong{Utilité :} faciliter le traitement, le tri ou l’analyse de données temporelles issues de sources hétérogènes.
-}
-\details{
-\subsection{Conseils d'utilisation}{
-- Pratique pour importer des dates depuis des fichiers CSV, des bases de données ou des saisies utilisateurs.
-- Gère automatiquement plusieurs formats de dates (ISO, français, anglais, etc.).
-- Si la conversion échoue, la fonction retourne \code{NA} (à tester avec \code{is.na()}).
-- Vérifiez la cohérence des dates après conversion, surtout si les formats sont ambigus (ex : "01/02/2023").
-}
-}
-\examples{
-# Exemple : Convertir différentes chaînes en dates
-convert_date("2023-05-01")      # Format ISO
-convert_date("01/05/2023")      # Format français
-convert_date("May 1, 2023")     # Format anglais
-convert_date("2023/05/01")      # Format alternatif
-
-# Exemple : Gestion d'une date invalide
-convert_date("date_invalide")   # Retourne NA
+This function attempts to convert a date string into a Date object using multiple formats.
 }

@@ -5,7 +5,6 @@
 #' @param db_name A character string specifying the name of the database file. Default is "mwi.db".
 #' @return A database connection object.
 #' @import RSQLite
-#' @import data.table
 #' @export
 
 connect_db <- function(db_name = "mwi.db") {
@@ -255,7 +254,8 @@ clean_string <- function(str) {
 #' @param land_name A character string specifying the name of the land.
 #' @param minimum_relevance A numeric value specifying the minimum relevance score for inclusion in the export.
 #' @param filename A character string specifying the name of the output GEXF file.
-#' @import DBI XML
+#' @import DBI
+#' @importFrom XML newXMLNode saveXML
 #' @export
 export_pagegexf <- function(con, land_name, minimum_relevance, filename) {
   # Retrieve the land ID from the name
@@ -368,7 +368,8 @@ convert_date <- function(date_str) {
 #' @param land_name A character string specifying the name of the land.
 #' @param minimum_relevance A numeric value specifying the minimum relevance score for inclusion in the export.
 #' @param filename A character string specifying the name of the output GEXF file.
-#' @import DBI XML
+#' @import DBI
+#' @importFrom XML newXMLNode saveXML
 #' @export
 export_nodegexf <- function(con, land_name, minimum_relevance, filename) {
   # Retrieve the land ID from the name
@@ -553,7 +554,7 @@ export_corpus <- function(con, land_name, minimum_relevance) {
   file_paths <- list.files(dir_name, full.names = TRUE)
 
   # Create a zip file containing all the files
-  zip(zipfile = paste0(dir_name, ".zip"), files = file_paths)
+  zip::zip(zipfile = paste0(dir_name, ".zip"), files = file_paths)
 }
 
 
@@ -565,7 +566,7 @@ export_corpus <- function(con, land_name, minimum_relevance) {
 #' @param export_type A character string specifying the type of export ("pagecsv", "fullpagecsv", "nodecsv", "mediacsv", "pagegexf", "nodegexf", or "corpus").
 #' @param minimum_relevance A numeric value specifying the minimum relevance score for inclusion in the export. Default is 1.
 #' @param labase A character string specifying the name of the database file. Default is "mwi.db".
-#' @import DBI RSQLite XML
+#' @import DBI RSQLite
 #' @export
 export_land <- function(land_name, export_type, minimum_relevance = 1, labase = "mwi.db") {
   con <- dbConnect(SQLite(), labase)
