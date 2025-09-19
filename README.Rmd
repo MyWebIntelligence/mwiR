@@ -290,3 +290,304 @@ This example demonstrates exporting data for the project "giletsjaunes" with a m
 
 export_land("giletsjaunes", "pagegexf", 3)
 ```
+
+## Step 4: Enrich Your Corpus with SerpAPI Helpers
+
+Once the foundational land is in place, the next objective is to broaden your web perimeter. The package provides dedicated helpers around [SerpAPI](https://serpapi.com/) so you can script keyword expansion and SERP harvesting before every crawl.
+
+### 1. Discover Related Queries
+
+```{r}
+related_query("intelligence artificielle", lang = "fr", country = "France")
+```
+
+`related_query()` returns the "People also search for" block as a tidy data frame. Typical workflow:
+
+-   collect the suggestions, inspect them quickly in R;
+-   fold the most relevant ones back into `addterm()` so the next crawl covers allied narratives;
+-   archive the CSV for methodological transparency.
+
+### 2. Capture Google, DuckDuckGo, and Bing Result Lists
+
+```{r}
+urlist_Google(
+  query = "ai OR artificial intelligence",
+  datestart = "2024-01-01",
+  dateend   = "2024-03-31",
+  timestep  = "month",
+  sleep_seconds = 2,
+  lang = "en"
+)
+```
+
+`urlist_Google()`, `urlist_Duck()`, and `urlist_Bing()` paginate SERP responses and write raw URL dumps on disk (one file per query). You can then read those files back with `importFile()` and feed them to `addurl()`. Remember to space requests (`sleep_seconds`) to stay inside rate limits.
+
+### 3. Monitor SEO Signals
+
+```{r}
+mwir_seorank(
+  filename = "aiwatch_seo",
+  urls     = c("example.com", "opencorpus.org"),
+  api_key  = Sys.getenv("SEORANK_API_KEY")
+)
+```
+
+`mwir_seorank()` queries the SEO Rank API for MOZ/PageSpeed style indicators. Because the function appends rows as soon as a response arrives, you can launch it overnight on dozens of domains and obtain a ready-to-share CSV.
+
+## Step 5: Clean and Structure Newly Found URLs
+
+Raw SERP captures and manual curation often contain duplicates, broken links, and media files. The toolkit ships with a mini cleaning pipeline so your database only stores actionable pages.
+
+### 1. Import URL Lists Interactively
+
+```{r}
+urls <- importFile()
+head(urls)
+```
+
+`importFile()` opens a file picker (CSV/TXT) and normalises the result into a data frame. Use it when colleagues send URL batches by email.
+
+### 2. Normalise Links and Detect Media Assets
+
+```{r}
+clean_url("https://site.org/article?id=42#section")
+is_media_link("https://cdn.site.org/logo.png")
+```
+
+-   `clean_url()` trims anchors and exotic characters so duplicates collapse early.
+-   `is_media_link()` tags images, documents, and audio/video files. Mix both inside `detect_links_and_add()` to store embedded media separately from HTML pages.
+
+```{r}
+detect_links_and_add(
+  con        = connect_db(),
+  content    = html_string,
+  parent_id  = 123,
+  land_id    = 5,
+  urlmax     = 50
+)
+```
+
+### 3. Rescue Content When the Primary URL Fails
+
+```{r}
+archive_info <- archive_available("https://example.com/article")
+get_last_memento_url("https://example.com/article")
+```
+
+The pair `archive_available()` / `get_last_memento_url()` coordinates with the Internet Archive to fall back to preserved versions before giving up on a source. Combine them with `PDFtoText()` to extract machine-readable content from PDFs when the HTML is absent.
+
+### 4. Produce Clean Metadata and Text Files
+
+```{r}
+slugify("IA Travail 2024 : Communiqué de presse")
+clean_string("\tUne\nchaine\nde caractères\n")
+```
+
+`slugify()` standardises filenames, while `clean_string()` strips control characters prior to export. Together with `to_metadata()` they underpin `export_corpus()`, which yields plain-text dossiers ready for qualitative coding suites.
+
+## Step 6: Build Dictionaries and Score Relevance
+
+Text scoring relies on carefully curated lexicons. The following helpers accelerate dictionary work directly in R.
+
+### 1. Tokenise and Stem
+
+```{r}
+phrases <- phrase_tokenizer("IA, travail, transformations du travail")
+lemmas  <- mkdictionary(phrases, language = "fr")
+```
+
+-   `phrase_tokenizer()` splits comma-separated concepts;
+-   `word_tokenizer()` and `stem_word()` operate at word level;
+-   `mkdictionary()` aggregates the stemmed phrases into a tidy data frame you can store in your land dictionary table.
+
+### 2. Detect Language Before Scoring
+
+```{r}
+mwiR_detectLang(
+  df        = expressions,
+  variables = c("title", "description"),
+  engine    = "cld3",
+  min_prob  = 0.75
+)
+```
+
+`mwiR_detectLang()` guards against mixing languages when dictionaries are language-specific. Switch to the fastText backend whenever you have a custom model (`engine = "fasttext"`).
+
+### 3. Compute Expression-Level Relevance
+
+```{r}
+scores <- expression_relevance(
+  dictionary = lemmas$lemma,
+  expression = expressions[1, ],
+  language   = "fr"
+)
+```
+
+`expression_relevance()` weights title and body occurrences, returning a single score that you can persist to the `Expression` table. For granularity, call `get_relevance()` directly on text fragments.
+
+## Step 7: Transform and Diagnose Numeric Variables
+
+When the time comes to model or discretise quantitative indicators (e.g., in-degree, frequency, sentiment scores), the package offers statistical helpers inspired by social-science workflows.
+
+### 1. Explore Transformations Visually
+
+```{r}
+plotlog(
+  df         = analytics,
+  variables  = c("in_degree", "reach"),
+  trans_type = c(in_degree = "log1p", reach = "zscore"),
+  save       = TRUE
+)
+```
+
+`plotlog()` overlays the original and transformed histograms so you can compare scales immediately. Main arguments and expected inputs:
+
+-   `df` — data frame passed to the function. If you leave `variables = NULL`, every **numeric** column in `df` is analysed.
+-   `variables` — character vector that specifies the columns to plot. You can supply a named vector or list so each variable receives its own transformation rule.
+-   `trans_type` — transformation applied to each series. Recognised keywords: `"none"`, `"log"`, `"log1p"`, `"sqrt"`, `"rank"`, `"zscore"`. Provide a single value to reuse it everywhere, a named vector/list to mix them, or a custom function returning a numeric vector.
+-   `bins` — histogram resolution. Accept an integer (e.g. `30`) or one of the standard rules: `"sturges"` (default), `"fd"`/`"freedman-diaconis"`, `"scott"`, `"sqrt"`, `"rice"`, `"doane"`, `"auto"` (maximum of Sturges and F-D).
+-   `colors`, `alpha` — choose the two fill colours (original vs transformed) and set the transparency level between 0 and 1.
+-   `theme` — any `ggplot2` theme object (`theme_minimal()` by default).
+-   `density`, `show_rug` — booleans that toggle a kernel density overlay and a rug showing individual points.
+-   `na_rm`, `min_non_missing` — control filtering. `na_rm = TRUE` drops non-finite values before plotting; `min_non_missing` (default 5) is the minimum number of finite values required for a variable to be plotted.
+-   `shift_constant` — positive offset automatically added before log/sqrt transformations when the data contains zero or negative values (default 1).
+-   `display` — `TRUE` prints the combined panel to the current graphics device; set to `FALSE` to return the object silently.
+-   `save` — set to `TRUE` to export the plots. Use with `save_dir` (folder), `save_format` (`"png"`, `"pdf"`, or `"jpg"`), `save_dpi`, `device_width`, and `device_height` to control the files that are written.
+-   `verbose` — produces progress messages when `TRUE` (defaults to `interactive()`).
+
+### 2. Apply Robust Transformations Programmatically
+
+```{r}
+scaled <- transform_variable(
+  x         = analytics$reach,
+  method    = "yeojohnson",
+  winsorize = 0.01
+)
+```
+
+`transform_variable()` stores both the transformed values and the inverse mapping. This makes it easy to export model-ready columns while keeping de-standardisation metadata.
+
+-   `x` — numeric vector to transform (NA/Inf allowed; non-finite entries are carried through).
+-   `method` — choose the transformation: `"auto"` (bestNormalize search), `"none"`, `"center"`, `"zscore"`, `"robust_z"`, `"log"`, `"log1p"`, `"sqrt"`, `"boxcox"`, `"yeojohnson"`, `"ranknorm"`, or pass your own function.
+-   `winsorize` — optional proportion (0 to <0.5) of tails to shrink before transforming. Set to `NULL` to disable (default).
+-   `shift_constant` — positive value added before log/sqrt transforms when the series contains non-positive values (default 1).
+-   `handle_na` — either `"keep"` (default; NA remain in the output) or `"omit"` (drop NA before estimating transformation parameters).
+-   `...` — forwarded to `bestNormalize` when relevant (e.g. Box-Cox options).
+
+### 3. Segment Indicators into Meaningful Classes
+
+```{r}
+clusters <- find_clusters(
+  analytics$reach,
+  max_G         = 5,
+  transform     = "auto",
+  winsorize     = 0.01,
+  return_breaks = TRUE
+)
+
+classes <- discretize_variable(
+  analytics$reach,
+  method = "manual",
+  breaks = clusters$breaks,
+  labels = c("Faible", "Moyen", "Élevé")
+)
+```
+
+-   `find_clusters()` ajuste des mélanges gaussiens 1D pour révéler des typologies. Principaux réglages : `max_G` (nombre de composantes testées),
+    `criterion` (`"bic"` ou `"icl"`), `transform` (`"none"`, `"log1p"`, `"yeojohnson"`, `"zscore"`, `"auto"`) et `winsorize` (0–0.5).
+    Avec `return_breaks = TRUE`, la fonction fournit des bornes prêtes à l’emploi. Vous récupérez aussi la `classification`, les
+    probabilités `posterior`, le nombre de classes retenu et plusieurs diagnostics (taille des clusters, entropie…).
+-   `discretize_variable()` convertit ensuite la mesure continue en classes parlantes. Selon `method`, vous obtenez des coupures
+    `"equal_freq"`, `"equal_width"`, `"quantile"`, `"jenks"`, `"kmeans"`, `"gmm"`, ou vos propres seuils via `"manual"`.
+    Le résultat est un facteur ordonné enrichi d’un attribut `discretize_meta` (bornes, effectifs, avertissements) pour alimenter vos rapports.
+
+### 4. Examine Heavy-Tailed Behaviours
+
+```{r}
+powerlaw <- analyse_powerlaw(
+  analytics$reach,
+  type             = "discrete",
+  candidate_models = c("powerlaw", "lognormal", "exponential"),
+  bootstrap_sims   = 200,
+  winsorize        = 0.01,
+  threads          = 4
+)
+```
+
+-   `analyse_powerlaw()` confronte plusieurs lois de queue pour tester la présence d’une véritable loi de puissance.
+-   En mode `"discrete"`, les valeurs sont automatiquement arrondies et les zéros supprimés ; assurez-vous d’avoir suffisamment d’observations positives (`min_n` par défaut = 50).
+-   Ajustez `type` (`"discrete"` ou `"continuous"`), la combinaison `candidate_models`, les paramètres de robustesse (`winsorize`, `xmin`) et `threads` (nombre de cœurs alloués au bootstrap) selon vos contraintes de calcul.
+-   `candidate_models` accepte, en fonction du type : `"powerlaw"`, `"lognormal"`, `"exponential"` côté discret, et ajoute `"weibull"` pour le continu. Fournissez un sous-ensemble pour tester uniquement les lois pertinentes à votre terrain.
+-   `bootstrap_sims` pilote le nombre de simulations KS ; `bootstrap_models` permet de restreindre les modèles testés. Réduisez `bootstrap_sims` pour obtenir un diagnostic rapide, augmentez-le pour un verdict plus solide.
+-   La liste retournée synthétise le modèle retenu (`best_model`), les paramètres (`best_fit`), les comparaisons de vraisemblance (`comparisons`), les diagnostics bootstrap (`bootstrap`) et un résumé (`data_summary`) directement mobilisable dans vos rapports.
+-   Bonnes pratiques : tester plusieurs valeurs de `winsorize`, surveiller `best_fit$n_tail` (taille de l’échantillon utilisé au-dessus de `xmin`) et examiner les p-values bootstrap pour juger de la qualité de l’ajustement.
+
+## Step 8: Leverage AI Assistance Responsibly
+
+Large Language Models can speed up qualitative coding, but they demand guardrails.
+
+```{r}
+Sys.setenv(OPENAI_API_KEY = "sk-...")
+GPT_Recode("Traduire en français", "Automation and labour markets")
+
+Sys.setenv(OPENROUTER_API_KEY = "orpk-...")
+OpenRouter_Recode(
+  prompt = "Résumer en 20 mots",
+  cell   = "The platform reorganised work across the supply chain"
+)
+```
+
+-   `GPT_Recode()` wraps the official OpenAI client with retries and validation. Use it for quick recoding or sentiment hints.
+-   `OpenRouter_Recode()` targets the OpenRouter ecosystem and can return rich metadata when `return_metadata = TRUE`.
+
+Document your prompts and models in the research log for reproducibility.
+
+## Step 9: Maintain the Database Throughout the Project Lifecycle
+
+The database layer underpins every land. The following helpers keep it healthy and synchronised with external edits.
+
+### 1. Connect Programmatically and Reuse IDs
+
+```{r}
+con      <- connect_db()
+land_id  <- get_land_id(con, "AIWork")
+domaines <- list_domain(con, land_name = "AIWork")
+```
+
+-   `connect_db()` returns a ready-to-use `DBI` connection.
+-   `get_land_id()` converts human-readable land names into numeric IDs when you automate workflows.
+-   `list_domain()` produces a domain summary (counts, keywords) to monitor coverage.
+
+### 2. Import Additional Material
+
+```{r}
+urls <- importFile()
+addurl("AIWork", urls = urls$url)
+```
+
+Use `importFile()` whenever you enrich your corpus from spreadsheets or open postings. The helper returns a data frame; pass the relevant column to `addurl()`.
+
+### 3. Reinstate Externally Annotated Data
+
+```{r}
+annotatedData(
+  dataplus = curated_notes,
+  table    = "Expression",
+  champ    = "description",
+  by       = "id"
+)
+```
+
+`annotatedData()` wraps transactional updates so a batch edit either fully succeeds or rolls back. Always back up `mwi.db` before bulk reinsertion.
+
+### 4. Export Precisely What You Need
+
+Beyond `export_land()`, the family of dedicated exporters gives you fine-grained control:
+
+-   `export_pagecsv()` and `export_fullpagecsv()` to share tabular corpora;
+-   `export_nodecsv()` / `export_nodegexf()` for network analysis;
+-   `export_mediacsv()` to audit associated media;
+-   `export_pagegexf()` for expression-level graphs;
+-   `export_corpus()` to assemble text files plus metadata headers (ideal for CAQDAS tools).
+
+Each exporter accepts `minimum_relevance`, so you can balance breadth and focus depending on the audience.

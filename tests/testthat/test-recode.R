@@ -56,15 +56,11 @@ test_that("mwiR_detectLang drops low-confidence predictions when conservative", 
   skip_if_not_installed("mockery")
   skip_if_not_installed("stringi")
 
-  fake_detect <- function(texts) {
-    replicate(
-      length(texts),
-      data.frame(language = "en", probability = 0.25, stringsAsFactors = FALSE),
-      simplify = FALSE
-    )
+  fake_detect <- function(text, size = 3L) {
+    data.frame(language = "en", probability = 0.25, stringsAsFactors = FALSE)
   }
 
-  mockery::stub(mwiR_detectLang, "cld3::detect_language_probabilities", fake_detect)
+  mockery::stub(mwiR_detectLang, "cld3::detect_language_mixed", fake_detect)
   mockery::stub(mwiR_detectLang, "requireNamespace", function(pkg, quietly) TRUE)
 
   df <- data.frame(

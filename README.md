@@ -385,92 +385,202 @@ with a minimum relevance score of 3 into a GEXF file.
 
     export_land("giletsjaunes", "pagegexf", 3)
 
-## Extra: Build a URLs List from Query [NOT WORK still on]
+## Step 4: Enrich Your Corpus with SerpAPI Helpers
 
-The `listurl.R` file provides functions to build a list of URLs from various search engines using the SerpAPI service. This can be useful for web scraping, data collection, and research purposes.
+Once the foundational land is in place, the next objective is to broaden your web perimeter. The package provides dedicated helpers around [SerpAPI](https://serpapi.com/) so you can script keyword expansion and SERP harvesting before every crawl.
 
-### Functions Overview
-
-The main functions included in `listurl.R` are:
-
-- `urlist_Google`: Retrieves URLs from Google search results.
-- `urlist_Duck`: Retrieves URLs from DuckDuckGo search results.
-- `urlist_Bing`: Retrieves URLs from Bing search results.
-
-### Usage Examples
-
-#### Retrieving URLs from Google Search
-
-The `urlist_Google` function allows you to retrieve URLs from Google search results based on a query, date range, and other parameters.
+### 1. Discover Related Queries
 
 ```r
-library(mwiR)
+related_query("intelligence artificielle", lang = "fr", country = "France")
+```
 
-# Retrieve URLs from Google search
+`related_query()` returns the "People also search for" block as a tidy data frame. Typical workflow: collect the suggestions, inspect them quickly in R, fold the most relevant ones back into `addterm()`, and archive the CSV for methodological transparency.
+
+### 2. Capture Google, DuckDuckGo, and Bing Result Lists
+
+```r
 urlist_Google(
-  query = "data science",
-  datestart = "2023-01-01",
-  dateend = "2023-03-01",
-  timestep = "month",
+  query = "ai OR artificial intelligence",
+  datestart = "2024-01-01",
+  dateend   = "2024-03-31",
+  timestep  = "month",
   sleep_seconds = 2,
   lang = "en"
 )
 ```
 
-Parameters:
-- `query`: A character string representing the search query.
-- `datestart`: A character string representing the start date for the search in "yyyy-mm-dd" format.
-- `dateend`: A character string representing the end date for the search in "yyyy-mm-dd" format.
-- `timestep`: A character string representing the time step for the date sequence (default is "week").
-- `sleep_seconds`: A numeric value representing the sleep time between API requests to avoid rate-limiting (default is 1).
-- `lang`: A character string representing the language for the search (default is "fr").
+`urlist_Google()`, `urlist_Duck()`, and `urlist_Bing()` paginate SERP responses and write raw URL dumps on disk (one file per query). You can then read those files back with `importFile()` and feed them to `addurl()`. Remember to space requests (`sleep_seconds`) to stay inside rate limits.
 
-#### Retrieving URLs from DuckDuckGo Search
-
-The `urlist_Duck` function allows you to retrieve URLs from DuckDuckGo search results.
+### 3. Monitor SEO Signals
 
 ```r
-library(mwiR)
-
-# Retrieve URLs from DuckDuckGo search
-urlist_Duck(
-  query = "data science",
-  filename = "data_science_results.txt",
-  sleep_seconds = 2,
-  lang = "en"
+mwir_seorank(
+  filename = "aiwatch_seo",
+  urls     = c("example.com", "opencorpus.org"),
+  api_key  = Sys.getenv("SEORANK_API_KEY")
 )
 ```
 
-Parameters:
-- `query`: A character string representing the search query.
-- `filename`: A character string representing the name of the file where the results will be saved. If NULL, a filename will be generated based on the query (default is NULL).
-- `sleep_seconds`: A numeric value representing the sleep time between API requests to avoid rate-limiting (default is 1).
-- `lang`: A character string representing the language for the search (default is "fr").
+`mwir_seorank()` queries the SEO Rank API for MOZ/PageSpeed style indicators. Because the function appends rows as soon as a response arrives, you can launch it overnight on dozens of domains and obtain a ready-to-share CSV.
 
-#### Retrieving URLs from Bing Search
+## Step 5: Transform and Diagnose Numeric Variables
 
-The `urlist_Bing` function allows you to retrieve URLs from Bing search results.
+When the time comes to model or discretise quantitative indicators (e.g., in-degree, frequency, sentiment scores), the package offers statistical helpers inspired by social-science workflows.
+
+### 1. Explore Transformations Visually
 
 ```r
-library(mwiR)
+plotlog(
+  df         = analytics,
+  variables  = c("in_degree", "reach"),
+  trans_type = c(in_degree = "log1p", reach = "zscore"),
+  save       = TRUE
+)
+```
+`plotlog()` overlays the original and transformed histograms so you can compare scales immediately. Main arguments and expected inputs:
 
-# Retrieve URLs from Bing search
-urlist_Bing(
-  query = "data science",
-  filename = "data_science_results.txt",
-  sleep_seconds = 2,
-  lang = "en"
+- `df` — data frame passed to the function. If you leave `variables = NULL`, every **numeric** column in `df` is analysed.
+- `variables` — character vector that specifies the columns to plot. You can supply a named vector or list so each variable receives its own transformation rule.
+- `trans_type` — transformation applied to each series. Recognised keywords: `"none"`, `"log"`, `"log1p"`, `"sqrt"`, `"rank"`, `"zscore"`. Provide a single value to reuse it everywhere, a named vector/list to mix them, or a custom function returning a numeric vector.
+- `bins` — histogram resolution. Accept an integer (e.g. `30`) or one of the standard rules: `"sturges"` (default), `"fd"`/`"freedman-diaconis"`, `"scott"`, `"sqrt"`, `"rice"`, `"doane"`, `"auto"` (maximum of Sturges and F-D).
+- `colors`, `alpha` — choose the two fill colours (original vs transformed) and set the transparency level between 0 and 1.
+- `theme` — any `ggplot2` theme object (`theme_minimal()` by default).
+- `density`, `show_rug` — booleans that toggle a kernel density overlay and a rug showing individual points.
+- `na_rm`, `min_non_missing` — control filtering. `na_rm = TRUE` drops non-finite values before plotting; `min_non_missing` (default 5) is the minimum number of finite values required for a variable to be plotted.
+- `shift_constant` — positive offset automatically added before log/sqrt transformations when the data contains zero or negative values (default 1).
+- `display` — `TRUE` prints the combined panel to the current graphics device; set to `FALSE` to return the object silently.
+- `save` — set to `TRUE` to export the plots. Use with `save_dir` (folder), `save_format` (`"png"`, `"pdf"`, or `"jpg"`), `save_dpi`, `device_width`, and `device_height` to control the files that are written.
+- `verbose` — produces progress messages when `TRUE` (defaults to `interactive()`).
+
+### 2. Apply Robust Transformations Programmatically
+
+```r
+scaled <- transform_variable(
+  x         = analytics$reach,
+  method    = "yeojohnson",
+  winsorize = 0.01
 )
 ```
 
-Parameters:
-- `query`: A character string representing the search query.
-- `filename`: A character string representing the name of the file where the results will be saved. If NULL, a filename will be generated based on the query (default is NULL).
-- `sleep_seconds`: A numeric value representing the sleep time between API requests to avoid rate-limiting (default is 1).
-- `lang`: A character string representing the language for the search (default is "fr").
+`transform_variable()` stores both the transformed values and the inverse mapping. This makes it easy to export model-ready columns while keeping de-standardisation metadata.
 
-### Note
+- `x` — numeric vector to transform (NA/Inf allowed; non-finite entries propagate).
+- `method` — transformation choice: `"auto"` (bestNormalize search), `"none"`, `"center"`, `"zscore"`, `"robust_z"`, `"log"`, `"log1p"`, `"sqrt"`, `"boxcox"`, `"yeojohnson"`, `"ranknorm"`, or a user-supplied function.
+- `winsorize` — optional share of tails to trim before transforming (0 ≤ value < 0.5). Use `NULL` to skip.
+- `shift_constant` — positive constant automatically added before log/sqrt transforms when `x` contains non-positive values (default 1).
+- `handle_na` — choose `"keep"` (default) to leave NA in place or `"omit"` to drop them before fitting the transform.
+- `...` — forwarded to `bestNormalize` helpers (e.g. Box-Cox tweaks) when the selected method requires it.
 
-To use these functions, you need to set up an API key for the SerpAPI service. You will be prompted to enter your API key if it is not already set.
+### 3. Segment Indicators into Meaningful Classes
 
-These functions write the search results to a text file, making it easy to analyze and utilize the retrieved URLs for your research or data collection projects.
+```r
+clusters <- find_clusters(
+  analytics$reach,
+  max_G         = 5,
+  transform     = "auto",
+  winsorize     = 0.01,
+  return_breaks = TRUE
+)
+
+classes <- discretize_variable(
+  analytics$reach,
+  method = "manual",
+  breaks = clusters$breaks,
+  labels = c("Faible", "Moyen", "Élevé")
+)
+```
+
+- `find_clusters()` ajuste des mélanges gaussiens 1D pour révéler des typologies. Paramètres essentiels : `max_G` (nombre de composantes), `criterion` (`"bic"` ou `"icl"`), `transform` (`"none"`, `"log1p"`, `"yeojohnson"`, `"zscore"`, `"auto"`) et `winsorize` (0–0.5). Avec `return_breaks = TRUE`, la fonction fournit des bornes prêtes à l’emploi et expose la `classification`, les probabilités `posterior`, `n_clusters` et plusieurs diagnostics.
+- `discretize_variable()` transforme ensuite la mesure continue en classes interprétables. Les méthodes disponibles (`"equal_freq"`, `"equal_width"`, `"quantile"`, `"jenks"`, `"kmeans"`, `"gmm"`, `"manual"`) couvrent la plupart des scénarios. En mode `"manual"`, fournissez vos `breaks` (ceux du clustering, par exemple) et des `labels` parlants. Le facteur retourné reste ordonné et conserve un attribut `discretize_meta` (bornes, effectifs, avertissements).
+
+### 4. Examine Heavy-Tailed Behaviours
+
+```r
+powerlaw <- analyse_powerlaw(
+  analytics$reach,
+  type             = "discrete",
+  candidate_models = c("powerlaw", "lognormal", "exponential"),
+  bootstrap_sims   = 200,
+  winsorize        = 0.01,
+  threads          = 4
+)
+```
+
+- `analyse_powerlaw()` confronte plusieurs lois de queue pour tester la présence d’une véritable loi de puissance.
+- En mode `"discrete"`, les données sont arrondies et les valeurs < 1 exclues ; vérifie qu’il reste assez d’observations positives (`min_n` = 50 par défaut).
+- Ajuste `type`, `candidate_models`, `winsorize`, `xmin` et `threads` (nombre de cœurs utilisés pendant le bootstrap) selon tes besoins de robustesse et de temps de calcul.
+- `candidate_models` accepte `"powerlaw"`, `"lognormal"`, `"exponential"` (et `"weibull"` en continu). Tu peux fournir un sous-ensemble ciblé ou changer l’ordre selon les lois pertinentes pour ton terrain.
+- `bootstrap_sims` contrôle le nombre de simulations KS, `bootstrap_models` restreint la liste des modèles simulés. Diminue `bootstrap_sims` pour un résultat rapide, augmente-le pour plus de précision.
+- La sortie regroupe `best_model`, les paramètres (`best_fit`), les comparaisons de vraisemblance (`comparisons`), les diagnostics bootstrap (`bootstrap`) et un `data_summary` directement mobilisable dans les rapports.
+- Bonnes pratiques : essayer plusieurs `winsorize`, surveiller `best_fit$n_tail`, examiner les p-values bootstrap et justifier le `xmin` retenu.
+
+## Step 8: Leverage AI Assistance Responsibly
+
+Large Language Models can speed up qualitative coding, but they demand guardrails.
+
+```r
+Sys.setenv(OPENAI_API_KEY = "sk-...")
+GPT_Recode("Traduire en français", "Automation and labour markets")
+
+Sys.setenv(OPENROUTER_API_KEY = "orpk-...")
+OpenRouter_Recode(
+  prompt = "Résumer en 20 mots",
+  cell   = "The platform reorganised work across the supply chain"
+)
+```
+
+- `GPT_Recode()` wraps the official OpenAI client with retries and validation. Use it for quick recoding or sentiment hints.
+- `OpenRouter_Recode()` targets the OpenRouter ecosystem and can return rich metadata when `return_metadata = TRUE`.
+
+Document your prompts and models in the research log for reproducibility.
+
+## Step 9: Maintain the Database Throughout the Project Lifecycle
+
+The database layer underpins every land. The following helpers keep it healthy and synchronised with external edits.
+
+### 1. Connect Programmatically and Reuse IDs
+
+```r
+con      <- connect_db()
+land_id  <- get_land_id(con, "AIWork")
+domaines <- list_domain(con, land_name = "AIWork")
+```
+
+- `connect_db()` returns a ready-to-use `DBI` connection.
+- `get_land_id()` converts human-readable land names into numeric IDs when you automate workflows.
+- `list_domain()` produces a domain summary (counts, keywords) to monitor coverage.
+
+### 2. Import Additional Material
+
+```r
+urls <- importFile()
+addurl("AIWork", urls = urls$url)
+```
+
+Use `importFile()` whenever you enrich your corpus from spreadsheets or open postings. The helper returns a data frame; pass the relevant column to `addurl()`.
+
+### 3. Reinstate Externally Annotated Data
+
+```r
+annotatedData(
+  dataplus = curated_notes,
+  table    = "Expression",
+  champ    = "description",
+  by       = "id"
+)
+```
+
+`annotatedData()` wraps transactional updates so a batch edit either fully succeeds or rolls back. Always back up `mwi.db` before bulk reinsertion.
+
+### 4. Export Precisely What You Need
+
+Beyond `export_land()`, the family of dedicated exporters gives you fine-grained control:
+
+- `export_pagecsv()` and `export_fullpagecsv()` to share tabular corpora.
+- `export_nodecsv()` / `export_nodegexf()` for network analysis.
+- `export_mediacsv()` to audit associated media.
+- `export_pagegexf()` for expression-level graphs.
+- `export_corpus()` to assemble text files plus metadata headers (ideal for CAQDAS tools).
+
+Each exporter accepts `minimum_relevance`, so you can balance breadth and focus depending on the audience.

@@ -122,12 +122,14 @@ mwiR_detectLang <- function(df,
   }
 
   detect_cld3 <- function(texts) {
-    detections <- cld3::detect_language_probabilities(texts)
     lang <- rep(NA_character_, length(texts))
     prob <- rep(NA_real_, length(texts))
-    for (i in seq_along(detections)) {
-      entry <- detections[[i]]
-      if (is.null(entry) || nrow(entry) == 0L) next
+    for (i in seq_along(texts)) {
+      entry <- try(cld3::detect_language_mixed(texts[i], size = 3L), silent = TRUE)
+      if (inherits(entry, "try-error") || is.null(entry) || nrow(entry) == 0L) {
+        next
+      }
+      entry <- entry[order(entry$probability, decreasing = TRUE), , drop = FALSE]
       top <- entry[1, , drop = FALSE]
       lang_i <- top$language
       prob_i <- top$probability
@@ -139,6 +141,9 @@ mwiR_detectLang <- function(df,
         if (!is.na(prob_i) && !is.na(second_prob) && (prob_i - second_prob) < 0.1) {
           lang_i <- NA_character_
         }
+      }
+      if (is.na(lang_i)) {
+        prob_i <- NA_real_
       }
       lang[i] <- lang_i
       prob[i] <- prob_i
@@ -664,7 +669,7 @@ plotlog <- function(df,
     }
 
     combined <- gridExtra::arrangeGrob(plot_original, plot_transformed, ncol = 2)
-    if (display) gridExtra::grid.draw(combined)
+    if (display) grid::grid.draw(combined)
 
     if (save) {
       file <- file.path(save_dir, paste0(var, ".", save_format))
@@ -1407,6 +1412,14 @@ find_clusters <- function(x,
     breaks <- unique(c(min(x_finite), midpoints, max(x_finite)))
   }
 
+  classification_entropy <- function(z) {
+    if (is.null(z)) return(NA_real_)
+    z <- as.matrix(z)
+    if (!is.numeric(z)) return(NA_real_)
+    z[z <= 0] <- .Machine$double.eps
+    -mean(rowSums(z * log(z)), na.rm = TRUE)
+  }
+
   list(
     fit_object = fit,
     best_model = fit$modelName,
@@ -1426,7 +1439,7 @@ find_clusters <- function(x,
       n_finite = length(x_finite),
       winsorize = winsorize,
       min_cluster_prop = min_cluster_prop,
-      entropy = mclust::entropy(fit)
+      entropy = classification_entropy(fit$z)
     )
   )
 }
@@ -1523,6 +1536,18 @@ analyse_powerlaw <- function(x,
     }
   }
 
+  if (type == "discrete") {
+    x_pos <- round(x_pos)
+    x_pos <- x_pos[x_pos >= 1]
+    if (length(x_pos) < min_n) {
+      stop("Après arrondi et filtrage des valeurs non positives, il reste seulement ",
+           length(x_pos), " observations discretes. Augmentez 'min_n' ou revoyez vos données.")
+    }
+    if (!all(abs(x_pos - round(x_pos)) < .Machine$double.eps^0.5)) {
+      stop("Les données doivent être entières pour l'analyse discrète. Utilisez 'round' ou passez en mode continu.")
+    }
+  }
+
   default_candidates <- if (type == "discrete") {
     c("powerlaw", "lognormal", "exponential")
   } else {
@@ -1575,7 +1600,11 @@ analyse_powerlaw <- function(x,
 
     tail_xmin <- xmin
     if (is.null(tail_xmin)) {
-      est_xmin <- poweRlaw::estimate_xmin(model_obj)
+      est_xmin <- suppressPackageStartupMessages(
+        suppressMessages(
+          poweRlaw::estimate_xmin(model_obj, xmax = max(x_pos))
+        )
+      )
       tail_xmin <- est_xmin$xmin
       model_obj$setXmin(est_xmin)
     } else {
@@ -1586,12 +1615,15 @@ analyse_powerlaw <- function(x,
     model_obj$setPars(est_pars)
 
     n_tail <- sum(model_obj$dat >= model_obj$getXmin())
-    loglik <- as.numeric(poweRlaw::logLik(model_obj))
+    loglik <- as.numeric(poweRlaw::dist_ll(model_obj))
     k <- length(model_obj$getPars())
     aic <- -2 * loglik + 2 * k
     bic <- -2 * loglik + k * log(n_tail)
 
-    ks <- poweRlaw::calc_ks(model_obj)
+    ks <- tryCatch(
+      poweRlaw::distance_ks(model_obj),
+      error = function(e) NA_real_
+    )
 
     list(
       name = model_name,
@@ -1607,8 +1639,23 @@ analyse_powerlaw <- function(x,
     )
   }
 
-  candidates <- lapply(candidate_models, fit_single_model)
+  if (isTRUE(verbose)) {
+    message("[analyse_powerlaw] Ajustement des modèles candidats (", length(candidate_models), ")...")
+  }
+
+  progress_candidates <- NULL
+  if (interactive() && length(candidate_models) > 1L && isTRUE(verbose)) {
+    progress_candidates <- utils::txtProgressBar(min = 0, max = length(candidate_models), style = 3)
+  }
+
+  candidates <- vector("list", length(candidate_models))
   names(candidates) <- candidate_models
+  for (i in seq_along(candidate_models)) {
+    candidates[[i]] <- fit_single_model(candidate_models[i])
+    if (!is.null(progress_candidates)) utils::setTxtProgressBar(progress_candidates, i)
+  }
+  if (!is.null(progress_candidates)) close(progress_candidates)
+
   candidates <- Filter(Negate(is.null), candidates)
 
   if (length(candidates) == 0L) {
@@ -1652,26 +1699,59 @@ analyse_powerlaw <- function(x,
                                  names(candidates))
   bootstrap_results <- NULL
   if (length(bootstrap_targets) > 0L && bootstrap_sims > 0L) {
+    if (isTRUE(verbose)) {
+      message("[analyse_powerlaw] Bootstrap goodness-of-fit (", bootstrap_sims, " simulations)...")
+    }
+    progress_boot <- NULL
+    if (interactive() && length(bootstrap_targets) > 1L && isTRUE(verbose)) {
+      progress_boot <- utils::txtProgressBar(min = 0, max = length(bootstrap_targets), style = 3)
+    }
+    old_profile <- Sys.getenv("R_PROFILE_USER", unset = NA_character_)
+    Sys.setenv(R_PROFILE_USER = "")
+    on.exit({
+      if (is.na(old_profile)) {
+        Sys.unsetenv("R_PROFILE_USER")
+      } else {
+        Sys.setenv(R_PROFILE_USER = old_profile)
+      }
+    }, add = TRUE)
     bootstrap_rows <- vector("list", length(bootstrap_targets))
     for (i in seq_along(bootstrap_targets)) {
       target <- bootstrap_targets[i]
       mod <- candidates[[target]]$object
-      boot <- poweRlaw::bootstrap_p(
-        mod,
-        no_of_sims = bootstrap_sims,
-        threads = threads,
-        quiet = !isTRUE(verbose)
+      boot <- tryCatch(
+        suppressPackageStartupMessages(
+          suppressMessages(
+            poweRlaw::bootstrap_p(
+              mod,
+              no_of_sims = bootstrap_sims,
+              threads = threads
+            )
+          )
+        ),
+        error = function(e) {
+          if (isTRUE(verbose)) {
+            message("  - Échec du bootstrap pour le modèle '", target, "' : ", e$message)
+          }
+          list(p = NA_real_, se = NA_real_)
+        }
       )
-      candidates[[target]]$gof <- boot$p
+      p_val <- boot$p
+      se_val <- boot$se
+      if (length(p_val) == 0L) p_val <- NA_real_
+      if (length(se_val) == 0L) se_val <- NA_real_
+      candidates[[target]]$gof <- p_val
       bootstrap_rows[[i]] <- data.frame(
         model = target,
-        p_value = boot$p,
-        se = boot$se,
+        p_value = p_val,
+        se = se_val,
         sims = bootstrap_sims,
         stringsAsFactors = FALSE
       )
+      if (!is.null(progress_boot)) utils::setTxtProgressBar(progress_boot, i)
     }
     bootstrap_results <- do.call(rbind, bootstrap_rows)
+    if (!is.null(progress_boot)) close(progress_boot)
   }
 
   data_summary <- list(
