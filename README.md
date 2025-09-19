@@ -161,7 +161,9 @@ You can install the development version of mwiR from
 
 This is a basic example which shows you how to solve a common problem:
 
-    devtools::install_github("MyWebIntelligence/mwiR", auth_token = "github_pat_XXXXXX")
+    install.packages("remotes")  # si nécessaire
+    remotes::install_git("https://github.com/MyWebIntelligence/mwiR.git")
+
     library(mwiR)
 
 
