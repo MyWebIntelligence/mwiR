@@ -528,19 +528,61 @@ Large Language Models can speed up qualitative coding, but they demand guardrail
 
 ```{r}
 Sys.setenv(OPENAI_API_KEY = "sk-...")
-GPT_Recode("Traduire en français", "Automation and labour markets")
+gpt_out <- GPT_Recode(
+  prompt      = "Traduire en français",
+  cell        = "Automation and labour markets",
+  model       = "gpt-4o",
+  temperature = 0.4,
+  max_tokens  = 120
+)
 
 Sys.setenv(OPENROUTER_API_KEY = "orpk-...")
-OpenRouter_Recode(
-  prompt = "Résumer en 20 mots",
-  cell   = "The platform reorganised work across the supply chain"
+or_out <- OpenRouter_Recode(
+  prompt          = "Résumer en 20 mots",
+  cell            = "The platform reorganised work across the supply chain",
+  model           = "openrouter/auto/gpt-4",
+  temperature     = 0.2,
+  max_tokens      = 80,
+  return_metadata = TRUE
 )
 ```
 
--   `GPT_Recode()` wraps the official OpenAI client with retries and validation. Use it for quick recoding or sentiment hints.
--   `OpenRouter_Recode()` targets the OpenRouter ecosystem and can return rich metadata when `return_metadata = TRUE`.
+**Entrées de `GPT_Recode()`**  
+- `prompt` : consigne textuelle (obligatoire).  
+- `cell` : contenu à transformer (caractère, longueur 1).  
+- `sysprompt` : message système pour cadrer le modèle (défaut : demander une réponse courte).  
+- `model` : identifiant OpenAI (ex. `"gpt-4o"`, `"gpt-4o-mini"`).  
+- `temperature` (0–2) : aléa de génération.  
+- `max_tokens` : limite de tokens en sortie.  
+- `max_retries`, `retry_delay` : politique de relance en cas d’échec réseau ou quota.  
+- `validate` : lorsqu’il est `TRUE`, la sortie est filtrée (longueur raisonnable, absence de messages d’erreur).  
+> **Prerequis** : la variable d’environnement `OPENAI_API_KEY` doit être définie avant l’appel.
 
-Document your prompts and models in the research log for reproducibility.
+**Sortie de `GPT_Recode()`**  
+- Une chaîne de caractères avec la valeur recodée.  
+- `NA` est renvoyé si l’API échoue après les relances ou si la validation estime la réponse incohérente (dans ce cas un `warning` est émis).
+
+**Entrées de `OpenRouter_Recode()`**  
+- `prompt`, `cell`, `sysprompt`, `model`, `temperature`, `max_tokens`, `max_retries`, `retry_delay`, `validate` (mêmes rôles que ci-dessus).  
+- `referer`, `title` : en-têtes requis par OpenRouter pour l’analytics.  
+- `api_base` : URL de l’endpoint (défaut : `"https://openrouter.ai/api/v1/chat/completions"`).  
+- `timeout` : durée maximale de la requête (secondes).  
+- `extra_headers` : vecteur nommé pour ajouter des en-têtes HTTP personnalisés.  
+- `return_metadata` : quand `TRUE`, la fonction renvoie aussi les métadonnées HTTP (statut, en-têtes) pour archivage.  
+> **Prerequis** : définir `OPENROUTER_API_KEY` et disposer des packages `httr` et `jsonlite`.
+
+**Sorties de `OpenRouter_Recode()`**  
+- Par défaut, une chaîne de caractères.  
+- Avec `return_metadata = TRUE`, une liste contenant :
+  - `value` : la réponse du modèle ou `NA` en cas d’échec,  
+  - `status` : informations sur la validation et le nombre de tentatives,  
+  - `http` : code de statut et en-têtes de la réponse HTTP.
+
+**Bonnes pratiques**  
+- consigner `prompt`, `sysprompt`, modèle et version dans votre journal de recherche ;  
+- fixer `temperature` bas (≤ 0.3) pour des traductions fidèles, et l’augmenter pour des reformulations plus créatives ;  
+- limiter `max_tokens` pour éviter les réponses prolixes ;  
+- surveiller les quotas et gérer les `NA` dans vos scripts (utiliser `if (is.na(result)) …`).
 
 ## Step 9: Maintain the Database Throughout the Project Lifecycle
 
