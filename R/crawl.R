@@ -79,9 +79,18 @@ crawl <- function(url) {
   trafilatura <- reticulate::import("trafilatura", delay_load = FALSE)
 
   # Double extraction: JSON for metadata + Markdown for text with proper links
+  # Use httr::GET with timeout instead of trafilatura$fetch_url (which has no timeout)
   readFull <- tryCatch({
-    downloaded <- trafilatura$fetch_url(url)
-    if (!is.null(downloaded)) {
+    # Download HTML with httr (30 second timeout)
+    response <- httr::GET(url, httr::timeout(30), httr::user_agent("Mozilla/5.0 (compatible; mwiR crawler)"))
+
+    if (httr::http_error(response)) {
+      stop(paste("HTTP error:", httr::status_code(response)))
+    }
+
+    downloaded <- httr::content(response, as = "text", encoding = "UTF-8")
+
+    if (!is.null(downloaded) && nchar(downloaded) > 0) {
       # 1. Extract metadata from JSON
       json_content <- trafilatura$extract(
         filecontent = downloaded,
@@ -129,48 +138,57 @@ crawl <- function(url) {
     if (!is.null(urlarchive)) {
       tryCatch({
         message("Extraction fallback avec Archive.org")
-        downloaded_archive <- trafilatura$fetch_url(urlarchive)
-        if (!is.null(downloaded_archive)) {
-          # 1. Extract metadata from JSON
-          json_content_archive <- trafilatura$extract(
-            filecontent = downloaded_archive,
-            url = urlarchive,
-            include_links = FALSE,
-            output_format = "json",
-            with_metadata = TRUE
-          )
+        # Download with httr (30 second timeout) instead of trafilatura$fetch_url
+        response_archive <- httr::GET(urlarchive, httr::timeout(30),
+                                       httr::user_agent("Mozilla/5.0 (compatible; mwiR crawler)"))
 
-          # 2. Extract text with links in markdown format
-          markdown_content_archive <- trafilatura$extract(
-            filecontent = downloaded_archive,
-            url = urlarchive,
-            include_links = TRUE,
-            output_format = "markdown"
-          )
+        if (!httr::http_error(response_archive)) {
+          downloaded_archive <- httr::content(response_archive, as = "text", encoding = "UTF-8")
 
-          if (!is.null(json_content_archive) && json_content_archive != "") {
-            readFull_archive <- jsonlite::fromJSON(json_content_archive, simplifyVector = TRUE)
+          if (!is.null(downloaded_archive) && nchar(downloaded_archive) > 0) {
+            # 1. Extract metadata from JSON
+            json_content_archive <- trafilatura$extract(
+              filecontent = downloaded_archive,
+              url = urlarchive,
+              include_links = FALSE,
+              output_format = "json",
+              with_metadata = TRUE
+            )
 
-            # Filter out "Wayback Machine" error pages from Archive.org
-            if (!is.null(readFull_archive$title) &&
-                grepl("^Wayback Machine", readFull_archive$title, ignore.case = TRUE)) {
-              message("Archive.org returned error page (Wayback Machine), skipping")
-              readFull_archive <- NULL
-            } else {
-              # Replace text with markdown version (contains [text](url) links)
-              if (!is.null(markdown_content_archive) && markdown_content_archive != "") {
-                readFull_archive$text <- markdown_content_archive
-                message("Extraction avec Archive.org (JSON metadata + Markdown links)")
+            # 2. Extract text with links in markdown format
+            markdown_content_archive <- trafilatura$extract(
+              filecontent = downloaded_archive,
+              url = urlarchive,
+              include_links = TRUE,
+              output_format = "markdown"
+            )
+
+            if (!is.null(json_content_archive) && json_content_archive != "") {
+              readFull_archive <- jsonlite::fromJSON(json_content_archive, simplifyVector = TRUE)
+
+              # Filter out "Wayback Machine" error pages from Archive.org
+              if (!is.null(readFull_archive$title) &&
+                  grepl("^Wayback Machine", readFull_archive$title, ignore.case = TRUE)) {
+                message("Archive.org returned error page (Wayback Machine), skipping")
+                readFull_archive <- NULL
               } else {
-                message("Extraction avec Archive.org (JSON only)")
+                # Replace text with markdown version (contains [text](url) links)
+                if (!is.null(markdown_content_archive) && markdown_content_archive != "") {
+                  readFull_archive$text <- markdown_content_archive
+                  message("Extraction avec Archive.org (JSON metadata + Markdown links)")
+                } else {
+                  message("Extraction avec Archive.org (JSON only)")
+                }
+                readFull <- readFull_archive
               }
-              readFull <- readFull_archive
+            } else {
+              stop("Extraction échouée ou contenu vide pour le memento.")
             }
           } else {
-            stop("Extraction échouée ou contenu vide pour le memento.")
+            stop("Téléchargement du memento échoué ou contenu vide.")
           }
         } else {
-          stop("Téléchargement du memento échoué ou URL invalide.")
+          stop(paste("Archive.org HTTP error:", httr::status_code(response_archive)))
         }
       }, error = function(e) {
         message("Erreur lors de la récupération avec Archive.org : ", e$message)
