@@ -222,7 +222,9 @@ crawl <- function(url) {
       tryCatch({
         message("Tentative avec GET HTML (xml2)")
         parsed_content <- xml2::read_html(httr::content(response, as = "text"))
-        title <- xml2::xml_text(xml2::xml_find_first(parsed_content, "//title"))
+
+        # Extract metadata with multiple fallback strategies
+        metadata <- extract_html_metadata(parsed_content, response, url)
 
         # Extract body text
         body_node <- xml2::xml_find_first(parsed_content, "//body")
@@ -248,15 +250,19 @@ crawl <- function(url) {
           }
         }
 
-        domain <- httr::parse_url(url)$hostname
-        date_published <- httr::headers(response)$`last-modified` %||% "Date non disponible"
-        message("Extraction avec GET HTML (xml2)")
+        message("Extraction avec GET HTML (xml2) - metadata: title=", !is.na(metadata$title),
+                ", date=", metadata$date != "Date non disponible",
+                ", excerpt=", !is.na(metadata$excerpt),
+                ", author=", !is.na(metadata$author))
+
         return(data.frame(
-          title = title,
-          date = date_published,
+          title = metadata$title,
+          date = metadata$date,
           text = body_text,
-          excerpt = NA,
-          hostname = domain,
+          excerpt = metadata$excerpt,
+          author = metadata$author,
+          sitename = metadata$sitename,
+          hostname = metadata$hostname,
           http_status = http_status,
           stringsAsFactors = FALSE
         ))
@@ -271,6 +277,158 @@ crawl <- function(url) {
   return(NULL)
 }
 
+
+
+#' Extract metadata from HTML with multiple fallback strategies
+#'
+#' This function extracts metadata from parsed HTML content using multiple
+#' sources in priority order: standard meta tags, Open Graph, Twitter Cards,
+#' Schema.org JSON-LD, and HTTP headers.
+#'
+#' @param parsed_content xml2 parsed HTML document
+#' @param response httr response object (for HTTP headers fallback)
+#' @param url The original URL (for hostname extraction)
+#' @return A list with title, date, excerpt, author, hostname
+#' @keywords internal
+extract_html_metadata <- function(parsed_content, response, url) {
+
+  # Helper to get first non-empty value from multiple XPath queries
+  get_first_match <- function(xpaths) {
+    for (xpath in xpaths) {
+      node <- xml2::xml_find_first(parsed_content, xpath)
+      if (!is.na(node)) {
+        value <- xml2::xml_text(node)
+        if (!is.na(value) && nchar(trimws(value)) > 0) {
+          return(trimws(value))
+        }
+        # Try content attribute for meta tags
+        content <- xml2::xml_attr(node, "content")
+        if (!is.na(content) && nchar(trimws(content)) > 0) {
+          return(trimws(content))
+        }
+      }
+    }
+    return(NA_character_)
+  }
+
+  # ===== TITLE =====
+  # Priority: og:title > twitter:title > <title> > schema name
+  title <- get_first_match(c(
+    "//meta[@property='og:title']",
+    "//meta[@name='twitter:title']",
+    "//title",
+    "//meta[@itemprop='name']",
+    "//h1"
+  ))
+
+  # ===== DATE =====
+  # Priority: article:published_time > og:published_time > datePublished >
+  #           meta date > time[datetime] > Last-Modified header
+  date <- get_first_match(c(
+    "//meta[@property='article:published_time']",
+    "//meta[@property='og:published_time']",
+    "//meta[@itemprop='datePublished']",
+    "//meta[@name='date']",
+    "//meta[@name='DC.date']",
+    "//meta[@name='pubdate']",
+    "//meta[@name='publishdate']",
+    "//time[@datetime]/@datetime",
+    "//time[@pubdate]/@datetime"
+  ))
+  # Fallback to HTTP Last-Modified header
+  if (is.na(date) && !is.null(response)) {
+    last_modified <- httr::headers(response)$`last-modified`
+    if (!is.null(last_modified) && nchar(last_modified) > 0) {
+      date <- last_modified
+    }
+  }
+  if (is.na(date)) date <- "Date non disponible"
+
+  # ===== EXCERPT / DESCRIPTION =====
+  # Priority: meta description > og:description > twitter:description > schema description
+  excerpt <- get_first_match(c(
+    "//meta[@name='description']",
+    "//meta[@property='og:description']",
+    "//meta[@name='twitter:description']",
+    "//meta[@itemprop='description']",
+    "//meta[@name='DC.description']"
+  ))
+
+  # ===== AUTHOR =====
+  # Priority: meta author > article:author > og:author > DC.creator > schema author
+  author <- get_first_match(c(
+    "//meta[@name='author']",
+    "//meta[@property='article:author']",
+    "//meta[@property='og:author']",
+    "//meta[@name='DC.creator']",
+    "//meta[@itemprop='author']",
+    "//a[@rel='author']",
+    "//span[@itemprop='author']"
+  ))
+
+  # ===== SITENAME =====
+  sitename <- get_first_match(c(
+    "//meta[@property='og:site_name']",
+    "//meta[@name='application-name']"
+  ))
+
+  # ===== HOSTNAME =====
+  hostname <- httr::parse_url(url)$hostname
+
+  # ===== TRY JSON-LD SCHEMA.ORG =====
+  # Look for structured data in <script type="application/ld+json">
+  tryCatch({
+    jsonld_nodes <- xml2::xml_find_all(parsed_content, "//script[@type='application/ld+json']")
+    if (length(jsonld_nodes) > 0) {
+      for (node in jsonld_nodes) {
+        jsonld_text <- xml2::xml_text(node)
+        if (!is.na(jsonld_text) && nchar(jsonld_text) > 0) {
+          jsonld <- tryCatch(jsonlite::fromJSON(jsonld_text, simplifyVector = TRUE), error = function(e) NULL)
+          if (!is.null(jsonld)) {
+            # Handle @graph structure
+            if (!is.null(jsonld$`@graph`)) {
+              for (item in jsonld$`@graph`) {
+                if (is.na(title) && !is.null(item$headline)) title <- item$headline
+                if (is.na(title) && !is.null(item$name)) title <- item$name
+                if (is.na(date) || date == "Date non disponible") {
+                  if (!is.null(item$datePublished)) date <- item$datePublished
+                }
+                if (is.na(excerpt) && !is.null(item$description)) excerpt <- item$description
+                if (is.na(author)) {
+                  if (!is.null(item$author$name)) author <- item$author$name
+                  else if (is.character(item$author)) author <- item$author
+                }
+              }
+            } else {
+              # Direct structure
+              if (is.na(title) && !is.null(jsonld$headline)) title <- jsonld$headline
+              if (is.na(title) && !is.null(jsonld$name)) title <- jsonld$name
+              if ((is.na(date) || date == "Date non disponible") && !is.null(jsonld$datePublished)) {
+                date <- jsonld$datePublished
+              }
+              if (is.na(excerpt) && !is.null(jsonld$description)) excerpt <- jsonld$description
+              if (is.na(author)) {
+                if (!is.null(jsonld$author$name)) author <- jsonld$author$name
+                else if (is.character(jsonld$author)) author <- jsonld$author
+              }
+            }
+          }
+        }
+      }
+    }
+  }, error = function(e) {
+    # JSON-LD parsing failed, continue with what we have
+  })
+
+  return(list(
+    title = title,
+    date = date,
+    excerpt = excerpt,
+    author = author,
+    sitename = sitename,
+    hostname = hostname
+  ))
+}
 
 
 #' Extract text from a PDF URL
