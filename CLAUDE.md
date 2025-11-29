@@ -55,7 +55,7 @@ R -e "install.packages('path/to/mwiR.tar.gz', repos = NULL, type = 'source')"
 ### Required Software
 
 - **R** (≥ 4.0 recommended)
-- **Python 3** with trafilatura: `pip3 install trafilatura`
+- **Python 3** (trafilatura is auto-installed by mwiR in a dedicated virtualenv)
 - **SQLite** (usually included with R)
 - **Git** for version control
 
@@ -109,6 +109,7 @@ SQLite database (mwi.db) structure:
 ### Critical Files
 
 - `R/initmwi.R`: Project initialization, database creation
+- `R/python_setup.R`: Python/trafilatura environment management (auto-setup)
 - `.Renviron`: API keys storage (create if needed)
 - `extdata/mwi.db`: Default database template
 
@@ -187,10 +188,11 @@ OPENROUTER_API_KEY="your_key"  # Alternative AI provider
 ## Common Issues & Solutions
 
 1. **"package not found"**: Check R version, run `install.packages()`
-2. **Trafilatura errors**: Verify Python setup with `reticulate::py_config()`
+2. **Trafilatura errors**: Run `check_python_status()` to diagnose, then `setup_python(force = TRUE)` to reinstall
 3. **Database locked**: Close connections, restart R session
 4. **API errors**: Check keys in environment variables
 5. **Test failures**: Update all dependencies, check mock functions
+6. **Python virtualenv corrupted**: Run `remove_python_env()` then `setup_python()`
 
 ## External Integrations
 

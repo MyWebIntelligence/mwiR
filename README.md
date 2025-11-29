@@ -167,10 +167,33 @@ This is a basic example which shows you how to solve a common problem:
     library(mwiR)
 
 
-Trafilatura is a python package necessary library for using this package.
-If it is not already installed, you can install it using the following code in your terminal console:
+### Python/Trafilatura Setup (Automatic)
 
-pip install trafilatura
+Trafilatura is a Python library used for web content extraction. **mwiR handles this automatically** - you don't need to install it manually.
+
+When you run `initmwi()` for the first time:
+1. mwiR creates a dedicated Python virtual environment (isolated from your system)
+2. Trafilatura is automatically installed in this environment
+3. The setup is cached, so subsequent sessions start instantly
+
+**Troubleshooting Python Setup:**
+
+```r
+# Check current status
+check_python_status()
+
+# Force reinstall if needed
+setup_python(force = TRUE)
+
+# Complete reset
+remove_python_env()
+setup_python()
+```
+
+**Requirements:** Python 3 must be available on your system. On most systems it's pre-installed. If not:
+- macOS: `brew install python3`
+- Ubuntu/Debian: `sudo apt install python3 python3-venv`
+- Windows: Download from https://www.python.org/downloads/
 
 For 'Enter your SERP API key or press Enter:'
 The serp_api function is a future feature. For now, you can just press Enter.
