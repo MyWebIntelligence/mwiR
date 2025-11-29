@@ -519,61 +519,84 @@ powerlaw <- analyse_powerlaw(
 
 ## Step 8: Leverage AI Assistance Responsibly
 
-Large Language Models can speed up qualitative coding, but they demand guardrails.
+Large Language Models can speed up qualitative coding, but they demand guardrails. The unified `LLM_Recode()` function supports multiple providers (OpenAI, OpenRouter, Anthropic, Ollama) with a simple, consistent interface.
+
+### Configuration (once per session)
 
 ```r
-Sys.setenv(OPENAI_API_KEY = "sk-...")
-gpt_out <- GPT_Recode(
-  prompt      = "Traduire en français",
-  cell        = "Automation and labour markets",
-  model       = "gpt-4o",
-  temperature = 0.4,
-  max_tokens  = 120
-)
+# Configure your preferred provider
+LLM_Config(provider = "openai", lang = "fr")
 
+# Or set API keys directly
+Sys.setenv(OPENAI_API_KEY = "sk-...")
 Sys.setenv(OPENROUTER_API_KEY = "orpk-...")
-or_out <- OpenRouter_Recode(
-  prompt          = "Résumer en 20 mots",
-  cell            = "The platform reorganised work across the supply chain",
-  model           = "openrouter/auto/gpt-4",
-  temperature     = 0.2,
-  max_tokens      = 80,
-  return_metadata = TRUE
+Sys.setenv(ANTHROPIC_API_KEY = "sk-ant-...")
+```
+
+### Basic Usage with Vectors
+
+```r
+# Simple translation of a vector
+translations <- LLM_Recode(
+  data        = c("Hello world", "Automation and labour markets"),
+  prompt      = "Traduire en français: {value}",
+  temperature = 0.4
 )
 ```
 
-**Entrées de `GPT_Recode()`**  
-- `prompt` : instruction textuelle (obligatoire).  
-- `cell` : contenu à transformer, chaîne unique.  
-- `sysprompt` : message système qui cadre la réponse.  
-- `model` : moteur OpenAI (`"gpt-4o"`, `"gpt-4o-mini"`, etc.).  
-- `temperature` (0–2) : aléa de génération.  
-- `max_tokens` : plafond de tokens en sortie.  
-- `max_retries`, `retry_delay` : nombre de relances et délai entre elles.  
-- `validate` : filtre la réponse (longueur raisonnable, pas d’excuses).  
-> **Prerequis** : définir `OPENAI_API_KEY` avant d’appeler la fonction.
+### Advanced Usage with Data Frames
 
-**Sortie**  
-- Une chaîne recodée, ou `NA` si l’appel échoue malgré les relances (un `warning` est émis).
+```r
+# Process multiple columns using glue templates
+results <- LLM_Recode(
+  data   = my_dataframe,
+  prompt = "Résumer en 20 mots: {title} - {content}",
+  provider        = "openrouter",
+  model           = "openrouter/auto",
+  temperature     = 0.2,
+  max_tokens      = 80,
+  return_metadata = TRUE,
+  parallel        = TRUE,       # Enable parallel processing
+  workers         = 4
+)
 
-**Entrées de `OpenRouter_Recode()`**  
-- mêmes arguments que ci-dessus (`prompt`, `cell`, `sysprompt`, `model`, `temperature`, `max_tokens`, `max_retries`, `retry_delay`, `validate`).  
-- `referer`, `title` : en-têtes requis par OpenRouter.  
-- `api_base` : URL de l’endpoint (par défaut `https://openrouter.ai/api/v1/chat/completions`).  
-- `timeout` : durée max de la requête.  
-- `extra_headers` : en-têtes additionnels (vecteur nommé).  
-- `return_metadata` : bascule entre chaîne simple et liste enrichie.  
-> **Prerequis** : `OPENROUTER_API_KEY` doit être défini et les packages `httr`, `jsonlite` installés.
+# Check failures
+failed <- results[results$status != "ok", ]
+```
 
-**Sortie**  
-- Par défaut, une chaîne.  
-- Avec `return_metadata = TRUE`, une liste composée de `value`, `status` (tentatives, validation) et `http` (code, en-têtes). Les champs sont `NA` en cas d’échec.
+**Entrées de `LLM_Recode()`**
+- `data` : vecteur ou data.frame à traiter (obligatoire).
+- `prompt` : template glue avec placeholders `{variable}` (obligatoire). Pour les vecteurs, utiliser `{value}`.
+- `provider` : `"openai"`, `"openrouter"`, `"anthropic"`, ou `"ollama"` (auto-détecté si omis).
+- `model` : identifiant du modèle (défaut selon provider).
+- `temperature` (0–2) : aléa de génération.
+- `max_tokens` : plafond de tokens en sortie.
+- `max_retries`, `retry_delay`, `backoff_multiplier` : stratégie de retry avec backoff exponentiel.
+- `rate_limit_delay` : délai entre requêtes pour respecter les quotas.
+- `parallel`, `workers` : traitement parallèle via `future`/`furrr`.
+- `return_metadata` : retourne un data.frame avec statut, tentatives, tokens utilisés.
+- `on_error` : `"continue"` (défaut) ou `"stop"` sur la première erreur.
 
-**Bonnes pratiques**  
-- Documenter `prompt`, `sysprompt`, modèle et version dans votre carnet de labo.  
-- Baisser `temperature` pour des traductions fidèles, l’augmenter pour des reformulations créatives.  
-- Limiter `max_tokens` pour garder des réponses concises.  
-- Gérer les `NA` dans vos scripts (`if (is.na(gpt_out)) …`) et surveiller les quotas des fournisseurs.
+**Sortie**
+- Par défaut, un vecteur de chaînes recodées (NA en cas d'échec).
+- Avec `return_metadata = TRUE`, un data.frame avec colonnes `value`, `status`, `attempts`, `tokens_used`, `model_used`, `error_message`.
+
+**`LLM_Config()` - Configuration de session**
+```r
+LLM_Config(
+  provider = "openai",    # Provider par défaut
+  model    = "gpt-4o",    # Modèle par défaut
+  lang     = "fr",        # Langue des messages (fr/en)
+  verbose  = TRUE         # Afficher les messages de progression
+)
+```
+
+**Bonnes pratiques**
+- Documenter `prompt`, `sysprompt`, modèle et version dans votre carnet de labo.
+- Baisser `temperature` pour des traductions fidèles, l'augmenter pour des reformulations créatives.
+- Limiter `max_tokens` pour garder des réponses concises.
+- Utiliser `return_metadata = TRUE` pour auditer les résultats.
+- Activer `parallel = TRUE` avec modération (respecter les rate limits des APIs).
 
 ## Step 9: Maintain the Database Throughout the Project Lifecycle
 

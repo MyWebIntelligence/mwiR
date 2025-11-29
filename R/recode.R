@@ -1981,327 +1981,787 @@ annotatedData <- function(dataplus, table, champ, by, labase = "mwi.db") {
   })
 }
 
-#' Recode Cell Values Using GPT
+# =============================================================================
+# LLM_Recode - Unified LLM-based data recoding for social science researchers
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Null-coalescing operator (internal)
+# -----------------------------------------------------------------------------
+`%||%` <- function(a, b) if (!is.null(a) && length(a) > 0L && !is.na(a[1])) a else b
+
+# -----------------------------------------------------------------------------
+# Provider registry (internal)
+# -----------------------------------------------------------------------------
+.llm_providers <- list(
+  openai = list(
+    env_key = "OPENAI_API_KEY",
+    default_model = "gpt-4o",
+    default_base = "https://api.openai.com/v1/chat/completions"
+  ),
+  openrouter = list(
+    env_key = "OPENROUTER_API_KEY",
+    default_model = "openrouter/auto",
+    default_base = "https://openrouter.ai/api/v1/chat/completions"
+  ),
+  anthropic = list(
+    env_key = "ANTHROPIC_API_KEY",
+    default_model = "claude-sonnet-4-20250514",
+    default_base = "https://api.anthropic.com/v1/messages"
+  ),
+  ollama = list(
+    env_key = NULL,
+    default_model = "llama3",
+    default_base = "http://localhost:11434/api/chat"
+  )
+)
+
+# -----------------------------------------------------------------------------
+# Bilingual messages (internal)
+# -----------------------------------------------------------------------------
+.llm_messages <- list(
+  fr = list(
+    no_api_key = "Aucune cl\u00e9 API trouv\u00e9e pour {provider}.",
+    ask_key = "Entrez votre cl\u00e9 API (ou appuyez sur Entr\u00e9e pour annuler): ",
+    key_saved = "Cl\u00e9 API enregistr\u00e9e pour cette session R.",
+    key_permanent = "Pour la rendre permanente, ajoutez \u00e0 votre .Renviron:",
+    cancelled = "Op\u00e9ration annul\u00e9e par l'utilisateur.",
+    rate_limit = "Limite de requ\u00eates atteinte. Pause de {delay} secondes...",
+    retry = "Tentative {attempt}/{max} \u00e9chou\u00e9e: {error}",
+    success = "Traitement termin\u00e9: {n} \u00e9l\u00e9ments, {errors} erreurs.",
+    missing_vars = "Variables manquantes dans les donn\u00e9es: {vars}",
+    processing = "Traitement de {n} \u00e9l\u00e9ments avec {provider}...",
+    config_title = "Configuration LLM actuelle:",
+    get_key_urls = "Vous pouvez obtenir une cl\u00e9 sur:",
+    failed_rows = "Lignes en erreur: {rows}"
+  ),
+  en = list(
+    no_api_key = "No API key found for {provider}.",
+    ask_key = "Enter your API key (or press Enter to cancel): ",
+    key_saved = "API key saved for this R session.",
+    key_permanent = "To make it permanent, add to your .Renviron:",
+    cancelled = "Operation cancelled by user.",
+    rate_limit = "Rate limit reached. Waiting {delay} seconds...",
+    retry = "Attempt {attempt}/{max} failed: {error}",
+    success = "Processing complete: {n} items, {errors} errors.",
+    missing_vars = "Missing variables in data: {vars}",
+    processing = "Processing {n} items with {provider}...",
+    config_title = "Current LLM configuration:",
+    get_key_urls = "You can get a key at:",
+    failed_rows = "Failed rows: {rows}"
+  )
+)
+
+# -----------------------------------------------------------------------------
+# Message helper (internal)
+# -----------------------------------------------------------------------------
+.msg <- function(key, ...) {
+  lang <- getOption("mwiR.llm.lang", "fr")
+  if (!lang %in% names(.llm_messages)) lang <- "fr"
+  template <- .llm_messages[[lang]][[key]] %||% .llm_messages[["en"]][[key]] %||% key
+  glue::glue(template, ..., .envir = parent.frame())
+}
+
+# -----------------------------------------------------------------------------
+# Auto-detect available provider (internal)
+# -----------------------------------------------------------------------------
+.auto_detect_provider <- function() {
+  available <- c()
+  if (nzchar(Sys.getenv("OPENAI_API_KEY", ""))) available <- c(available, "openai")
+  if (nzchar(Sys.getenv("OPENROUTER_API_KEY", ""))) available <- c(available, "openrouter")
+  if (nzchar(Sys.getenv("ANTHROPIC_API_KEY", ""))) available <- c(available, "anthropic")
+
+  # Check if Ollama is running locally
+  ollama_running <- tryCatch({
+    resp <- httr::GET("http://localhost:11434/api/tags", httr::timeout(2))
+    httr::status_code(resp) == 200
+  }, error = function(e) FALSE)
+  if (ollama_running) available <- c(available, "ollama")
+
+  if (length(available) == 0) return(NULL)
+  if (length(available) == 1) return(available)
+
+  # Return preferred provider from session or first available
+  pref <- getOption("mwiR.llm.preferred_provider")
+  if (!is.null(pref) && pref %in% available) return(pref)
+  available[1]
+}
+
+# -----------------------------------------------------------------------------
+# Interactive API key request (internal)
+# -----------------------------------------------------------------------------
+.ask_for_api_key <- function(provider) {
+  if (!interactive()) {
+    env_key <- .llm_providers[[provider]]$env_key
+    stop(.msg("no_api_key", provider = provider), "\n",
+         "Sys.setenv(", env_key, " = 'your-key')")
+  }
+
+  message("\n=== Configuration ", toupper(provider), " ===")
+  message(.msg("no_api_key", provider = provider))
+  message(.msg("get_key_urls"))
+  message("  - OpenAI: https://platform.openai.com/api-keys")
+  message("  - OpenRouter: https://openrouter.ai/keys")
+  message("  - Anthropic: https://console.anthropic.com/")
+
+  key <- readline(.msg("ask_key"))
+  if (!nzchar(key)) stop(.msg("cancelled"))
+
+  env_key <- .llm_providers[[provider]]$env_key
+  do.call(Sys.setenv, setNames(list(key), env_key))
+  message(.msg("key_saved"))
+  message(.msg("key_permanent"))
+  message("  ", env_key, "=", substr(key, 1, 10), "...")
+
+  key
+}
+
+# -----------------------------------------------------------------------------
+# Resolve API key (internal)
+# -----------------------------------------------------------------------------
+.resolve_api_key <- function(provider, api_key) {
+  if (!is.null(api_key) && nzchar(api_key)) return(api_key)
+  if (provider == "ollama") return("")
+
+  env_key <- .llm_providers[[provider]]$env_key
+  key <- Sys.getenv(env_key, unset = "")
+  if (nzchar(key)) return(key)
+
+  .ask_for_api_key(provider)
+}
+
+# -----------------------------------------------------------------------------
+# Render glue template (internal)
+# -----------------------------------------------------------------------------
+.render_prompt <- function(template, data_row) {
+  glue::glue_data(.x = as.list(data_row), template, .null = "NA", .envir = emptyenv())
+}
+
+# -----------------------------------------------------------------------------
+# Prepare data for batch processing (internal)
+# -----------------------------------------------------------------------------
+.prepare_data <- function(data, prompt) {
+  matches <- regmatches(prompt, gregexpr("\\{([^}]+)\\}", prompt))[[1]]
+  vars <- gsub("[{}]", "", matches)
+
+  if (is.vector(data) && !is.data.frame(data) && !is.list(data)) {
+    data <- data.frame(value = data, stringsAsFactors = FALSE)
+  }
+  if (is.list(data) && !is.data.frame(data)) {
+    data <- as.data.frame(data, stringsAsFactors = FALSE)
+  }
+
+  if (length(vars) > 0) {
+    missing <- setdiff(vars, names(data))
+    if (length(missing) > 0) {
+      stop(.msg("missing_vars", vars = paste(missing, collapse = ", ")))
+    }
+  }
+  data
+}
+
+# -----------------------------------------------------------------------------
+# OpenAI API call (internal)
+# -----------------------------------------------------------------------------
+.call_openai <- function(prompt, sysprompt, config) {
+  messages <- list(
+    list(role = "system", content = sysprompt),
+    list(role = "user", content = prompt)
+  )
+
+  payload <- list(
+    model = config$model,
+    messages = messages,
+    temperature = config$temperature,
+    max_tokens = config$max_tokens
+  )
+
+  headers <- httr::add_headers(
+    "Authorization" = paste("Bearer", config$api_key),
+    "Content-Type" = "application/json"
+  )
+
+  resp <- httr::POST(
+    url = config$api_base,
+    headers,
+    body = jsonlite::toJSON(payload, auto_unbox = TRUE),
+    encode = "raw",
+    httr::timeout(config$timeout)
+  )
+
+  status <- httr::status_code(resp)
+  body <- httr::content(resp, as = "text", encoding = "UTF-8")
+  parsed <- jsonlite::fromJSON(body, simplifyVector = FALSE)
+
+  list(
+    status_code = status,
+    content = if (status == 200) parsed$choices[[1]]$message$content else NULL,
+    error = if (status != 200) (parsed$error$message %||% body) else NULL,
+    tokens = parsed$usage$total_tokens %||% NA_integer_
+  )
+}
+
+# -----------------------------------------------------------------------------
+# OpenRouter API call (internal)
+# -----------------------------------------------------------------------------
+.call_openrouter <- function(prompt, sysprompt, config) {
+  messages <- list(
+    list(role = "system", content = sysprompt),
+    list(role = "user", content = prompt)
+  )
+
+  payload <- list(
+    model = config$model,
+    messages = messages,
+    temperature = config$temperature,
+    max_tokens = config$max_tokens,
+    stream = FALSE
+  )
+
+  referer <- getOption("mwiR.llm.referer", "https://github.com/MyWebIntelligence")
+  title <- getOption("mwiR.llm.title", "mwiR")
+
+  headers <- httr::add_headers(
+    "Authorization" = paste("Bearer", config$api_key),
+    "Content-Type" = "application/json",
+    "HTTP-Referer" = referer,
+    "X-Title" = title
+  )
+
+  if (!is.null(config$extra_headers)) {
+    headers <- httr::add_headers(.headers = c(headers, config$extra_headers))
+  }
+
+  resp <- httr::POST(
+    url = config$api_base,
+    headers,
+    body = jsonlite::toJSON(payload, auto_unbox = TRUE),
+    encode = "raw",
+    httr::timeout(config$timeout)
+  )
+
+  status <- httr::status_code(resp)
+  body <- httr::content(resp, as = "text", encoding = "UTF-8")
+  parsed <- jsonlite::fromJSON(body, simplifyVector = FALSE)
+
+  list(
+    status_code = status,
+    content = if (status == 200) parsed$choices[[1]]$message$content else NULL,
+    error = if (status != 200) (parsed$error$message %||% body) else NULL,
+    tokens = parsed$usage$total_tokens %||% NA_integer_
+  )
+}
+
+# -----------------------------------------------------------------------------
+# Anthropic API call (internal)
+# -----------------------------------------------------------------------------
+.call_anthropic <- function(prompt, sysprompt, config) {
+  payload <- list(
+    model = config$model,
+    max_tokens = config$max_tokens,
+    system = sysprompt,
+    messages = list(
+      list(role = "user", content = prompt)
+    )
+  )
+
+  headers <- httr::add_headers(
+    "x-api-key" = config$api_key,
+    "anthropic-version" = "2023-06-01",
+    "Content-Type" = "application/json"
+  )
+
+  resp <- httr::POST(
+    url = config$api_base,
+    headers,
+    body = jsonlite::toJSON(payload, auto_unbox = TRUE),
+    encode = "raw",
+    httr::timeout(config$timeout)
+  )
+
+  status <- httr::status_code(resp)
+  body <- httr::content(resp, as = "text", encoding = "UTF-8")
+  parsed <- jsonlite::fromJSON(body, simplifyVector = FALSE)
+
+  list(
+    status_code = status,
+    content = if (status == 200) parsed$content[[1]]$text else NULL,
+    error = if (status != 200) (parsed$error$message %||% body) else NULL,
+    tokens = (parsed$usage$input_tokens %||% 0L) + (parsed$usage$output_tokens %||% 0L)
+  )
+}
+
+# -----------------------------------------------------------------------------
+# Ollama API call (internal)
+# -----------------------------------------------------------------------------
+.call_ollama <- function(prompt, sysprompt, config) {
+  payload <- list(
+    model = config$model,
+    messages = list(
+      list(role = "system", content = sysprompt),
+      list(role = "user", content = prompt)
+    ),
+    stream = FALSE,
+    options = list(
+      temperature = config$temperature,
+      num_predict = config$max_tokens
+    )
+  )
+
+  resp <- httr::POST(
+    url = config$api_base,
+    httr::add_headers("Content-Type" = "application/json"),
+    body = jsonlite::toJSON(payload, auto_unbox = TRUE),
+    encode = "raw",
+    httr::timeout(config$timeout)
+  )
+
+  status <- httr::status_code(resp)
+  body <- httr::content(resp, as = "text", encoding = "UTF-8")
+  parsed <- jsonlite::fromJSON(body, simplifyVector = FALSE)
+
+  list(
+    status_code = status,
+    content = if (status == 200) parsed$message$content else NULL,
+    error = if (status != 200) (parsed$error %||% body) else NULL,
+    tokens = (parsed$prompt_eval_count %||% 0L) + (parsed$eval_count %||% 0L)
+  )
+}
+
+# -----------------------------------------------------------------------------
+# LLM dispatcher (internal)
+# -----------------------------------------------------------------------------
+.call_llm <- function(prompt, sysprompt, provider, config) {
+  switch(provider,
+    openai = .call_openai(prompt, sysprompt, config),
+    openrouter = .call_openrouter(prompt, sysprompt, config),
+    anthropic = .call_anthropic(prompt, sysprompt, config),
+    ollama = .call_ollama(prompt, sysprompt, config),
+    stop("Unknown provider: ", provider)
+  )
+}
+
+# -----------------------------------------------------------------------------
+# Call with retry logic (internal)
+# -----------------------------------------------------------------------------
+.call_with_retry <- function(prompt, sysprompt, provider, config) {
+  delay <- config$retry_delay
+  last_error <- NULL
+  verbose <- getOption("mwiR.llm.verbose", TRUE)
+
+  for (attempt in seq_len(config$max_retries)) {
+    result <- tryCatch({
+      .call_llm(prompt, sysprompt, provider, config)
+    }, error = function(e) {
+      list(status_code = NA, content = NULL, error = conditionMessage(e), tokens = NA)
+    })
+
+    if (!is.na(result$status_code) && result$status_code == 200 && !is.null(result$content)) {
+      return(list(
+        value = result$content,
+        status = "ok",
+        attempts = attempt,
+        tokens = result$tokens,
+        error_message = NA_character_
+      ))
+    }
+
+    last_error <- result$error %||% "Unknown error"
+
+    if (verbose && attempt < config$max_retries) {
+      message(.msg("retry", attempt = attempt, max = config$max_retries, error = substr(last_error, 1, 50)))
+    }
+
+    if (!is.na(result$status_code) && result$status_code == 429) {
+      delay <- min(delay * config$backoff_multiplier, 60)
+      if (verbose) message(.msg("rate_limit", delay = round(delay, 1)))
+    }
+
+    if (attempt < config$max_retries) {
+      Sys.sleep(delay)
+      delay <- delay * config$backoff_multiplier
+    }
+  }
+
+  list(
+    value = NA_character_,
+    status = "failed",
+    attempts = config$max_retries,
+    tokens = NA_integer_,
+    error_message = last_error
+  )
+}
+
+# -----------------------------------------------------------------------------
+# Process single row (internal)
+# -----------------------------------------------------------------------------
+.process_single_row <- function(data_row, prompt_template, sysprompt, provider, config, on_error) {
+  tryCatch({
+    rendered_prompt <- .render_prompt(prompt_template, data_row)
+    result <- .call_with_retry(rendered_prompt, sysprompt, provider, config)
+
+    if (config$validate && result$status == "ok") {
+      content <- result$value
+      refusal_pattern <- "sorry|error|cannot|not able|do not understand|unable|je ne peux pas"
+      if (!nzchar(content) || grepl(refusal_pattern, content, ignore.case = TRUE)) {
+        result$status <- "invalid"
+        result$value <- NA_character_
+      }
+    }
+    result
+  }, error = function(e) {
+    if (on_error == "stop") stop(e)
+    list(
+      value = NA_character_,
+      status = "error",
+      attempts = 0L,
+      tokens = NA_integer_,
+      error_message = conditionMessage(e)
+    )
+  })
+}
+
+# -----------------------------------------------------------------------------
+# Batch processing (internal)
+# -----------------------------------------------------------------------------
+.process_batch <- function(data, prompt_template, sysprompt, provider, config,
+                           parallel, workers, progress, on_error) {
+  n <- nrow(data)
+  verbose <- getOption("mwiR.llm.verbose", TRUE)
+
+  if (verbose) message(.msg("processing", n = n, provider = provider))
+
+  if (parallel && n > 1) {
+    if (is.null(workers)) workers <- max(1, future::availableCores() - 1)
+    oplan <- future::plan(future::multisession, workers = workers)
+    on.exit(future::plan(oplan), add = TRUE)
+
+    if (progress) {
+      progressr::handlers(global = TRUE)
+      results <- progressr::with_progress({
+        p <- progressr::progressor(steps = n)
+        furrr::future_map(seq_len(n), function(i) {
+          p()
+          .process_single_row(data[i, , drop = FALSE], prompt_template, sysprompt, provider, config, on_error)
+        }, .options = furrr::furrr_options(seed = TRUE))
+      })
+    } else {
+      results <- furrr::future_map(seq_len(n), function(i) {
+        .process_single_row(data[i, , drop = FALSE], prompt_template, sysprompt, provider, config, on_error)
+      }, .options = furrr::furrr_options(seed = TRUE))
+    }
+  } else {
+    results <- vector("list", n)
+    pb <- NULL
+
+    if (progress && interactive()) {
+      pb <- utils::txtProgressBar(min = 0, max = n, style = 3)
+      on.exit(if (!is.null(pb)) close(pb), add = TRUE)
+    }
+
+    for (i in seq_len(n)) {
+      if (config$rate_limit_delay > 0 && i > 1) {
+        Sys.sleep(config$rate_limit_delay)
+      }
+
+      results[[i]] <- .process_single_row(
+        data[i, , drop = FALSE], prompt_template, sysprompt, provider, config, on_error
+      )
+
+      if (!is.null(pb)) utils::setTxtProgressBar(pb, i)
+    }
+  }
+
+  results
+}
+
+# -----------------------------------------------------------------------------
+# Format results (internal)
+# -----------------------------------------------------------------------------
+.format_results <- function(results, return_metadata) {
+  if (!return_metadata) {
+    vapply(results, function(r) r$value %||% NA_character_, character(1))
+  } else {
+    data.frame(
+      row_index = seq_along(results),
+      value = vapply(results, function(r) r$value %||% NA_character_, character(1)),
+      status = vapply(results, function(r) r$status %||% "unknown", character(1)),
+      attempts = vapply(results, function(r) as.integer(r$attempts %||% NA_integer_), integer(1)),
+      tokens_used = vapply(results, function(r) as.integer(r$tokens %||% NA_integer_), integer(1)),
+      error_message = vapply(results, function(r) r$error_message %||% NA_character_, character(1)),
+      stringsAsFactors = FALSE
+    )
+  }
+}
+
+# -----------------------------------------------------------------------------
+# Print summary (internal)
+# -----------------------------------------------------------------------------
+.print_summary <- function(results, verbose) {
+  if (!verbose) return(invisible(NULL))
+
+  n_total <- length(results)
+  n_success <- sum(vapply(results, function(r) r$status == "ok", logical(1)))
+  n_failed <- n_total - n_success
+
+  message("\n", .msg("success", n = n_total, errors = n_failed))
+
+  if (n_failed > 0) {
+    failed_idx <- which(vapply(results, function(r) r$status != "ok", logical(1)))
+    if (length(failed_idx) <= 10) {
+      message(.msg("failed_rows", rows = paste(failed_idx, collapse = ", ")))
+    } else {
+      message(.msg("failed_rows", rows = paste(c(head(failed_idx, 10), "..."), collapse = ", ")))
+    }
+  }
+
+  invisible(NULL)
+}
+
+#' Configure LLM Settings for Session
 #'
 #' @description
-#' This function uses OpenAI's GPT models to recode/transform cell values based on a provided prompt.
-#' It includes robust error handling, input validation, and rate limiting.
+#' Configure default settings for LLM_Recode that persist for the R session.
+#' This function is designed for social science researchers who want to set up
+#' their configuration once and reuse it across multiple analyses.
 #'
-#' @param prompt A character string specifying the transformation prompt (e.g., "Translate to French").
-#' @param cell A character string containing the value to be recoded.
-#' @param sysprompt Optional system prompt to guide the model's behavior. 
-#'   Default: "You are a helpful assistant that recodes dataframe values. Return only the transformed value."
-#' @param model The GPT model to use. Default: "gpt-4o". Alternatives: "gpt-3.5-turbo".
-#' @param temperature Controls randomness (0-2). Lower = more deterministic. Default: 0.8.
-#' @param max_tokens Maximum length of response. Default: 1000.
-#' @param max_retries Maximum API retry attempts on failure. Default: 3.
-#' @param retry_delay Seconds between retries. Default: 1.
+#' @param provider Default LLM provider: "openai", "openrouter", "anthropic", or "ollama".
+#' @param model Default model to use (NULL = provider default).
+#' @param api_key API key to store for the session.
+#' @param verbose Show progress messages (TRUE/FALSE).
+#' @param lang Language for messages: "fr" (French) or "en" (English).
 #'
-#' @return A character string containing the recoded value, or NA if the operation fails.
-#'
-#' @details
-#' The function performs the following steps:
-#' 1. Validates all input parameters
-#' 2. Checks for OpenAI API key in environment variables
-#' 3. Makes API call with retry logic
-#' 4. Handles various error conditions gracefully
-#' 5. Returns transformed value or NA on failure
-#'
-#' @note
-#' Requires the 'openai' package and a valid OPENAI_API_KEY environment variable.
-#' For bulk operations, consider implementing additional rate limiting.
+#' @return Invisibly returns NULL. Prints current configuration.
 #'
 #' @examples
 #' \dontrun{
-#' # Set API key
-#' Sys.setenv(OPENAI_API_KEY = "your-key-here")
+#' # Configure for French users with OpenAI
+#' LLM_Config(provider = "openai", lang = "fr")
 #'
-#' # Simple translation
-#' GPT_Recode("Translate to French", "Hello world")
+#' # Configure with API key
+#' LLM_Config(provider = "openai", api_key = "sk-...")
 #'
-#' # More complex transformation
-#' GPT_Recode("Extract the main verb", "The cat sat on the mat")
+#' # View current configuration
+#' LLM_Config()
 #' }
 #'
-#' @importFrom openai create_chat_completion
 #' @export
-GPT_Recode <- function(prompt, cell, 
-                      sysprompt = "You are a helpful assistant that recodes dataframe values. Return only the transformed value.",
-                      model = "gpt-4o", 
-                      temperature = 0.8,
-                      max_tokens = 1000,
-                      max_retries = 3,
-                      retry_delay = 1,
-                      validate = TRUE) {
-  
-  # Input validation
-  if (!is.character(prompt) || length(prompt) != 1 || nchar(prompt) == 0) {
-    stop("'prompt' must be a non-empty character string")
+LLM_Config <- function(provider = NULL, model = NULL, api_key = NULL,
+                       verbose = NULL, lang = NULL) {
+
+  if (!is.null(provider)) {
+    if (!provider %in% names(.llm_providers)) {
+      stop("Provider must be one of: ", paste(names(.llm_providers), collapse = ", "))
+    }
+    options(mwiR.llm.preferred_provider = provider)
   }
-  if (!is.character(cell) || length(cell) != 1) {
-    stop("'cell' must be a character string")
+
+  if (!is.null(model)) options(mwiR.llm.default_model = model)
+  if (!is.null(verbose)) options(mwiR.llm.verbose = verbose)
+  if (!is.null(lang)) {
+    if (!lang %in% c("fr", "en")) stop("lang must be 'fr' or 'en'")
+    options(mwiR.llm.lang = lang)
+  }
+
+  if (!is.null(api_key) && !is.null(provider)) {
+    env_key <- .llm_providers[[provider]]$env_key
+    if (!is.null(env_key)) {
+      do.call(Sys.setenv, setNames(list(api_key), env_key))
+    }
+  }
+
+  message(.msg("config_title"))
+  message("  Provider: ", getOption("mwiR.llm.preferred_provider", "auto-detect"))
+  message("  Model: ", getOption("mwiR.llm.default_model", "provider default"))
+  message("  Verbose: ", getOption("mwiR.llm.verbose", TRUE))
+  message("  Lang: ", getOption("mwiR.llm.lang", "fr"))
+
+  available <- c()
+  if (nzchar(Sys.getenv("OPENAI_API_KEY", ""))) available <- c(available, "openai")
+  if (nzchar(Sys.getenv("OPENROUTER_API_KEY", ""))) available <- c(available, "openrouter")
+  if (nzchar(Sys.getenv("ANTHROPIC_API_KEY", ""))) available <- c(available, "anthropic")
+  message("  Available: ", if (length(available) > 0) paste(available, collapse = ", ") else "none (configure API keys)")
+
+  invisible(NULL)
+}
+
+#' Recode Data Using Large Language Models
+#'
+#' @description
+#' Transform data values using LLMs (OpenAI, OpenRouter, Anthropic, Ollama).
+#' Designed for social science researchers: simple to use, interactive configuration,
+#' resilient error handling, and French/English messages.
+#'
+#' Uses glue-style templates for prompts: `"Translate {value} to French"`.
+#' When passing a simple vector, use `{value}` as the placeholder.
+#' When passing a data frame, use column names as placeholders.
+#'
+#' @param data A character vector or data frame to process. For vectors, use
+#'   `{value}` in your prompt. For data frames, use column names.
+#' @param prompt A glue-style template string. Example: `"Translate to French: {value}"`.
+#' @param provider LLM provider: "openai", "openrouter", "anthropic", or "ollama".
+#'   If NULL, auto-detects based on available API keys.
+#' @param model Model identifier. NULL uses provider default (e.g., "gpt-4o" for OpenAI).
+#' @param temperature Sampling temperature (0-2). Lower = more deterministic. Default: 0.7.
+#' @param max_tokens Maximum tokens per response. Default: 1000.
+#' @param sysprompt System prompt guiding model behavior.
+#' @param api_key API key. If NULL, reads from environment or asks interactively.
+#' @param api_base Custom API endpoint URL (for local models or proxies).
+#' @param timeout Request timeout in seconds. Default: 60.
+#' @param max_retries Maximum retry attempts per request. Default: 3.
+#' @param retry_delay Initial delay between retries (seconds). Default: 1.
+#' @param backoff_multiplier Multiplier for exponential backoff. Default: 2.
+#' @param rate_limit_delay Delay between requests (seconds). Default: 0.
+#' @param validate Apply heuristics to detect invalid responses. Default: TRUE.
+#' @param return_metadata If TRUE, returns data frame with metadata. Default: FALSE.
+#' @param on_error "continue" (default) returns NA and proceeds, "stop" halts on error.
+#' @param parallel Enable parallel processing. Default: FALSE.
+#' @param workers Number of parallel workers. NULL = auto.
+#' @param progress Show progress bar. Default: TRUE.
+#' @param extra_headers Named character vector of additional HTTP headers.
+#'
+#' @return By default, a character vector of same length as input.
+#'   If `return_metadata = TRUE`, a data frame with columns:
+#'   row_index, value, status, attempts, tokens_used, error_message.
+#'
+#' @examples
+#' \dontrun{
+#' # Simple translation (auto-detects provider from API keys)
+#' result <- LLM_Recode(
+#'   data = c("Hello world", "Good morning"),
+#'   prompt = "Translate to French: {value}"
+#' )
+#'
+#' # With data frame
+#' df <- data.frame(
+#'   title = c("Article 1", "Article 2"),
+#'   abstract = c("This paper explores...", "We analyze...")
+#' )
+#' summaries <- LLM_Recode(
+#'   data = df,
+#'   prompt = "Summarize in 10 words: {title} - {abstract}",
+#'   provider = "openai"
+#' )
+#'
+#' # Get detailed metadata
+#' results <- LLM_Recode(
+#'   data = my_texts,
+#'   prompt = "Classify sentiment (positive/negative/neutral): {value}",
+#'   return_metadata = TRUE
+#' )
+#' # Check failures
+#' failed <- results[results$status != "ok", ]
+#'
+#' # Configure once for the session
+#' LLM_Config(provider = "openai", lang = "fr")
+#' # Then use simply
+#' LLM_Recode(my_data, "Traduire: {value}")
+#' }
+#'
+#' @seealso \code{\link{LLM_Config}} for session configuration.
+#'
+#' @importFrom httr POST GET add_headers timeout status_code content headers
+#' @importFrom jsonlite toJSON fromJSON
+#' @importFrom glue glue glue_data
+#' @importFrom future plan multisession sequential availableCores
+#' @importFrom furrr future_map furrr_options
+#' @importFrom progressr handlers with_progress progressor
+#' @export
+LLM_Recode <- function(data,
+                       prompt,
+                       provider = NULL,
+                       model = NULL,
+                       temperature = 0.7,
+                       max_tokens = 1000,
+                       sysprompt = "You are a helpful assistant that recodes dataframe values. Return only the transformed value.",
+                       api_key = NULL,
+                       api_base = NULL,
+                       timeout = 60,
+                       max_retries = 3,
+                       retry_delay = 1,
+                       backoff_multiplier = 2,
+                       rate_limit_delay = 0,
+                       validate = TRUE,
+                       return_metadata = FALSE,
+                       on_error = c("continue", "stop"),
+                       parallel = FALSE,
+                       workers = NULL,
+                       progress = TRUE,
+                       extra_headers = NULL) {
+
+  on_error <- match.arg(on_error)
+
+  if (missing(data) || is.null(data)) {
+    stop("'data' is required")
+  }
+  if ((is.vector(data) && !is.data.frame(data) && length(data) == 0) ||
+      (is.data.frame(data) && nrow(data) == 0)) {
+    stop("'data' cannot be empty")
+  }
+  if (missing(prompt) || !is.character(prompt) || length(prompt) != 1 || !nzchar(prompt)) {
+    stop("'prompt' must be a non-empty character string with {variable} placeholders")
   }
   if (!is.numeric(temperature) || temperature < 0 || temperature > 2) {
     stop("'temperature' must be between 0 and 2")
   }
-  
-  # Check for API key
-  if (Sys.getenv("OPENAI_API_KEY") == "") {
-    stop("OPENAI_API_KEY environment variable not set. Please set it with Sys.setenv(OPENAI_API_KEY = 'your-key')")
-  }
-  
-  # Prepare messages
-  messages <- list(
-    list(role = "system", content = sysprompt),
-    list(role = "user", content = paste0(prompt, ":\n\n", cell))
-  )
-  
-  # Try with retries
-  for (i in 1:max_retries) {
-    tryCatch({
-      response <- openai::create_chat_completion(
-        model = model,
-        messages = messages,
-        temperature = temperature,
-        max_tokens = max_tokens
-      )
-      
-      # Validate response
-      if (is.null(response$choices) || length(response$choices) == 0) {
-        stop("Empty response from API")
-      }
-      
-      transformed <- response$choices[[1]]$message$content
-      
-      # Optional validation
-      if (validate) {
-        valid <- nchar(transformed) > 0 && 
-                 nchar(transformed) < (nchar(cell) * 10) &&
-                 !grepl("sorry|error|cannot", transformed, ignore.case = TRUE)
-        if (!valid) {
-          warning("GPT returned potentially invalid response")
-          return(NA_character_)
-        }
-      }
-      return(transformed)
-    }, error = function(e) {
-      if (i == max_retries) {
-        warning(paste("GPT recoding failed after", max_retries, "attempts:", e$message))
-        return(NA_character_)
-      }
-      Sys.sleep(retry_delay)
-    })
-  }
-}
-
-
-#' Recode Cell Values Using OpenRouter
-#'
-#' @description
-#' Leverage an OpenRouter-hosted LLM to transform a single cell value. The
-#' function mirrors `GPT_Recode` but targets the vendor-neutral OpenRouter REST
-#' endpoint, adding strict validation, retry logic (including handling rate
-#' limits), optional response sanity checks, and rich metadata for auditing.
-#'
-#' @param prompt Instruction describing how the `cell` content should be
-#'   transformed.
-#' @param cell Single character string (or coercible value) to recode.
-#' @param sysprompt Optional system message guiding the model. Defaults to a
-#'   minimal “return only the transformed value” directive.
-#' @param model OpenRouter model identifier. Default: `"openrouter/auto/gpt-4"`.
-#' @param temperature Sampling temperature (0–2).
-#' @param max_tokens Upper bound on tokens generated by the LLM.
-#' @param max_retries Maximum number of attempts when the API call fails.
-#' @param retry_delay Seconds to wait before retrying; automatically increased
-#'   after HTTP 429.
-#' @param validate If `TRUE`, applies simple heuristics (length, refusal lexicon)
-#'   to guard against malformed responses.
-#' @param referer Value for the mandatory `HTTP-Referer` header (OpenRouter
-#'   requirement). Defaults to the `openrouter.referer` option or a GitHub URL.
-#' @param title Value for the `X-Title` header (used for analytics).
-#' @param api_base Base URL of the OpenRouter chat completions endpoint.
-#' @param timeout Request timeout in seconds (default 60).
-#' @param extra_headers Named character vector of additional HTTP headers.
-#' @param return_metadata Logical; if `TRUE`, returns a list with the transformed
-#'   text and a metadata list; otherwise returns only the transformed value.
-#'
-#' @return Either a character string (default) or a list containing
-#'   `value`, `status`, and `http` metadata when `return_metadata = TRUE`.
-#'
-#' @note
-#' Requires `OPENROUTER_API_KEY`, plus the packages `httr` and `jsonlite`.
-#' Respect OpenRouter’s rate limits and usage policies.
-#'
-#' @export
-OpenRouter_Recode <- function(prompt,
-                              cell,
-                              sysprompt = "You are a helpful assistant that recodes dataframe values. Return only the transformed value.",
-                              model = "openrouter/auto/gpt-4",
-                              temperature = 0.8,
-                              max_tokens = 1000,
-                              max_retries = 3,
-                              retry_delay = 1,
-                              validate = TRUE,
-                              referer = getOption("openrouter.referer", "https://github.com/MyWebIntelligence"),
-                              title = getOption("openrouter.title", "mwiR"),
-                              api_base = "https://openrouter.ai/api/v1/chat/completions",
-                              timeout = 60,
-                              extra_headers = NULL,
-                              return_metadata = FALSE) {
-  if (!is.character(prompt) || length(prompt) != 1L || !nzchar(prompt)) {
-    stop("'prompt' must be a non-empty character string.")
-  }
-  if (length(cell) != 1L) {
-    stop("'cell' must be length 1; recycle or summarise your value first.")
-  }
-  if (!is.character(cell)) cell <- as.character(cell)
-  if (!is.character(model) || length(model) != 1L || !nzchar(model)) {
-    stop("'model' must be a non-empty character string.")
-  }
-  if (!is.numeric(temperature) || temperature < 0 || temperature > 2) {
-    stop("'temperature' must be numeric in [0, 2].")
-  }
   if (!is.numeric(max_tokens) || max_tokens <= 0) {
-    stop("'max_tokens' must be a positive number.")
-  }
-  if (!is.numeric(max_retries) || max_retries < 1) {
-    stop("'max_retries' must be >= 1.")
-  }
-  if (!is.numeric(retry_delay) || retry_delay < 0) {
-    stop("'retry_delay' must be >= 0.")
+    stop("'max_tokens' must be a positive number")
   }
   if (!is.numeric(timeout) || timeout <= 0) {
-    stop("'timeout' must be > 0.")
-  }
-  if (!is.null(extra_headers) && (!is.character(extra_headers) || is.null(names(extra_headers)))) {
-    stop("'extra_headers' must be a named character vector.")
-  }
-  if (!requireNamespace("httr", quietly = TRUE)) {
-    stop("Package 'httr' is required for OpenRouter_Recode().")
-  }
-  if (!requireNamespace("jsonlite", quietly = TRUE)) {
-    stop("Package 'jsonlite' is required for OpenRouter_Recode().")
+    stop("'timeout' must be positive")
   }
 
-  api_key <- Sys.getenv("OPENROUTER_API_KEY", unset = "")
-  if (!nzchar(api_key)) {
-    stop("OPENROUTER_API_KEY not found. Set it with Sys.setenv(OPENROUTER_API_KEY = '...').")
+  if (is.null(provider)) {
+    provider <- .auto_detect_provider()
+    if (is.null(provider)) {
+      provider <- getOption("mwiR.llm.preferred_provider", "openai")
+    }
+  } else {
+    provider <- match.arg(provider, names(.llm_providers))
   }
 
-  messages <- list(
-    list(role = "system", content = sysprompt),
-    list(role = "user", content = paste(prompt, cell, sep = ":\n\n"))
-  )
-  payload <- list(
+  prov_config <- .llm_providers[[provider]]
+
+  if (is.null(model)) {
+    model <- getOption("mwiR.llm.default_model") %||% prov_config$default_model
+  }
+
+  resolved_key <- .resolve_api_key(provider, api_key)
+
+  if (is.null(api_base)) {
+    api_base <- prov_config$default_base
+  }
+
+  prepared_data <- .prepare_data(data, prompt)
+
+  config <- list(
     model = model,
-    messages = messages,
+    api_key = resolved_key,
+    api_base = api_base,
     temperature = temperature,
     max_tokens = max_tokens,
-    stream = FALSE
+    timeout = timeout,
+    max_retries = max_retries,
+    retry_delay = retry_delay,
+    backoff_multiplier = backoff_multiplier,
+    rate_limit_delay = rate_limit_delay,
+    validate = validate,
+    extra_headers = extra_headers
   )
 
-  base_headers <- c(
-    "Authorization" = paste("Bearer", api_key),
-    "Content-Type" = "application/json",
-    "Accept" = "application/json",
-    "HTTP-Referer" = referer %||% "https://github.com/MyWebIntelligence",
-    "X-Title" = title %||% "mwiR"
+  results <- .process_batch(
+    data = prepared_data,
+    prompt_template = prompt,
+    sysprompt = sysprompt,
+    provider = provider,
+    config = config,
+    parallel = parallel,
+    workers = workers,
+    progress = progress,
+    on_error = on_error
   )
-  headers <- httr::add_headers(.headers = c(base_headers, extra_headers))
 
-  attempt_request <- function(delay) {
-    if (delay > 0) Sys.sleep(delay)
-    httr::POST(
-      url = api_base,
-      headers,
-      body = jsonlite::toJSON(payload, auto_unbox = TRUE, digits = NA),
-      encode = "raw",
-      httr::timeout(timeout)
-    )
-  }
+  .print_summary(results, getOption("mwiR.llm.verbose", TRUE))
 
-  resp <- NULL
-  attempts_log <- vector("list", max_retries)
-
-  for (attempt in seq_len(max_retries)) {
-    resp <- try(attempt_request(if (attempt == 1) 0 else retry_delay), silent = TRUE)
-    attempts_log[[attempt]] <- list(
-      attempt = attempt,
-      timestamp = Sys.time(),
-      result = if (inherits(resp, "try-error")) "error" else "success",
-      message = if (inherits(resp, "try-error")) conditionMessage(attr(resp, "condition")) else NULL
-    )
-
-    if (inherits(resp, "try-error")) {
-      if (attempt == max_retries) {
-        warning("OpenRouter request failed after ", max_retries, " attempts: ",
-                conditionMessage(attr(resp, "condition")))
-        break
-      }
-      next
-    }
-
-    status_code <- httr::status_code(resp)
-    body_txt <- httr::content(resp, as = "text", encoding = "UTF-8")
-    parsed <- try(jsonlite::fromJSON(body_txt, simplifyVector = FALSE), silent = TRUE)
-
-    if (status_code == 429 && attempt < max_retries) {
-      retry_delay <- max(retry_delay * 2, 2)  # back-off on rate limit
-      next
-    }
-
-    if (status_code < 200 || status_code >= 300 || inherits(parsed, "try-error")) {
-      err_msg <- if (!inherits(parsed, "try-error") && !is.null(parsed$error$message)) {
-        parsed$error$message
-      } else if (inherits(parsed, "try-error")) {
-        conditionMessage(attr(parsed, "condition"))
-      } else {
-        body_txt
-      }
-      if (attempt == max_retries || status_code %in% c(400, 401, 403)) {
-        warning("OpenRouter recoding failed (HTTP ", status_code, "): ", substr(err_msg, 1, 200))
-        resp <- NULL
-        break
-      }
-      next
-    }
-
-    choices <- parsed$choices
-    if (is.null(choices) || length(choices) == 0) {
-      warning("OpenRouter returned an empty 'choices' array.")
-      resp <- NULL
-      break
-    }
-
-    transformed <- choices[[1]]$message$content %||% ""
-    refusal_pattern <- "sorry|error|cannot|not able|do not understand|unable"
-    valid <- !validate || (
-      nzchar(transformed) &&
-        nchar(transformed) <= max(10L, nchar(cell) * 10L) &&
-        !grepl(refusal_pattern, transformed, ignore.case = TRUE)
-    )
-
-    result <- list(
-      value = if (valid) transformed else NA_character_,
-      status = if (valid) "ok" else "invalid",
-      http = list(
-        status = status_code,
-        headers = httr::headers(resp),
-        attempts = attempts_log,
-        raw_response = parsed
-      )
-    )
-
-    if (!valid) warning("OpenRouter returned a potentially invalid response.")
-    return(if (return_metadata) result else result$value)
-  }
-
-  fallback <- list(
-    value = NA_character_,
-    status = "failed",
-    http = list(status = NA_integer_, headers = NULL, attempts = attempts_log, raw_response = NULL)
-  )
-  if (return_metadata) fallback else fallback$value
+  .format_results(results, return_metadata)
 }
-
-`%||%` <- function(a, b) if (!is.null(a) && length(a) > 0L && !is.na(a)) a else b

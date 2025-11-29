@@ -1,6 +1,6 @@
 Package: mwiR
 Title: The R Package of My Web Intelligence Project
-Version: 0.2.1
+Version: 0.3.0
 Authors@R: 
     person(given = "Amar",
            family = "Lakel",
@@ -12,10 +12,13 @@ Depends: R (>= 3.5.0)
 License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: false
-Imports: 
+Imports:
     cld3,
     DBI,
+    future,
+    furrr,
     ggplot2,
+    glue,
     gridExtra,
     httr,
     jsonlite,
@@ -23,6 +26,7 @@ Imports:
     mclust,
     openai,
     pdftools,
+    progressr,
     readr,
     reticulate,
     RSQLite,

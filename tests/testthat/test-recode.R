@@ -203,9 +203,106 @@ test_that("annotatedData errors on missing table or fields", {
   unlink(db)
 })
 
-test_that("GPT_Recode errors on missing API key or invalid input", {
-  expect_error(GPT_Recode("Translate to French", "Hello world", model = "gpt-4o", temperature = 0.8, max_tokens = 1000, max_retries = 1, retry_delay = 0.1, validate = FALSE))
-  expect_error(GPT_Recode("", "Hello world"))
-  expect_error(GPT_Recode("Translate", 123))
-  expect_error(GPT_Recode("Translate", "Hello", temperature = -1))
+# =============================================================================
+# Tests for LLM_Recode and LLM_Config
+# =============================================================================
+
+test_that("LLM_Recode validates prompt parameter", {
+  # Empty prompt
+  expect_error(LLM_Recode(c("a", "b"), prompt = ""), "prompt.*non.*empty")
+  # NULL prompt
+  expect_error(LLM_Recode(c("a", "b"), prompt = NULL), "prompt.*non.*empty")
+})
+
+test_that("LLM_Recode validates data parameter", {
+  # NULL data
+  expect_error(LLM_Recode(NULL, prompt = "test"), "data.*required")
+  # Empty vector
+  expect_error(LLM_Recode(character(0), prompt = "test"), "data.*empty")
+})
+
+test_that("LLM_Recode validates temperature parameter", {
+  expect_error(
+    LLM_Recode(c("test"), prompt = "Translate {value}", temperature = -1),
+    "temperature"
+  )
+  expect_error(
+    LLM_Recode(c("test"), prompt = "Translate {value}", temperature = 3),
+    "temperature"
+  )
+})
+
+test_that("LLM_Recode requires API key when no interactive mode", {
+  # Clear any existing API keys
+  old_openai <- Sys.getenv("OPENAI_API_KEY")
+  old_openrouter <- Sys.getenv("OPENROUTER_API_KEY")
+  old_anthropic <- Sys.getenv("ANTHROPIC_API_KEY")
+  on.exit({
+    Sys.setenv(OPENAI_API_KEY = old_openai)
+    Sys.setenv(OPENROUTER_API_KEY = old_openrouter)
+    Sys.setenv(ANTHROPIC_API_KEY = old_anthropic)
+  })
+  Sys.setenv(OPENAI_API_KEY = "")
+  Sys.setenv(OPENROUTER_API_KEY = "")
+  Sys.setenv(ANTHROPIC_API_KEY = "")
+
+  # Without API key, should error
+  expect_error(
+    LLM_Recode(c("test"), prompt = "Translate {value}", provider = "openai"),
+    "API"
+  )
+})
+
+test_that("LLM_Config sets and retrieves options correctly", {
+  old_provider <- getOption("mwiR.llm.preferred_provider")
+  old_model <- getOption("mwiR.llm.default_model")
+  on.exit({
+    options(mwiR.llm.preferred_provider = old_provider)
+    options(mwiR.llm.default_model = old_model)
+  })
+
+  LLM_Config(provider = "openai", model = "gpt-4o")
+  expect_equal(getOption("mwiR.llm.preferred_provider"), "openai")
+  expect_equal(getOption("mwiR.llm.default_model"), "gpt-4o")
+
+  LLM_Config(provider = "openrouter")
+  expect_equal(getOption("mwiR.llm.preferred_provider"), "openrouter")
+})
+
+test_that(".prepare_data converts vectors to data.frame with value column", {
+  # Use internal function directly
+  prepared <- mwiR:::.prepare_data(c("a", "b", "c"), "test {value}")
+  expect_true(is.data.frame(prepared))
+  expect_true("value" %in% names(prepared))
+  expect_equal(nrow(prepared), 3)
+})
+
+test_that(".prepare_data validates required variables in prompt", {
+  df <- data.frame(col1 = c("a", "b"))
+  expect_error(
+    mwiR:::.prepare_data(df, "process {missing_col}"),
+    "Variables manquantes"
+  )
+})
+
+test_that(".render_prompt substitutes variables correctly", {
+  row <- list(value = "hello", lang = "fr")
+  result <- mwiR:::.render_prompt("Translate {value} to {lang}", row)
+  expect_equal(as.character(result), "Translate hello to fr")
+})
+
+test_that(".auto_detect_provider finds available API keys", {
+  old_openai <- Sys.getenv("OPENAI_API_KEY")
+  old_openrouter <- Sys.getenv("OPENROUTER_API_KEY")
+  on.exit({
+    Sys.setenv(OPENAI_API_KEY = old_openai)
+    Sys.setenv(OPENROUTER_API_KEY = old_openrouter)
+  })
+
+  # Set only OpenRouter key
+  Sys.setenv(OPENAI_API_KEY = "")
+  Sys.setenv(OPENROUTER_API_KEY = "test-key")
+
+  provider <- mwiR:::.auto_detect_provider()
+  expect_equal(provider, "openrouter")
 })
