@@ -44,15 +44,28 @@ initmwi <- function() {
     }, logical(1L))
   )
 
-  # Check if the 'trafilatura' module is available -----------------------------------------------
-  if (reticulate::py_module_available("trafilatura")) {
-    message("Trafilatura is installed and available.")
-    assign(".trafilatura_mod",
-           reticulate::import("trafilatura", delay_load = FALSE),
-           envir = .GlobalEnv)
-  } else {
-    warning("Trafilatura is not installed. Run 'pip install trafilatura' in your Python environment.")
-  }
+  # Setup Python environment and trafilatura ---------------------------------------------------
+  # Uses dedicated virtualenv for isolation and reliability
+  tryCatch({
+    status <- check_python_status()
+    if (!status$trafilatura_installed) {
+      message("Setting up Python environment for mwiR...")
+      setup_python(quiet = FALSE)
+    } else {
+      message("Trafilatura is ready (v", status$trafilatura_version, ")")
+      # Ensure virtualenv is active for this session
+      venv_path <- mwi_python_env()
+      if (dir.exists(venv_path)) {
+        reticulate::use_virtualenv(venv_path, required = FALSE)
+      }
+    }
+  }, error = function(e) {
+    warning(
+      "Python setup failed: ", e$message, "\n",
+      "You can try manually: setup_python(force = TRUE)\n",
+      "Or install trafilatura: pip3 install trafilatura"
+    )
+  })
 
   # Retrieve or prompt for SERP API key -----------------------------------------------------------
   serp_key <- Sys.getenv("SERPAPI_KEY", unset = NA_character_)

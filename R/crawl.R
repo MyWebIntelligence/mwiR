@@ -120,8 +120,8 @@ crawl <- function(url) {
     }
   }
 
-  # Importation de Trafilatura (réimporté à chaque appel pour éviter les objets invalides entre sessions)
-  trafilatura <- reticulate::import("trafilatura", delay_load = FALSE)
+  # Get trafilatura module (cached, auto-setup if needed)
+  trafilatura <- ensure_trafilatura()
 
   # Double extraction: JSON for metadata + Markdown for text with proper links
   # Use httr::GET with timeout instead of trafilatura$fetch_url (which has no timeout)
