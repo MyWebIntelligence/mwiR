@@ -474,7 +474,7 @@ crawlurls <- function(land_name, urlmax=50, limit = NULL, http_status = NULL, db
       if (relevance_score > 0) {
         if (!is.null(url_data$hostname)) {
           existing_domain <- dbGetQuery(con, "SELECT id, name FROM Domain WHERE name = ?", params = list(url_data$hostname))
-          detected_lang <- detect_language(as.character(url_data$text[1]))
+          detected_lang <- cld3::detect_language(as.character(url_data$text[1]))
 
           if (nrow(existing_domain) == 0) {
             dbExecute(con, "INSERT INTO Domain (name) VALUES (?)", params = list(url_data$hostname))
@@ -666,10 +666,13 @@ crawlForce <- function(land_name, db_name = "mwi.db") {
   # Set the fetched_at column to NULL where approved_at is NULL
   update_query <- "UPDATE Expression SET fetched_at = NULL WHERE approved_at IS NULL AND fetched_at IS NOT NULL AND land_id = (SELECT id FROM Land WHERE name = ?)"
 
-  dbExecute(con, update_query, params = list(land_name))
+  rows_affected <- dbExecute(con, update_query, params = list(land_name))
 
   # Close the database connection
   dbDisconnect(con)
+
+  message("Reset ", rows_affected, " URLs for re-crawling in land '", land_name, "'")
+  return(invisible(rows_affected))
 }
 
 #' Check URL availability in Archive.org
