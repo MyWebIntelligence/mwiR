@@ -7,11 +7,10 @@
 #' @param url A character string representing the URL to be crawled.
 #' @return A data frame containing the extracted content from the URL.
 #' @import reticulate
-.trafilatura_mod <- reticulate::import("trafilatura", delay_load = FALSE)
 #' @export
 crawl <- function(url) {
-  # Importation de Trafilatura
-  trafilatura <- .trafilatura_mod
+  # Importation de Trafilatura (réimporté à chaque appel pour éviter les objets invalides entre sessions)
+  trafilatura <- reticulate::import("trafilatura", delay_load = FALSE)
 
   # Fonction pour extraire le contenu
   readFull <- tryCatch({
@@ -427,13 +426,29 @@ crawlurls <- function(land_name, urlmax=50, limit = NULL, http_status = NULL, db
 
   urls_to_crawl <- dbGetQuery(con, sql_query, params = params)
 
+  # Vérifier qu'il y a des URLs à crawler
+
+  if (nrow(urls_to_crawl) == 0) {
+    message("No URLs to crawl for land ", land_name)
+    dbCommit(con)
+    dbDisconnect(con)
+    return(0)
+  }
+
   timestamp_now <- format(Sys.time(), format = "%Y-%m-%dT%H:%M:%OS3Z")
   for (i in 1:nrow(urls_to_crawl)) {
+    # Vérifier que l'URL n'est pas NA ou vide
+    current_url <- urls_to_crawl$url[i]
+    if (is.na(current_url) || current_url == "") {
+      message("Skipping invalid URL (NA or empty) at row ", i)
+      next
+    }
+
     tryCatch({
-      message("start : ", urls_to_crawl$url[i])
+      message("start : ", current_url)
       dbExecute(con, "UPDATE Expression SET fetched_at = ? WHERE id = ?", params = list(timestamp_now, urls_to_crawl$id[i]))
 
-      url_data <- crawl(urls_to_crawl$url[i])
+      url_data <- crawl(current_url)
 
       relevance_score <- expression_relevance(dictionary$lemma, url_data, language)
 
@@ -455,13 +470,13 @@ crawlurls <- function(land_name, urlmax=50, limit = NULL, http_status = NULL, db
           detect_links_and_add(con, url_data$text[1], urls_to_crawl$id[i], land_id, urlmax)
 
           # Placeholder for the detect_links_and_add function
-          message("Crawled URL: ", urls_to_crawl$url[i])
+          message("Crawled URL: ", current_url)
         } else {
-          message("Both primary and fallback crawls failed for URL: ", urls_to_crawl$url[i])
+          message("Both primary and fallback crawls failed for URL: ", current_url)
         }
       }
     }, error = function(e) {
-      message("Error processing URL: ", urls_to_crawl$url[i], " Error: ", e)
+      message("Error processing URL: ", current_url, " Error: ", e$message)
     })
   }
 
