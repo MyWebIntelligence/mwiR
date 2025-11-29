@@ -218,14 +218,39 @@ crawl <- function(url) {
         ))
       }
     } else {
-      # Extraction HTML classique
+      # Extraction HTML classique avec xml2 (équivalent BeautifulSoup)
       tryCatch({
-        message("Tentative avec GET HTML")
+        message("Tentative avec GET HTML (xml2)")
         parsed_content <- xml2::read_html(httr::content(response, as = "text"))
         title <- xml2::xml_text(xml2::xml_find_first(parsed_content, "//title"))
-        body_text <- xml2::xml_text(xml2::xml_find_first(parsed_content, "//body"))
+
+        # Extract body text
+        body_node <- xml2::xml_find_first(parsed_content, "//body")
+        body_text <- xml2::xml_text(body_node)
+
+        # Extract links and format as markdown [text](url)
+        link_nodes <- xml2::xml_find_all(parsed_content, "//a[@href]")
+        if (length(link_nodes) > 0) {
+          links_md <- sapply(link_nodes, function(node) {
+            href <- xml2::xml_attr(node, "href")
+            text <- trimws(xml2::xml_text(node))
+            # Only process http/https links
+            if (!is.na(href) && grepl("^https?://", href) && nchar(text) > 0) {
+              paste0("[", text, "](", href, ")")
+            } else {
+              NULL
+            }
+          })
+          links_md <- links_md[!sapply(links_md, is.null)]
+          # Append links section to body text
+          if (length(links_md) > 0) {
+            body_text <- paste0(body_text, "\n\n## Links\n", paste(links_md, collapse = "\n"))
+          }
+        }
+
         domain <- httr::parse_url(url)$hostname
         date_published <- httr::headers(response)$`last-modified` %||% "Date non disponible"
+        message("Extraction avec GET HTML (xml2)")
         return(data.frame(
           title = title,
           date = date_published,
