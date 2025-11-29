@@ -18,6 +18,7 @@ detect_links_and_add(con, content, parent_id, land_id, urlmax = 50)
 \item{urlmax}{An integer specifying the maximum number of URLs to be processed.}
 }
 \description{
-This function extracts links from content, cleans them, and adds them to the database.
-It handles both media and non-media links.
+This function extracts links from content, cleans them, validates them,
+and adds them to the database. It handles both media and non-media links.
+Uses multiple extraction strategies: markdown links, then raw URL regex.
 }

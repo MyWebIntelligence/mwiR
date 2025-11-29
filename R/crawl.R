@@ -1,3 +1,19 @@
+#' Extract a safe scalar value from a field
+#'
+#' This helper function extracts a single scalar value from a field that may be
+#' NULL, NA, or a vector of length > 1. Used for safe SQL parameter binding.
+#'
+#' @param x The value to extract from (can be NULL, NA, vector, or scalar).
+#' @param default The default value to return if x is NULL or empty (default: NA_character_).
+#' @return A single character value safe for SQL binding.
+#' @export
+safe_scalar <- function(x, default = NA_character_) {
+  if (is.null(x) || length(x) == 0) return(default)
+  val <- x[1]
+  if (is.na(val)) return(default)
+  as.character(val)
+}
+
 #' Crawl a URL and extract content
 #'
 #' This function attempts to crawl a given URL using various methods, including
@@ -9,20 +25,55 @@
 #' @import reticulate
 #' @export
 crawl <- function(url) {
-  # Obtenir le code HTTP status d'abord
+  # Phase 4: Resolve redirects (DOI, short URLs, etc.)
+  original_url <- url
+  tryCatch({
+    head_check <- httr::HEAD(url, httr::timeout(10), httr::config(followlocation = TRUE))
+    final_url <- head_check$url
+    if (!is.null(final_url) && final_url != url) {
+      message("URL redirected: ", url, " -> ", final_url)
+      url <- final_url
+    }
+  }, error = function(e) {
+    # Keep original URL if redirect check fails
+  })
+
+  # Obtenir le code HTTP status et content-type
   http_status <- NA
+  content_type <- NA
   tryCatch({
     head_response <- httr::HEAD(url, httr::timeout(10))
     http_status <- httr::status_code(head_response)
+    content_type <- httr::headers(head_response)$`content-type`
   }, error = function(e) {
     # Si HEAD échoue, essayer GET
     tryCatch({
       get_response <- httr::GET(url, httr::timeout(10))
       http_status <<- httr::status_code(get_response)
+      content_type <<- httr::http_type(get_response)
     }, error = function(e2) {
       http_status <<- NA
     })
   })
+
+  # Phase 3: Early PDF detection - go directly to PDF extraction
+  if (!is.na(content_type) && grepl("application/pdf", content_type, ignore.case = TRUE)) {
+    message("PDF detected early, direct extraction")
+    pdf_content <- PDFtoText(url)
+    if (!is.null(pdf_content) && !grepl("^Download error", pdf_content)) {
+      title <- trimws(unlist(strsplit(pdf_content, "\n"))[1])
+      excerpt <- substr(pdf_content, nchar(title) + 2, nchar(title) + 651)
+      return(data.frame(
+        title = title,
+        date = "Date inconnue",
+        text = trimws(pdf_content),
+        excerpt = trimws(excerpt),
+        hostname = httr::parse_url(url)$hostname,
+        http_status = http_status,
+        stringsAsFactors = FALSE
+      ))
+    }
+  }
 
   # Importation de Trafilatura (réimporté à chaque appel pour éviter les objets invalides entre sessions)
   trafilatura <- reticulate::import("trafilatura", delay_load = FALSE)
@@ -70,8 +121,17 @@ crawl <- function(url) {
             with_metadata = TRUE
           )
           if (!is.null(extracted_content) && extracted_content != "") {
-            message("Extraction avec Archive.org")
-            readFull <- jsonlite::fromJSON(extracted_content, simplifyVector = TRUE)
+            readFull_archive <- jsonlite::fromJSON(extracted_content, simplifyVector = TRUE)
+
+            # Filter out "Wayback Machine" error pages from Archive.org
+            if (!is.null(readFull_archive$title) &&
+                grepl("^Wayback Machine", readFull_archive$title, ignore.case = TRUE)) {
+              message("Archive.org returned error page (Wayback Machine), skipping")
+              readFull_archive <- NULL
+            } else {
+              message("Extraction avec Archive.org")
+              readFull <- readFull_archive
+            }
           } else {
             stop("Extraction échouée ou contenu vide pour le memento.")
           }
@@ -166,6 +226,9 @@ crawl <- function(url) {
 PDFtoText <- function(url) {
   # Download the PDF
   temp_file <- tempfile(fileext = ".pdf")
+  # Ensure temp file is cleaned up when function exits (Phase 6: prevent disk leakage)
+  on.exit(unlink(temp_file), add = TRUE)
+
   download <- httr::GET(url, httr::write_disk(temp_file))
 
   if (httr::http_status(download)$category != "Success") {
@@ -186,6 +249,46 @@ PDFtoText <- function(url) {
 }
 
 
+#' Validate and normalize URL
+#'
+#' This function validates a URL to ensure it's complete and well-formed.
+#' Rejects truncated URLs like "https://www." or "https://example."
+#'
+#' @param url A character string representing the URL to validate.
+#' @return The validated URL or NULL if invalid.
+#' @importFrom stringr str_detect
+#' @export
+validate_url <- function(url) {
+  if (is.na(url) || is.null(url) || url == "") return(NULL)
+
+  # Reject URLs too short (minimum: https://a.bc = 12 chars)
+  if (nchar(url) < 12) return(NULL)
+
+  # Must start with http:// or https://
+ if (!grepl("^https?://", url)) return(NULL)
+
+  # Reject truncated URLs ending with just a dot or incomplete domain
+  if (grepl("^https?://[^/]*\\.$", url)) return(NULL)
+  if (grepl("^https?://www\\.?$", url)) return(NULL)
+  if (grepl("^https?://[^./]+$", url)) return(NULL)
+
+  # Must have a valid TLD (at least 2 characters after last dot before path)
+  # Extract the domain part
+  domain_match <- regmatches(url, regexpr("^https?://([^/]+)", url))
+  if (length(domain_match) == 0) return(NULL)
+
+  domain <- sub("^https?://", "", domain_match)
+  # Remove port if present
+  domain <- sub(":[0-9]+$", "", domain)
+
+  # Check for valid TLD (must have at least one dot with 2+ chars after it)
+  if (!grepl("\\.[a-zA-Z]{2,}$", domain) && !grepl("\\.[a-zA-Z]{2,}[:/]", url)) {
+    return(NULL)
+  }
+
+  return(url)
+}
+
 #' Clean the extracted URL
 #'
 #' This function removes fragment identifiers and keeps only valid URL characters.
@@ -199,7 +302,7 @@ clean_url <- function(url) {
   url <- str_replace(url, "#.*$", "")
 
   # Keep only valid URL characters
-  url <- str_extract(url, "https?://[A-Za-z0-9-._~:/?#\\[\\]@!$&'()*+,;=]+")
+  url <- str_extract(url, "https?://[A-Za-z0-9-._~:/?#\\[\\]@!$&'()*+,;=%]+")
 
   return(url)
 }
@@ -228,8 +331,9 @@ is_media_link <- function(link) {
 
 #' Detect links in content and add to database
 #'
-#' This function extracts links from content, cleans them, and adds them to the database.
-#' It handles both media and non-media links.
+#' This function extracts links from content, cleans them, validates them,
+#' and adds them to the database. It handles both media and non-media links.
+#' Uses multiple extraction strategies: markdown links, then raw URL regex.
 #'
 #' @param con A database connection object.
 #' @param content A character string containing the content to be parsed for links.
@@ -237,16 +341,34 @@ is_media_link <- function(link) {
 #' @param land_id An integer representing the ID of the land associated with the links.
 #' @param urlmax An integer specifying the maximum number of URLs to be processed.
 #' @import DBI
-#' @importFrom stringr str_extract_all str_extract
+#' @importFrom stringr str_extract_all str_extract str_match_all
 #' @export
 detect_links_and_add <- function(con, content, parent_id, land_id, urlmax=50) {
-  # Refined regex pattern for URL extraction
-  links <- str_extract_all(content, "(?<=\\s)https?://[^\\s]+(?=\\s)|(?<=\\()https?://[^\\)]+(?=\\)\\s)")
+  if (is.null(content) || is.na(content) || content == "") {
+    return(invisible(NULL))
+  }
+
+  # Strategy 1: Extract markdown-style links [text](url)
+  markdown_matches <- str_match_all(content, "\\[([^\\]]+)\\]\\(([^\\)]+)\\)")[[1]]
+  markdown_urls <- character(0)
+  if (nrow(markdown_matches) > 0) {
+    markdown_urls <- markdown_matches[, 3]  # Column 3 contains the URLs
+    markdown_urls <- markdown_urls[grepl("^https?://", markdown_urls)]
+  }
+
+  # Strategy 2: Improved regex for raw URLs
+  # This regex captures URLs more completely, including query strings and paths
+  raw_url_pattern <- "https?://[A-Za-z0-9][-A-Za-z0-9+&@#/%?=~_|!:,.;]*[-A-Za-z0-9+&@#/%=~_|]"
+  raw_urls <- str_extract_all(content, raw_url_pattern)[[1]]
+
+  # Combine both strategies, prioritizing markdown URLs
+  all_links <- unique(c(markdown_urls, raw_urls))
 
   # Counter for non-media links
   non_media_count <- 0
+  added_count <- 0
 
-  for (link in links[[1]]) {
+  for (link in all_links) {
     # If the counter reaches urlmax, exit the loop
     if (non_media_count >= urlmax) {
       break
@@ -255,37 +377,62 @@ detect_links_and_add <- function(con, content, parent_id, land_id, urlmax=50) {
     # Clean the extracted link
     clean_link <- clean_url(link)
 
-    if (!is.na(clean_link) && is_media_link(clean_link)) {
+    # Skip if cleaning failed
+    if (is.na(clean_link) || is.null(clean_link)) {
+      next
+    }
+
+    # Validate the URL to reject truncated URLs
+    validated_link <- validate_url(clean_link)
+    if (is.null(validated_link)) {
+      message("Rejected invalid/truncated URL: ", clean_link)
+      next
+    }
+
+    if (is_media_link(validated_link)) {
       # Retrieve the media extension
-      media_type <- str_extract(clean_link, "\\.([a-zA-Z]+)(?=[?#]|$)")
+      media_type <- str_extract(validated_link, "\\.([a-zA-Z]+)(?=[?#]|$)")
 
       # Add to the Media table
-      dbExecute(con, "INSERT INTO Media (url, expression_id, type) VALUES (?, ?, ?)", params = list(clean_link, parent_id, media_type))
-    } else if (!is.na(clean_link)) {
+      tryCatch({
+        dbExecute(con, "INSERT INTO Media (url, expression_id, type) VALUES (?, ?, ?)",
+                  params = list(validated_link, parent_id, media_type))
+      }, error = function(e) {
+        # Ignore duplicate errors
+      })
+    } else {
       # Increment the counter for non-media links
       non_media_count <- non_media_count + 1
 
-      res <- dbGetQuery(con, "SELECT * FROM Expression WHERE url = ?", params = list(clean_link))
+      res <- dbGetQuery(con, "SELECT * FROM Expression WHERE url = ?", params = list(validated_link))
 
       if (nrow(res) == 0) {
         parent_depth <- as.integer(dbGetQuery(con, "SELECT depth FROM Expression WHERE id = ?", params = list(parent_id)))
 
         # Insert the new URL into the "Expression" table
-        dbExecute(con, "INSERT INTO Expression (url, land_id, created_at, depth) VALUES (?, ?, ?, ?)", params = list(clean_link, land_id, format(Sys.time(), format = "%Y-%m-%dT%H:%M:%OS3Z"), parent_depth + 1))
+        dbExecute(con, "INSERT INTO Expression (url, land_id, created_at, depth) VALUES (?, ?, ?, ?)",
+                  params = list(validated_link, land_id, format(Sys.time(), format = "%Y-%m-%dT%H:%M:%OS3Z"), parent_depth + 1))
 
         new_url_id <- dbGetQuery(con, "SELECT last_insert_rowid()")[1, 1]
+        added_count <- added_count + 1
       } else {
         new_url_id <- res$id[1]
       }
 
       # Check if the link already exists in ExpressionLink
-      link_exists <- dbGetQuery(con, "SELECT * FROM ExpressionLink WHERE source_id = ? AND target_id = ?", params = list(parent_id, new_url_id))
+      link_exists <- dbGetQuery(con, "SELECT * FROM ExpressionLink WHERE source_id = ? AND target_id = ?",
+                                params = list(parent_id, new_url_id))
 
       if (nrow(link_exists) == 0) {
         # Insert the link into the "ExpressionLink" table
-        dbExecute(con, "INSERT INTO ExpressionLink (source_id, target_id) VALUES (?, ?)", params = list(parent_id, new_url_id))
+        dbExecute(con, "INSERT INTO ExpressionLink (source_id, target_id) VALUES (?, ?)",
+                  params = list(parent_id, new_url_id))
       }
     }
+  }
+
+  if (added_count > 0) {
+    message("Added ", added_count, " new URLs from content")
   }
 }
 
@@ -463,6 +610,14 @@ crawlurls <- function(land_name, urlmax=50, limit = NULL, http_status = NULL, db
       next
     }
 
+    # Validate URL structure before crawling
+    validated_url <- validate_url(current_url)
+    if (is.null(validated_url)) {
+      message("Skipping invalid/malformed URL: ", current_url)
+      next
+    }
+    current_url <- validated_url
+
     tryCatch({
       message("start : ", current_url)
       dbExecute(con, "UPDATE Expression SET fetched_at = ? WHERE id = ?", params = list(timestamp_now, urls_to_crawl$id[i]))
@@ -484,9 +639,22 @@ crawlurls <- function(land_name, urlmax=50, limit = NULL, http_status = NULL, db
           }
 
           # Récupérer http_status du résultat du crawl
-          crawl_http_status <- if (!is.null(url_data$http_status)) url_data$http_status else NA
+          crawl_http_status <- if (!is.null(url_data$http_status)) url_data$http_status[1] else NA
 
-          dbExecute(con, "UPDATE Expression SET title = ?, readable = ?, domain_id = ?, description = ?, published_at = ?, approved_at = ?, lang = ?, relevance = ?, http_status = ? WHERE id = ?", params = list(url_data$title, url_data$text[1], domain_id, url_data$excerpt, url_data$date, timestamp_now, detected_lang, relevance_score, crawl_http_status, urls_to_crawl$id[i]))
+          # Use safe_scalar to ensure all params are single values (fixes "Parameter X does not have length 1" error)
+          dbExecute(con, "UPDATE Expression SET title = ?, readable = ?, domain_id = ?, description = ?, published_at = ?, approved_at = ?, lang = ?, relevance = ?, http_status = ? WHERE id = ?",
+                    params = list(
+                      safe_scalar(url_data$title),
+                      safe_scalar(url_data$text),
+                      domain_id,
+                      safe_scalar(url_data$excerpt),
+                      safe_scalar(url_data$date),
+                      timestamp_now,
+                      safe_scalar(detected_lang),
+                      relevance_score,
+                      crawl_http_status,
+                      urls_to_crawl$id[i]
+                    ))
 
           # add links to data base
           detect_links_and_add(con, url_data$text[1], urls_to_crawl$id[i], land_id, urlmax)
