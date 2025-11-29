@@ -14,6 +14,51 @@ safe_scalar <- function(x, default = NA_character_) {
   as.character(val)
 }
 
+#' Extract original URL from Archive.org URL
+#'
+#' This function extracts the original URL from an Archive.org (Wayback Machine) URL.
+#' For example: "https://web.archive.org/web/20230101/https://example.com/page"
+#' returns "https://example.com/page"
+#'
+#' @param url A character string representing the URL (may or may not be an Archive.org URL).
+#' @return The original URL if input is an Archive.org URL, otherwise returns the input URL unchanged.
+#' @export
+extract_original_from_archive <- function(url) {
+  if (is.null(url) || is.na(url) || url == "") return(url)
+
+  # Pattern matches: https?://web.archive.org/web/TIMESTAMP[flags]/ORIGINAL_URL
+  # Timestamp is digits, optionally followed by letters like 'if_' or 'id_'
+  archive_pattern <- "^https?://web\\.archive\\.org/web/[0-9]+[a-z_]*/(.+)$"
+
+  if (grepl(archive_pattern, url, perl = TRUE)) {
+    original_url <- sub(archive_pattern, "\\1", url, perl = TRUE)
+    message("Extracted original URL from Archive.org: ", original_url)
+    return(original_url)
+  }
+
+  return(url)
+}
+
+#' Extract hostname, handling Archive.org URLs
+#'
+#' This function extracts the hostname from a URL. If the URL is from Archive.org,
+#' it first extracts the original URL and then gets its hostname.
+#'
+#' @param url A character string representing the URL.
+#' @return The hostname of the original URL (not archive.org for archived URLs).
+#' @export
+extract_real_hostname <- function(url) {
+  if (is.null(url) || is.na(url) || url == "") return(NA_character_)
+
+  # First extract original URL if this is an Archive.org URL
+  real_url <- extract_original_from_archive(url)
+
+  # Then extract hostname
+  hostname <- httr::parse_url(real_url)$hostname
+
+  return(hostname)
+}
+
 #' Crawl a URL and extract content
 #'
 #' This function attempts to crawl a given URL using various methods, including
@@ -68,7 +113,7 @@ crawl <- function(url) {
         date = "Date inconnue",
         text = trimws(pdf_content),
         excerpt = trimws(excerpt),
-        hostname = httr::parse_url(url)$hostname,
+        hostname = extract_real_hostname(url),
         http_status = http_status,
         stringsAsFactors = FALSE
       ))
@@ -179,6 +224,8 @@ crawl <- function(url) {
                 } else {
                   message("Extraction avec Archive.org (JSON only)")
                 }
+                # IMPORTANT: Replace hostname with original URL's hostname (not archive.org)
+                readFull_archive$hostname <- extract_real_hostname(url)
                 readFull <- readFull_archive
               }
             } else {
@@ -230,7 +277,7 @@ crawl <- function(url) {
           date = "Date inconnue",
           text = trimws(pdf_content),
           excerpt = trimws(excerpt),
-          hostname = httr::parse_url(url)$hostname,
+          hostname = extract_real_hostname(url),
           http_status = http_status,
           stringsAsFactors = FALSE
         ))
@@ -391,7 +438,8 @@ extract_html_metadata <- function(parsed_content, response, url) {
   ))
 
   # ===== HOSTNAME =====
-  hostname <- httr::parse_url(url)$hostname
+  # Use extract_real_hostname to handle Archive.org URLs correctly
+  hostname <- extract_real_hostname(url)
 
   # ===== TRY JSON-LD SCHEMA.ORG =====
   # Look for structured data in <script type="application/ld+json">
@@ -993,7 +1041,7 @@ crawlDetails <- function(url) {
   result <- paste(result, get_nodes_text('//strong | //b'))
 
   # Alt Text from Images
-  altTexts <- xpathSApply(doc, '//img/@alt')
+  altTexts <- XML::xpathSApply(doc, '//img/@alt')
   result <- paste(result, paste(altTexts[!is.na(altTexts)], collapse = " "))
 
   # Truncate if too long
@@ -1045,11 +1093,11 @@ crawlDomain <- function(nburl = 100, db_name = "mwi.db") {
       })
 
       if (!is.null(url_data) && !is.null(url_data$title) && length(url_data$title) == 1) {
-        # Update moment
+        # Update moment - use safe_scalar to ensure single values
         update_query <- "UPDATE Domain SET title = ?, description = ? WHERE id = ?"
         dbExecute(con, update_query, params = list(
-          url_data$title,
-          paste(url_data$excerpt, url_datadetail, sep = "\n\n"),
+          safe_scalar(url_data$title),
+          paste(safe_scalar(url_data$excerpt, ""), safe_scalar(url_datadetail, ""), sep = "\n\n"),
           urls_to_crawl$id[i]
         ))
 
