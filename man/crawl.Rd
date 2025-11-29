@@ -10,7 +10,7 @@ crawl(url)
 \item{url}{A character string representing the URL to be crawled.}
 }
 \value{
-A data frame containing the extracted content from the URL.
+A data frame containing the extracted content from the URL, including http_status.
 }
 \description{
 This function attempts to crawl a given URL using various methods, including

@@ -5,10 +5,25 @@
 #' It handles different content types, including PDFs.
 #'
 #' @param url A character string representing the URL to be crawled.
-#' @return A data frame containing the extracted content from the URL.
+#' @return A data frame containing the extracted content from the URL, including http_status.
 #' @import reticulate
 #' @export
 crawl <- function(url) {
+  # Obtenir le code HTTP status d'abord
+  http_status <- NA
+  tryCatch({
+    head_response <- httr::HEAD(url, httr::timeout(10))
+    http_status <- httr::status_code(head_response)
+  }, error = function(e) {
+    # Si HEAD échoue, essayer GET
+    tryCatch({
+      get_response <- httr::GET(url, httr::timeout(10))
+      http_status <<- httr::status_code(get_response)
+    }, error = function(e2) {
+      http_status <<- NA
+    })
+  })
+
   # Importation de Trafilatura (réimporté à chaque appel pour éviter les objets invalides entre sessions)
   trafilatura <- reticulate::import("trafilatura", delay_load = FALSE)
 
@@ -77,7 +92,9 @@ crawl <- function(url) {
       readFull$date <- "Date inconnue"
     }
     message("Extraction reussie de : ", readFull$title)
-    return(as.data.frame(t(unlist(readFull))))
+    result_df <- as.data.frame(t(unlist(readFull)))
+    result_df$http_status <- http_status
+    return(result_df)
   }
 
   # Si tout échoue, utilisation de httr::GET pour des solutions alternatives
@@ -102,6 +119,7 @@ crawl <- function(url) {
           text = trimws(pdf_content),
           excerpt = trimws(excerpt),
           hostname = httr::parse_url(url)$hostname,
+          http_status = http_status,
           stringsAsFactors = FALSE
         ))
       }
@@ -120,6 +138,7 @@ crawl <- function(url) {
           text = body_text,
           excerpt = NA,
           hostname = domain,
+          http_status = http_status,
           stringsAsFactors = FALSE
         ))
       }, error = function(e) {
@@ -464,7 +483,10 @@ crawlurls <- function(land_name, urlmax=50, limit = NULL, http_status = NULL, db
             domain_id <- existing_domain$id[1]
           }
 
-          dbExecute(con, "UPDATE Expression SET title = ?, readable = ?, domain_id = ?, description = ?, published_at = ?, approved_at = ?, lang = ?, relevance = ? WHERE id = ?", params = list(url_data$title, url_data$text[1], domain_id, url_data$excerpt, url_data$date, timestamp_now, detected_lang, relevance_score, urls_to_crawl$id[i]))
+          # Récupérer http_status du résultat du crawl
+          crawl_http_status <- if (!is.null(url_data$http_status)) url_data$http_status else NA
+
+          dbExecute(con, "UPDATE Expression SET title = ?, readable = ?, domain_id = ?, description = ?, published_at = ?, approved_at = ?, lang = ?, relevance = ?, http_status = ? WHERE id = ?", params = list(url_data$title, url_data$text[1], domain_id, url_data$excerpt, url_data$date, timestamp_now, detected_lang, relevance_score, crawl_http_status, urls_to_crawl$id[i]))
 
           # add links to data base
           detect_links_and_add(con, url_data$text[1], urls_to_crawl$id[i], land_id, urlmax)
