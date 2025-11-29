@@ -527,23 +527,36 @@ clean_url <- function(url) {
 #' Check if a link is a media link
 #'
 #' This function checks if a given link points to a media file based on its extension.
+#' Handles URLs with query strings (e.g., image.jpg?size=large) and is case-insensitive.
 #'
 #' @param link A character string representing the link to be checked.
 #' @return A logical value indicating whether the link is a media link.
 #' @importFrom stringr str_detect
 #' @export
 is_media_link <- function(link) {
-  if (is.na(link)) {
+  if (is.na(link) || is.null(link) || link == "") {
     return(FALSE)
   }
 
-  media_extensions <- c('.jpg$', '.jpeg$', '.png$', '.bmp$', '.webp$', '.txt$', '.csv$', '.xls$', '.xlsx$', '.doc$', '.docx$', '.mp3$', '.mp4$', '.avi$', '.mov$')
-  for (ext in media_extensions) {
-    if (str_detect(link, ext)) {
-      return(TRUE)
-    }
-  }
-  return(FALSE)
+  # Media extensions - case insensitive, handles query strings and fragments
+  # Images
+  image_ext <- c("jpg", "jpeg", "png", "gif", "bmp", "webp", "svg", "ico", "tiff", "tif")
+  # Documents
+  doc_ext <- c("pdf", "txt", "csv", "xls", "xlsx", "doc", "docx", "ppt", "pptx", "odt", "ods", "odp", "rtf")
+  # Audio
+  audio_ext <- c("mp3", "wav", "ogg", "flac", "aac", "wma", "m4a")
+  # Video
+  video_ext <- c("mp4", "avi", "mov", "mkv", "webm", "wmv", "flv", "m4v", "mpeg", "mpg")
+  # Archives
+  archive_ext <- c("zip", "rar", "tar", "gz", "7z", "bz2")
+
+  all_extensions <- c(image_ext, doc_ext, audio_ext, video_ext, archive_ext)
+
+  # Build regex pattern: matches .ext at end of path (before ? or # or end of string)
+  # Case insensitive
+  pattern <- paste0("\\.(?i)(", paste(all_extensions, collapse = "|"), ")(?=[?#]|$)")
+
+  return(grepl(pattern, link, perl = TRUE))
 }
 
 #' Detect links in content and add to database
@@ -607,8 +620,13 @@ detect_links_and_add <- function(con, content, parent_id, land_id, urlmax=50) {
     }
 
     if (is_media_link(validated_link)) {
-      # Retrieve the media extension
-      media_type <- str_extract(validated_link, "\\.([a-zA-Z]+)(?=[?#]|$)")
+      # Retrieve the media extension (without the dot, lowercase)
+      media_match <- regmatches(validated_link, regexpr("\\.([a-zA-Z0-9]+)(?=[?#]|$)", validated_link, perl = TRUE))
+      media_type <- if (length(media_match) > 0) {
+        tolower(sub("^\\.", "", media_match))  # Remove leading dot and lowercase
+      } else {
+        NA_character_
+      }
 
       # Add to the Media table
       tryCatch({

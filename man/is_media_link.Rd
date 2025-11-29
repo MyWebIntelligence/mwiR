@@ -14,4 +14,5 @@ A logical value indicating whether the link is a media link.
 }
 \description{
 This function checks if a given link points to a media file based on its extension.
+Handles URLs with query strings (e.g., image.jpg?size=large) and is case-insensitive.
 }
