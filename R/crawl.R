@@ -78,21 +78,39 @@ crawl <- function(url) {
   # Importation de Trafilatura (réimporté à chaque appel pour éviter les objets invalides entre sessions)
   trafilatura <- reticulate::import("trafilatura", delay_load = FALSE)
 
-  # Fonction pour extraire le contenu
+  # Double extraction: JSON for metadata + Markdown for text with proper links
   readFull <- tryCatch({
     downloaded <- trafilatura$fetch_url(url)
     if (!is.null(downloaded)) {
-      extracted_content <- trafilatura$extract(
+      # 1. Extract metadata from JSON
+      json_content <- trafilatura$extract(
         filecontent = downloaded,
         url = url,
-        include_links = TRUE,
+        include_links = FALSE,
         output_format = "json",
         with_metadata = TRUE
       )
-      if (!is.null(extracted_content) && extracted_content != "") {
-        # Convertir le JSON en structure R
-        message("Extraction avec Trafilutara")
-        jsonlite::fromJSON(extracted_content, simplifyVector = TRUE)
+
+      # 2. Extract text with links in markdown format
+      markdown_content <- trafilatura$extract(
+        filecontent = downloaded,
+        url = url,
+        include_links = TRUE,
+        output_format = "markdown"
+      )
+
+      if (!is.null(json_content) && json_content != "") {
+        # Parse metadata from JSON
+        readFull <- jsonlite::fromJSON(json_content, simplifyVector = TRUE)
+
+        # Replace text with markdown version (contains [text](url) links)
+        if (!is.null(markdown_content) && markdown_content != "") {
+          readFull$text <- markdown_content
+          message("Extraction avec Trafilatura (JSON metadata + Markdown links)")
+        } else {
+          message("Extraction avec Trafilatura (JSON only)")
+        }
+        readFull
       } else {
         stop("Extraction échouée ou contenu vide.")
       }
@@ -111,17 +129,27 @@ crawl <- function(url) {
     if (!is.null(urlarchive)) {
       tryCatch({
         message("Extraction fallback avec Archive.org")
-        downloaded <- trafilatura$fetch_url(urlarchive)
-        if (!is.null(downloaded)) {
-          extracted_content <- trafilatura$extract(
-            filecontent = downloaded,
+        downloaded_archive <- trafilatura$fetch_url(urlarchive)
+        if (!is.null(downloaded_archive)) {
+          # 1. Extract metadata from JSON
+          json_content_archive <- trafilatura$extract(
+            filecontent = downloaded_archive,
             url = urlarchive,
-            include_links = TRUE,
+            include_links = FALSE,
             output_format = "json",
             with_metadata = TRUE
           )
-          if (!is.null(extracted_content) && extracted_content != "") {
-            readFull_archive <- jsonlite::fromJSON(extracted_content, simplifyVector = TRUE)
+
+          # 2. Extract text with links in markdown format
+          markdown_content_archive <- trafilatura$extract(
+            filecontent = downloaded_archive,
+            url = urlarchive,
+            include_links = TRUE,
+            output_format = "markdown"
+          )
+
+          if (!is.null(json_content_archive) && json_content_archive != "") {
+            readFull_archive <- jsonlite::fromJSON(json_content_archive, simplifyVector = TRUE)
 
             # Filter out "Wayback Machine" error pages from Archive.org
             if (!is.null(readFull_archive$title) &&
@@ -129,7 +157,13 @@ crawl <- function(url) {
               message("Archive.org returned error page (Wayback Machine), skipping")
               readFull_archive <- NULL
             } else {
-              message("Extraction avec Archive.org")
+              # Replace text with markdown version (contains [text](url) links)
+              if (!is.null(markdown_content_archive) && markdown_content_archive != "") {
+                readFull_archive$text <- markdown_content_archive
+                message("Extraction avec Archive.org (JSON metadata + Markdown links)")
+              } else {
+                message("Extraction avec Archive.org (JSON only)")
+              }
               readFull <- readFull_archive
             }
           } else {
