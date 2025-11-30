@@ -181,6 +181,45 @@ test_that("analyse_powerlaw works for valid input and errors for small samples",
   expect_error(analyse_powerlaw(1:10, type = "discrete"))
 })
 
+test_that("analyse_powerlaw parallel bootstrap works", {
+  skip_on_cran()
+  set.seed(456)
+  # Generate data with power-law like distribution
+  x <- rpois(150, lambda = 15) + 1
+
+  # Test with explicit threads = 1 (sequential)
+  res1 <- analyse_powerlaw(x, type = "discrete", bootstrap_sims = 5, threads = 1L)
+  expect_true(is.list(res1))
+  expect_true("best_model" %in% names(res1))
+
+  # Test with threads = NULL (auto-detect)
+  res2 <- analyse_powerlaw(x, type = "discrete", bootstrap_sims = 5, threads = NULL)
+  expect_true(is.list(res2))
+  expect_true("best_model" %in% names(res2))
+
+  # Test with explicit threads = 2 (parallel)
+  res3 <- analyse_powerlaw(x, type = "discrete", bootstrap_sims = 5, threads = 2L)
+  expect_true(is.list(res3))
+  expect_true("best_model" %in% names(res3))
+})
+
+test_that(".detect_optimal_threads returns valid integer", {
+  threads <- mwiR:::.detect_optimal_threads()
+  expect_true(is.integer(threads) || is.numeric(threads))
+  expect_true(threads >= 1L)
+  expect_true(threads <= parallel::detectCores())
+})
+
+test_that("mwir_system_info returns valid config", {
+  config <- mwir_system_info()
+  expect_true(is.list(config))
+  expect_true("os" %in% names(config))
+  expect_true("total_cores" %in% names(config))
+  expect_true("recommended_workers" %in% names(config))
+  expect_true(config$total_cores >= 1)
+  expect_true(config$recommended_workers >= 1)
+})
+
 test_that("mwir_seorank errors on missing arguments", {
   expect_error(mwir_seorank(NULL, "example.com", "key"))
   expect_error(mwir_seorank("file", NULL, "key"))

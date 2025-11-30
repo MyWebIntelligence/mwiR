@@ -11,7 +11,7 @@ analyse_powerlaw(
   xmin = NULL,
   bootstrap_sims = 300L,
   bootstrap_models = c("powerlaw", "best"),
-  threads = 1L,
+  threads = NULL,
   winsorize = NULL,
   min_n = 50L,
   verbose = interactive(),
@@ -37,7 +37,8 @@ goodness-of-fit (défaut 300).}
 \item{bootstrap_models}{Modèles sur lesquels exécuter le bootstrap : par
 défaut `c("powerlaw", "best")`.}
 
-\item{threads}{Nombre de threads (passé à `bootstrap_p`). Par défaut 1.}
+\item{threads}{Nombre de threads pour le bootstrap. Par défaut `NULL` pour
+auto-détection (utilise les P-cores sur Apple Silicon, sinon moitié des cœurs).}
 
 \item{winsorize}{Proportion optionnelle (0–0.5) pour winsoriser les extrêmes
 avant estimation (utile en présence de valeurs aberrantes).}

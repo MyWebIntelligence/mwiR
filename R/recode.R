@@ -1526,6 +1526,126 @@ find_clusters <- function(x,
 # 5. ANALYSE DE LOI DE PUISSANCE
 # ------------------------------------------------------------------------------
 
+#' Detect optimal number of threads for parallel processing
+#'
+#' On Apple Silicon, uses only performance cores (not efficiency cores).
+#' On other systems, uses half of available cores minus one.
+#'
+#' @return Integer number of recommended threads
+#' @keywords internal
+.detect_optimal_threads <- function() {
+
+  n_cores <- parallel::detectCores(logical = FALSE)
+
+  if (Sys.info()["sysname"] == "Darwin") {
+    # Apple Silicon: use only performance cores
+    perf_cores <- tryCatch({
+      as.integer(system("sysctl -n hw.perflevel0.physicalcpu", intern = TRUE))
+    }, error = function(e) NULL, warning = function(w) NULL)
+
+    if (!is.null(perf_cores) && !is.na(perf_cores) && perf_cores > 0) {
+      return(max(1L, perf_cores - 1L))  # Leave 1 P-core free
+    }
+  }
+
+  # Fallback: half of cores - 1
+  max(1L, as.integer(floor(n_cores / 2) - 1L))
+}
+
+#' Safe bootstrap_p wrapper that fixes poweRlaw parallel bug
+#'
+#' The poweRlaw package has a bug where `dist_rand` (a reference class method)
+#' cannot be found by parallel workers. This wrapper implements a custom
+#' sequential bootstrap that avoids the parallel bug entirely.
+#'
+#' @param model A poweRlaw distribution object with xmin and pars set
+#' @param no_of_sims Number of bootstrap simulations
+#' @param threads Number of parallel threads (currently ignored, always sequential)
+#' @param seed Random seed for reproducibility
+#' @param verbose Print progress messages
+#' @return List with p-value, se, gof statistic, and bootstrap results
+#' @keywords internal
+.safe_bootstrap_p <- function(model, no_of_sims, threads = 1L, seed = NULL, verbose = FALSE) {
+
+  if (!is.null(seed)) set.seed(seed)
+
+  m_copy <- model$copy()
+
+  # Check parameters are set
+  if (is.null(m_copy$getPars()) || is.null(m_copy$getXmin())) {
+    est <- poweRlaw::estimate_xmin(m_copy)
+    m_copy$setXmin(est)
+  }
+
+  # Get model info
+  m_data <- m_copy$dat
+  m_xmin <- m_copy$getXmin()
+  m_pars <- m_copy$getPars()
+  x_lower <- m_data[m_data < m_xmin]
+
+  n <- length(m_data)
+  ntail <- sum(m_data >= m_xmin)
+  ntail_prop <- ntail / n
+
+  # Calculate original GOF (KS statistic)
+  gof_original <- tryCatch(
+    poweRlaw::get_distance_statistic(m_copy),
+    error = function(e) {
+      tryCatch(poweRlaw::get_KS_statistic(m_copy), error = function(e2) NA_real_)
+    }
+  )
+
+  # Run sequential bootstrap
+  gof_values <- numeric(no_of_sims)
+
+  for (i in seq_len(no_of_sims)) {
+    tryCatch({
+      # Sample from empirical distribution below xmin
+      n1 <- sum(runif(n) > ntail_prop)
+
+      # Generate bootstrap sample
+      sampled_lower <- if (n1 > 0 && length(x_lower) > 0) {
+        sample(x_lower, n1, replace = TRUE)
+      } else {
+        numeric(0)
+      }
+
+      # Generate from fitted distribution above xmin
+      sampled_upper <- poweRlaw::dist_rand(m_copy, n - n1)
+      q <- c(sampled_lower, sampled_upper)
+
+      # Fit model on bootstrap sample
+      m_boot <- m_copy$getRefClass()$new(q)
+      est_boot <- poweRlaw::estimate_xmin(m_boot)
+
+      gof_values[i] <- if (!is.null(est_boot$gof) && !is.na(est_boot$gof)) {
+        est_boot$gof
+      } else {
+        NA_real_
+      }
+    }, error = function(e) {
+      gof_values[i] <<- NA_real_
+    })
+  }
+
+  # Calculate p-value: proportion of bootstrap GOF >= original GOF
+  valid_gof <- gof_values[!is.na(gof_values)]
+  if (length(valid_gof) > 0) {
+    p_value <- sum(valid_gof >= gof_original) / length(valid_gof)
+    se_value <- sqrt(p_value * (1 - p_value) / length(valid_gof))
+  } else {
+    p_value <- NA_real_
+    se_value <- NA_real_
+  }
+
+  list(
+    p = p_value,
+    se = se_value,
+    gof = gof_original,
+    bootstraps = data.frame(gof = gof_values)
+  )
+}
+
 #' @title Sélectionner et valider un modèle de queue lourde
 #' @description
 #' Analyse la queue d'une distribution positive (comptages ou mesures continues)
@@ -1548,7 +1668,8 @@ find_clusters <- function(x,
 #'   goodness-of-fit (défaut 300).
 #' @param bootstrap_models Modèles sur lesquels exécuter le bootstrap : par
 #'   défaut `c("powerlaw", "best")`.
-#' @param threads Nombre de threads (passé à `bootstrap_p`). Par défaut 1.
+#' @param threads Nombre de threads pour le bootstrap. Par défaut `NULL` pour
+#'   auto-détection (utilise les P-cores sur Apple Silicon, sinon moitié des cœurs).
 #' @param winsorize Proportion optionnelle (0–0.5) pour winsoriser les extrêmes
 #'   avant estimation (utile en présence de valeurs aberrantes).
 #' @param min_n Taille minimale d'échantillon (après nettoyage) pour lancer
@@ -1582,7 +1703,7 @@ analyse_powerlaw <- function(x,
                              xmin = NULL,
                              bootstrap_sims = 300L,
                              bootstrap_models = c("powerlaw", "best"),
-                             threads = 1L,
+                             threads = NULL,
                              winsorize = NULL,
                              min_n = 50L,
                              verbose = interactive(),
@@ -1593,6 +1714,16 @@ analyse_powerlaw <- function(x,
 
   type <- match.arg(type)
   bootstrap_models <- unique(bootstrap_models)
+
+
+  # Auto-detect optimal thread count if not specified
+  if (is.null(threads)) {
+    threads <- .detect_optimal_threads()
+    if (isTRUE(verbose)) {
+      message("[analyse_powerlaw] Utilisation de ", threads, " thread(s) pour le bootstrap")
+    }
+  }
+  threads <- as.integer(max(1L, threads))
 
   x_pos <- x[is.finite(x) & x > 0]
   if (length(x_pos) < min_n) {
@@ -1797,25 +1928,14 @@ analyse_powerlaw <- function(x,
     for (i in seq_along(bootstrap_targets)) {
       target <- bootstrap_targets[i]
       mod <- candidates[[target]]$object
-      boot <- tryCatch(
-        suppressPackageStartupMessages(
-          suppressMessages(
-            poweRlaw::bootstrap_p(
-              mod,
-              no_of_sims = bootstrap_sims,
-              threads = threads
-            )
-          )
-        ),
-        error = function(e) {
-          if (isTRUE(verbose)) {
-            message("  - Échec du bootstrap pour le modèle '", target, "' : ", e$message)
-          }
-          list(p = NA_real_, se = NA_real_)
-        }
+      boot <- .safe_bootstrap_p(
+        model = mod,
+        no_of_sims = bootstrap_sims,
+        threads = threads,
+        verbose = verbose
       )
       p_val <- boot$p
-      se_val <- boot$se
+      se_val <- if (!is.null(boot$se)) boot$se else NA_real_
       if (length(p_val) == 0L) p_val <- NA_real_
       if (length(se_val) == 0L) se_val <- NA_real_
       candidates[[target]]$gof <- p_val
@@ -3125,4 +3245,73 @@ LLM_Recode <- function(data,
   .print_summary(results, getOption("mwiR.llm.verbose", TRUE))
 
   .format_results(results, return_metadata)
+}
+
+# -----------------------------------------------------------------------------
+# UTILITY: SYSTEM INFO FOR PARALLELIZATION
+# -----------------------------------------------------------------------------
+
+#' Display system information for parallelization
+#'
+#' Shows system capabilities for parallel processing, including CPU core count,
+#' Apple Silicon detection, and recommended worker count.
+#'
+#' @return Invisibly returns a list with system configuration details
+#' @export
+#' @examples
+#' \dontrun{
+#' mwir_system_info()
+#' }
+mwir_system_info <- function() {
+
+  config <- list(
+    os = as.character(Sys.info()["sysname"]),
+    total_cores = parallel::detectCores(),
+    recommended_workers = .detect_optimal_threads(),
+    is_apple_silicon = FALSE,
+    performance_cores = NA_integer_,
+    efficiency_cores = NA_integer_
+  )
+
+  if (config$os == "Darwin") {
+    # Check for Apple Silicon
+    arch <- tryCatch(
+      system("uname -m", intern = TRUE),
+      error = function(e) "unknown"
+    )
+    config$is_apple_silicon <- arch %in% c("arm64", "arm64e")
+
+    if (config$is_apple_silicon) {
+      # Get performance core count
+      config$performance_cores <- tryCatch({
+        as.integer(system("sysctl -n hw.perflevel0.physicalcpu", intern = TRUE))
+      }, error = function(e) NA_integer_)
+
+      # Get efficiency core count
+      config$efficiency_cores <- tryCatch({
+        as.integer(system("sysctl -n hw.perflevel1.physicalcpu", intern = TRUE))
+      }, error = function(e) NA_integer_)
+    }
+  }
+
+  cat("=== mwiR System Information ===\n")
+  cat("OS:", config$os, "\n")
+  cat("Total cores:", config$total_cores, "\n")
+
+  if (config$is_apple_silicon) {
+    cat("Apple Silicon: Yes\n")
+    if (!is.na(config$performance_cores)) {
+      cat("Performance cores (P):", config$performance_cores, "\n")
+    }
+    if (!is.na(config$efficiency_cores)) {
+      cat("Efficiency cores (E):", config$efficiency_cores, "\n")
+    }
+  } else if (config$os == "Darwin") {
+    cat("Apple Silicon: No (Intel Mac)\n")
+  }
+
+  cat("Recommended workers:", config$recommended_workers, "\n")
+  cat("================================\n")
+
+  invisible(config)
 }
