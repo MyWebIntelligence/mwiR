@@ -14,6 +14,36 @@ safe_scalar <- function(x, default = NA_character_) {
   as.character(val)
 }
 
+#' Get a random User-Agent string
+#'
+#' Returns a randomly selected User-Agent string from a pool of 10 realistic
+#' browser User-Agents. This helps avoid detection by anti-scraping systems.
+#'
+#' @return A character string containing a realistic browser User-Agent.
+#' @keywords internal
+get_random_user_agent <- function() {
+ user_agents <- c(
+    # Chrome on Windows
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+    # Chrome on Mac
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+    # Firefox on Windows
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:120.0) Gecko/20100101 Firefox/120.0",
+    # Firefox on Mac
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:121.0) Gecko/20100101 Firefox/121.0",
+    # Safari on Mac
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15",
+    # Edge on Windows
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0",
+    # Chrome on Linux
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+  )
+  sample(user_agents, 1)
+}
+
 #' Extract original URL from Archive.org URL
 #'
 #' This function extracts the original URL from an Archive.org (Wayback Machine) URL.
@@ -127,7 +157,7 @@ crawl <- function(url) {
   # Use httr::GET with timeout instead of trafilatura$fetch_url (which has no timeout)
   readFull <- tryCatch({
     # Download HTML with httr (30 second timeout)
-    response <- httr::GET(url, httr::timeout(30), httr::user_agent("Mozilla/5.0 (compatible; mwiR crawler)"))
+    response <- httr::GET(url, httr::timeout(30), httr::user_agent(get_random_user_agent()))
 
     if (httr::http_error(response)) {
       stop(paste("HTTP error:", httr::status_code(response)))
@@ -185,7 +215,7 @@ crawl <- function(url) {
         message("Extraction fallback avec Archive.org")
         # Download with httr (30 second timeout) instead of trafilatura$fetch_url
         response_archive <- httr::GET(urlarchive, httr::timeout(30),
-                                       httr::user_agent("Mozilla/5.0 (compatible; mwiR crawler)"))
+                                       httr::user_agent(get_random_user_agent()))
 
         if (!httr::http_error(response_archive)) {
           downloaded_archive <- httr::content(response_archive, as = "text", encoding = "UTF-8")
