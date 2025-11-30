@@ -1,0 +1,1266 @@
+---
+title: "My Web Intelligence : Méthodes Numériques pour les Sciences Sociales"
+subtitle: "Digital Methods for Social Sciences Research - Master Level"
+author: "MIT Sociology Department - Digital Methods Lab"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    number_sections: true
+    theme: cosmo
+    highlight: tango
+    code_folding: show
+    df_print: paged
+  pdf_document:
+    toc: true
+    number_sections: true
+editor_options:
+  markdown:
+    wrap: 140
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  eval = FALSE,
+  message = TRUE,
+  warning = FALSE,
+  fig.width = 10,
+  fig.height = 6,
+  cache = TRUE
+)
+```
+
+---
+
+# Introduction aux Méthodes Numériques
+
+## Objectifs du cours
+
+Ce cours de Master en **Data Analysis for Social Sciences** vous guidera à travers une méthodologie complète de recherche numérique appliquée aux sciences sociales. Vous apprendrez à :
+
+1. **Collecter** des données web de manière systématique et reproductible
+2. **Crawler** et extraire du contenu textuel à partir d'URLs
+3. **Analyser** les réseaux de liens entre acteurs numériques
+4. **Recoder** qualitativement vos données avec l'assistance de LLM (Large Language Models)
+5. **Visualiser** et interpréter les écosystèmes numériques
+
+## Le package mwiR
+
+**My Web Intelligence (mwiR)** est un package R développé pour les chercheurs en sciences sociales qui souhaitent cartographier des controverses, analyser des discours en ligne, ou étudier des écosystèmes numériques.
+
+### Philosophie méthodologique
+
+```
+    ┌─────────────────┐
+    │  1. COLLECTE    │  ← Constitution d'un corpus d'URLs
+    │  (Seed URLs)    │
+    └────────┬────────┘
+             │
+    ┌────────▼────────┐
+    │  2. CRAWL       │  ← Extraction de contenu et métadonnées
+    │  (Trafilatura)  │
+    └────────┬────────┘
+             │
+    ┌────────▼────────┐
+    │  3. SCORING     │  ← Calcul de pertinence thématique
+    │  (Relevance)    │
+    └────────┬────────┘
+             │
+    ┌────────▼────────────┐
+    │  4. RECODAGE LLM    │  ← Annotation assistée par IA
+    │  (OpenAI/Anthropic) │
+    └────────┬────────────┘
+             │
+    ┌────────▼────────┐
+    │  5. ANALYSE     │  ← Export CSV, GEXF (Gephi), Corpus
+    │  & EXPORT       │
+    └─────────────────┘
+```
+
+---
+
+# Installation de l'Environnement
+
+## Prérequis système
+
+### Installation de R (Obligatoire)
+
+R est le langage de programmation utilisé par mwiR.
+
+**Windows:**
+1. Télécharger depuis https://cran.r-project.org/bin/windows/base/
+2. Lancer l'installateur et accepter les options par défaut
+3. Vérifier : `R --version` dans l'invite de commandes
+
+**macOS:**
+```bash
+# Via Homebrew (recommandé)
+brew install r
+
+# Ou télécharger depuis https://cran.r-project.org/bin/macosx/
+```
+
+**Linux (Ubuntu/Debian):**
+```bash
+sudo apt update
+sudo apt install r-base r-base-dev
+```
+
+### Installation de RStudio (Recommandé)
+
+RStudio offre une interface conviviale pour travailler avec R.
+
+1. Télécharger depuis https://posit.co/download/rstudio-desktop/
+2. Installer selon votre système d'exploitation
+3. Lancer RStudio
+
+### Installation de Python 3 (Obligatoire pour le crawling)
+
+Python est nécessaire pour la bibliothèque **trafilatura** qui extrait le contenu des pages web.
+
+**Windows (IMPORTANT):**
+1. Télécharger depuis https://www.python.org/downloads/windows/
+2. **CRITIQUE:** Cocher ✅ "Add Python to PATH" pendant l'installation
+3. Vérifier :
+```bash
+python --version    # ou python3 --version
+pip --version
+```
+
+**macOS:**
+```bash
+# Vérifier si déjà installé
+python3 --version
+
+# Sinon, installer via Homebrew
+brew install python3
+```
+
+**Linux:**
+```bash
+sudo apt install python3 python3-pip python3-venv
+```
+
+### Installation de Git (Obligatoire)
+
+Git est nécessaire pour installer le package depuis GitHub.
+
+**Windows:** Télécharger depuis https://git-scm.com/download/win
+
+**macOS:**
+```bash
+xcode-select --install
+# ou
+brew install git
+```
+
+**Linux:**
+```bash
+sudo apt install git
+```
+
+## Installation de mwiR
+
+Une fois les prérequis installés, ouvrez RStudio et exécutez :
+
+```{r installation-mwir}
+# Étape 1 : Installer le package remotes
+install.packages("remotes")
+
+# Étape 2 : Installer mwiR depuis GitHub
+remotes::install_github("MyWebIntelligence/mwiR")
+
+# Étape 3 : Charger le package
+library(mwiR)
+```
+
+### Vérification de l'installation
+
+```{r verification}
+# Charger mwiR
+library(mwiR)
+
+# Initialiser l'environnement (configure automatiquement Python/trafilatura)
+initmwi()
+
+# Vérifier le statut Python/trafilatura
+check_python_status()
+```
+
+> **Note:** Lors du premier `initmwi()`, mwiR crée automatiquement un environnement virtuel Python et installe trafilatura. Ce processus peut prendre quelques minutes.
+
+### Résolution de problèmes courants
+
+```{r troubleshooting, eval=FALSE}
+# Si trafilatura ne fonctionne pas, forcer la réinstallation
+setup_python(force = TRUE)
+
+# En cas de corruption de l'environnement virtuel
+remove_python_env()
+setup_python()
+```
+
+---
+
+# Cas d'Étude : L'Impact de l'IA sur le Travail
+
+Pour ce cours, nous allons réaliser une étude complète sur **l'impact de l'intelligence artificielle sur le marché du travail**. Ce sujet est idéal car il :
+
+- Génère des controverses entre différents acteurs (entreprises, syndicats, académiques, médias)
+- Produit une diversité de discours (technophiles vs technophobes)
+- Implique des enjeux sociaux majeurs
+- Est documenté par de nombreuses sources en ligne
+
+## URLs de départ (Seed URLs)
+
+Voici les 10 URLs initiales pour notre corpus :
+
+```{r seed-urls}
+# Définition des URLs de départ pour notre étude
+seed_urls <- c(
+  # Sources académiques/institutionnelles
+  "https://www.oecd.org/employment/future-of-work/",
+  "https://www.weforum.org/publications/the-future-of-jobs-report-2023/",
+  "https://www.mckinsey.com/featured-insights/future-of-work",
+
+  # Sources médiatiques
+  "https://www.lemonde.fr/emploi/article/2023/04/15/l-ia-va-t-elle-detruire-des-emplois_6169674_1698637.html",
+  "https://www.theguardian.com/technology/2024/jan/15/ai-jobs-workforce-automation",
+
+  # Sources syndicales/associatives
+  "https://www.cfdt.fr/portail/presse/actualites/intelligence-artificielle-quels-enjeux-pour-les-travailleurs-srv2_1238651",
+
+  # Sources entreprises tech
+  "https://blogs.microsoft.com/on-the-issues/2023/05/25/microsoft-responsible-ai-standard/",
+  "https://ai.google/responsibility/principles/",
+
+  # Think tanks / Research
+  "https://www.brookings.edu/articles/understanding-the-impact-of-automation-on-workers-jobs-and-wages/",
+  "https://www.europarl.europa.eu/news/en/headlines/society/20200918STO87404/artificial-intelligence-threats-and-opportunities"
+)
+
+# Afficher les URLs
+cat("=== CORPUS INITIAL : 10 URLs ===\n")
+for (i in seq_along(seed_urls)) {
+  cat(sprintf("%d. %s\n", i, seed_urls[i]))
+}
+```
+
+---
+
+# Configuration de la Base de Données
+
+## Initialisation du projet
+
+```{r init-project}
+# Charger mwiR et initialiser l'environnement
+library(mwiR)
+initmwi()
+
+# Configurer la base de données SQLite
+db_setup()
+```
+
+La fonction `db_setup()` crée les tables suivantes dans une base SQLite `mwi.db` :
+
+| Table | Description |
+|-------|-------------|
+| **Land** | Projets de recherche (conteneurs) |
+| **Domain** | Domaines web (sites) |
+| **Expression** | URLs et leur contenu crawlé |
+| **ExpressionLink** | Liens entre expressions |
+| **Word** | Termes du dictionnaire |
+| **LandDictionary** | Association termes-projets |
+| **Media** | Médias extraits (images, vidéos) |
+| **Tag** | Étiquettes de classification |
+| **TaggedContent** | Contenu étiqueté |
+
+## Création du projet de recherche
+
+```{r create-land}
+# Créer le "Land" (projet de recherche)
+create_land(
+  name = "AI_Work_Impact",
+  desc = "Étude de l'impact de l'intelligence artificielle sur l'emploi et le marché du travail",
+  lang = "en"  # Langue principale du corpus
+)
+
+# Vérifier la création
+listlands("AI_Work_Impact")
+```
+
+### Comprendre les "Lands"
+
+Un **Land** est un conteneur logique pour votre projet de recherche. Il permet de :
+
+- Isoler les données de différentes études
+- Appliquer des dictionnaires de pertinence spécifiques
+- Gérer des corpus multilingues
+- Faciliter les exports ciblés
+
+## Ajout des termes de recherche
+
+Les termes définissent le **dictionnaire de pertinence** qui permettra de scorer les pages crawlées.
+
+```{r add-terms}
+# Termes en anglais (langue principale)
+addterm("AI_Work_Impact",
+        "artificial intelligence, AI, machine learning, automation, employment,
+         job loss, workforce, labor market, future of work, ChatGPT, generative AI,
+         workplace automation, job displacement, reskilling, upskilling")
+
+# Termes en français (pour sources francophones)
+addterm("AI_Work_Impact",
+        "intelligence artificielle, IA, emploi, travail, automatisation,
+         marché du travail, transformation digitale, reconversion, compétences")
+
+# Vérifier les termes ajoutés
+listlands("AI_Work_Impact")
+```
+
+---
+
+# Collecte des URLs
+
+## Méthode 1 : Ajout manuel d'URLs
+
+```{r add-manual-urls}
+# Ajouter les URLs initiales
+for (url in seed_urls) {
+  addurl("AI_Work_Impact", urls = url)
+}
+
+# Vérifier l'ajout
+listlands("AI_Work_Impact")
+```
+
+## Méthode 2 : Import depuis un fichier
+
+```{r import-file, eval=FALSE}
+# Créer un fichier texte avec des URLs (une par ligne)
+writeLines(seed_urls, "ai_work_urls.txt")
+
+# Importer les URLs depuis le fichier
+addurl("AI_Work_Impact", path = "ai_work_urls.txt")
+
+# Alternative : import interactif (ouvre une fenêtre de sélection)
+addurl("AI_Work_Impact")  # Sans paramètre, ouvre un sélecteur de fichier
+```
+
+## Méthode 3 : Collecte via SerpAPI (Recommandé pour études exhaustives)
+
+### Configuration de l'API
+
+```{r serpapi-config, eval=FALSE}
+# Option 1 : Définir temporairement dans la session
+Sys.setenv(SERPAPI_KEY = "votre_clé_api_ici")
+
+# Option 2 (Recommandé) : Ajouter dans ~/.Renviron
+# Ouvrir le fichier .Renviron
+usethis::edit_r_environ()
+
+# Ajouter cette ligne (sans guillemets autour de la valeur) :
+# SERPAPI_KEY=votre_clé_api_ici
+# Puis redémarrer R/RStudio
+```
+
+### Collecte de requêtes associées
+
+```{r related-queries, eval=FALSE}
+# Découvrir les requêtes associées (expansion du corpus)
+related_en <- related_query("artificial intelligence work", lang = "en", country = "United States")
+related_fr <- related_query("intelligence artificielle travail", lang = "fr", country = "France")
+
+# Afficher les suggestions
+print(related_en)
+print(related_fr)
+```
+
+### Collecte depuis Google
+
+```{r google-search, eval=FALSE}
+# Collecter des URLs sur une période donnée
+urlist_Google(
+  query = "artificial intelligence impact employment",
+  datestart = "2023-01-01",
+  dateend = "2024-06-30",
+  timestep = "month",      # Granularité temporelle
+  sleep_seconds = 2,       # Pause entre requêtes (respect rate limits)
+  lang = "en"
+)
+
+# Le fichier CSV généré contiendra : position, title, link, date
+# Importer les résultats dans le projet
+addurl("AI_Work_Impact", path = "artificial_intelligence_impact_employment.txt")
+```
+
+### Collecte depuis DuckDuckGo et Bing
+
+```{r duck-bing, eval=FALSE}
+# DuckDuckGo (plus de confidentialité, moins de personnalisation)
+urlist_Duck(
+  query = "AI job automation future",
+  filename = "duck_ai_jobs.txt",
+  sleep_seconds = 2,
+  lang = "en"
+)
+
+# Bing (alternative à Google)
+urlist_Bing(
+  query = "machine learning workplace transformation",
+  filename = "bing_ml_work.txt",
+  sleep_seconds = 2,
+  lang = "en"
+)
+
+# Importer dans le projet
+addurl("AI_Work_Impact", path = "duck_ai_jobs.txt")
+addurl("AI_Work_Impact", path = "bing_ml_work.txt")
+```
+
+## Méthode 4 : Bookmarklet pour extraction manuelle
+
+Pour collecter des URLs manuellement depuis une page de résultats Google :
+
+1. Créer un nouveau favori dans votre navigateur
+2. Donner un nom explicite : "ExtractURLs"
+3. Coller ce code JavaScript dans le champ URL :
+
+```javascript
+javascript:(function(){
+  var anchors = document.getElementsByTagName("a");
+  var urls = "";
+  for(var i = 0; i < anchors.length; i++){
+    var anchorLink = anchors[i].href;
+    if(anchorLink.match(/^((?!google|cache|youtube\.com\/results|javascript:|api\.technorati|web\.archive\.org|www\.alexa\.com).)*$/i)){
+      urls += anchorLink + "\n";
+    }
+  }
+  var win = window.open();
+  win.document.write("<pre>" + urls + "</pre>");
+  win.document.close();
+})();
+```
+
+4. Sur une page de résultats Google, cliquer sur le favori
+5. Copier les URLs dans un fichier texte
+6. Importer avec `addurl("AI_Work_Impact", path = "fichier.txt")`
+
+**Astuce Google:** Ajouter `&num=100` à l'URL de recherche pour afficher 100 résultats par page.
+
+---
+
+# Crawling du Corpus
+
+## Principe du crawling
+
+Le crawling avec mwiR utilise **trafilatura**, une bibliothèque Python spécialisée dans l'extraction de contenu textuel :
+
+- Supprime le boilerplate (menus, publicités, footers)
+- Extrait le texte principal de l'article
+- Préserve la structure sémantique
+- Détecte la langue et les métadonnées
+
+## Crawl initial
+
+```{r crawl-basic}
+# Crawler les premières URLs (test avec un petit échantillon)
+crawlurls("AI_Work_Impact", limit = 10)
+
+# Vérifier les résultats
+listlands("AI_Work_Impact")
+```
+
+## Crawl itératif avec pauses
+
+Pour des corpus importants, il est préférable de crawler par lots avec des pauses :
+
+```{r crawl-iterative}
+# Fonction de crawl par lots avec pauses aléatoires
+crawl_batch <- function(land_name, iterations = 10, min_urls = 10, max_urls = 30,
+                        min_pause = 2, max_pause = 5) {
+  for (i in 1:iterations) {
+    # Nombre aléatoire d'URLs à crawler
+    current_limit <- sample(min_urls:max_urls, 1)
+
+    cat(sprintf("Itération %d/%d : Crawl de %d URLs...\n", i, iterations, current_limit))
+
+    # Crawl
+    crawlurls(land_name, limit = current_limit)
+
+    # Pause aléatoire
+    pause_time <- runif(1, min_pause, max_pause)
+    cat(sprintf("Pause de %.1f secondes...\n", pause_time))
+    Sys.sleep(pause_time)
+  }
+  cat("Crawl terminé!\n")
+}
+
+# Exécuter le crawl par lots
+crawl_batch("AI_Work_Impact", iterations = 10)
+```
+
+## Crawl des domaines
+
+Le crawl des domaines extrait les métadonnées des sites (titre, description, mots-clés) :
+
+```{r crawl-domains}
+# Crawler les domaines associés aux URLs
+crawlDomain(nburl = 100)
+```
+
+## Re-crawl des URLs en erreur
+
+Certaines URLs peuvent échouer (403, 503, timeouts). mwiR utilise automatiquement Archive.org comme fallback, mais vous pouvez re-tenter :
+
+```{r recrawl-errors, eval=FALSE}
+# Re-crawler les URLs avec erreurs HTTP
+crawlurls("AI_Work_Impact", http_status = "403", limit = 50)
+crawlurls("AI_Work_Impact", http_status = "503", limit = 50)
+
+# Re-crawler les URLs non encore traitées
+crawlurls("AI_Work_Impact", http_status = NULL, limit = 100)
+```
+
+## Monitoring du corpus
+
+```{r monitoring}
+# Vérifier l'état du corpus
+listlands("AI_Work_Impact")
+
+# Résumé attendu :
+# - Total number of expressions: X
+# - Number of expressions remaining to be fetched: Y
+# - HTTP status codes: 200: N1, 403: N2, 404: N3, etc.
+```
+
+---
+
+# Calcul de Pertinence et Filtrage
+
+## Comprendre le score de pertinence
+
+mwiR calcule un **score de pertinence** pour chaque page crawlée en fonction :
+
+1. **Présence des termes** du dictionnaire dans le contenu
+2. **Fréquence** des termes (TF)
+3. **Position** des termes (titre > description > corps)
+4. **Stemming** pour capturer les variantes morphologiques
+
+Les scores vont de 0 (non pertinent) à N (très pertinent).
+
+## Filtrage par pertinence
+
+```{r filter-relevance}
+# Supprimer les expressions peu pertinentes (relevance <= 2)
+deleteland("AI_Work_Impact", maxrel = 2)
+
+# Vérifier le corpus filtré
+listlands("AI_Work_Impact")
+```
+
+> **Attention:** Cette opération est destructive. Sauvegardez votre base de données avant le filtrage.
+
+## Sauvegarde de la base
+
+```{r backup-db, eval=FALSE}
+# Créer une sauvegarde datée
+file.copy("mwi.db", paste0("mwi_backup_", format(Sys.Date(), "%Y%m%d"), ".db"))
+```
+
+---
+
+# Export des Données
+
+## Types d'export disponibles
+
+| Type | Description | Usage |
+|------|-------------|-------|
+| `pagecsv` | Données basiques des pages | Analyse statistique |
+| `fullpagecsv` | Données complètes avec contenu | Text mining |
+| `nodecsv` | Nœuds (domaines) agrégés | Analyse réseau |
+| `nodegexf` | Graphe des domaines | Gephi |
+| `pagegexf` | Graphe des pages | Gephi |
+| `mediacsv` | Médias extraits | Analyse visuelle |
+| `corpus` | Corpus textuel (md/txt/pdf) | CAQDAS (NVivo, Atlas.ti) |
+
+## Export CSV pour analyse statistique
+
+```{r export-csv}
+# Export basique (sans le contenu complet)
+export_land("AI_Work_Impact", "pagecsv", minimum_relevance = 3)
+
+# Export complet (avec le contenu textuel)
+export_land("AI_Work_Impact", "fullpagecsv", minimum_relevance = 3)
+
+# Export des domaines agrégés
+export_land("AI_Work_Impact", "nodecsv", minimum_relevance = 3)
+
+# Export des médias
+export_land("AI_Work_Impact", "mediacsv", minimum_relevance = 3)
+```
+
+## Export GEXF pour Gephi
+
+[Gephi](https://gephi.org/) est un logiciel open-source d'analyse et de visualisation de réseaux.
+
+```{r export-gexf}
+# Graphe des domaines (recommandé pour vision macro)
+export_land("AI_Work_Impact", "nodegexf", minimum_relevance = 3)
+
+# Graphe des pages (pour analyse micro)
+export_land("AI_Work_Impact", "pagegexf", minimum_relevance = 3)
+```
+
+### Analyse dans Gephi
+
+1. Ouvrir Gephi et charger le fichier `.gexf`
+2. Calculer les métriques : **Statistics > Network Overview**
+   - Degree (centralité de degré)
+   - Betweenness Centrality (intermédiarité)
+   - Modularity (communautés)
+3. Appliquer un layout : **Layout > ForceAtlas 2**
+4. Colorer les nœuds par communauté ou pertinence
+
+## Export Corpus pour CAQDAS
+
+```{r export-corpus}
+# Export en Markdown (défaut)
+export_land("AI_Work_Impact", "corpus", minimum_relevance = 3, ext = "md")
+
+# Export en texte brut
+export_land("AI_Work_Impact", "corpus", minimum_relevance = 3, ext = "txt")
+
+# Export en PDF (nécessite pandoc)
+export_land("AI_Work_Impact", "corpus", minimum_relevance = 3, ext = "pdf")
+```
+
+Les fichiers générés incluent des métadonnées Dublin Core pour import dans NVivo, Atlas.ti, ou MaxQDA.
+
+---
+
+# Recodage Assisté par LLM
+
+## Introduction au recodage algorithmique
+
+Les **Large Language Models** (ChatGPT, Claude, etc.) permettent d'automatiser certaines tâches de codage qualitatif :
+
+- Classification thématique
+- Extraction d'arguments
+- Identification de positions (pour/contre)
+- Résumé de contenu
+- Traduction
+
+> **Avertissement éthique:** Le recodage LLM doit être vérifié manuellement et documenté dans votre méthodologie.
+
+## Configuration des APIs
+
+### Option 1 : OpenAI
+
+```{r openai-config, eval=FALSE}
+# Configurer la clé API OpenAI
+Sys.setenv(OPENAI_API_KEY = "sk-votre-clé-openai")
+
+# Ou dans .Renviron (recommandé)
+# OPENAI_API_KEY=sk-votre-clé-openai
+```
+
+### Option 2 : OpenRouter (Accès multi-modèles)
+
+```{r openrouter-config, eval=FALSE}
+# OpenRouter permet d'utiliser différents modèles (GPT-4, Claude, Llama, etc.)
+Sys.setenv(OPENROUTER_API_KEY = "sk-or-votre-clé")
+
+# Configurer mwiR pour OpenRouter
+LLM_Config(provider = "openrouter", model = "openrouter/auto", lang = "fr")
+```
+
+### Option 3 : Ollama (Local, gratuit)
+
+```{r ollama-config, eval=FALSE}
+# Installer Ollama : https://ollama.ai/
+# Puis télécharger un modèle : ollama pull llama3.1
+
+# Configurer mwiR
+LLM_Config(provider = "ollama", model = "llama3.1", lang = "fr")
+```
+
+## Classification thématique
+
+```{r llm-classification}
+# Charger les données exportées
+pages <- read.csv("AI_Work_Impact_fullpagecsv.csv", stringsAsFactors = FALSE)
+
+# Définir le prompt de classification
+prompt_classification <- "
+#Contexte: Classification de pages web sur l'impact de l'IA sur le travail.
+
+#Instruction: Analyse le texte suivant et attribue-lui UN SEUL thème parmi cette liste:
+- Destruction d'emplois par l'IA
+- Création de nouveaux métiers
+- Transformation des compétences
+- Régulation et politique publique
+- Cas d'usage en entreprise
+- Perspectives technophiles
+- Perspectives technophobes
+- Recherche académique
+- Témoignages de travailleurs
+- Autre
+
+#Format: Réponds uniquement avec le nom du thème, sans commentaire.
+
+#Texte à analyser:
+{readable}
+"
+
+# Appliquer le recodage
+results <- LLM_Recode(
+  data = pages,
+  prompt = prompt_classification,
+  provider = "openai",
+  model = "gpt-4o-mini",
+  temperature = 0.2,        # Basse température pour cohérence
+  return_metadata = TRUE
+)
+
+# Vérifier les résultats
+table(results$value)
+```
+
+## Extraction d'arguments
+
+```{r llm-arguments}
+# Prompt pour extraction d'arguments
+prompt_arguments <- "
+#Contexte: Analyse de discours sur l'IA et l'emploi.
+
+#Instruction: Identifie les 3 principaux arguments avancés dans ce texte.
+
+#Format: Liste numérotée, max 15 mots par argument.
+
+#Texte:
+{readable}
+"
+
+# Appliquer
+arguments <- LLM_Recode(
+  data = pages[1:50, ],  # Test sur 50 premières pages
+  prompt = prompt_arguments,
+  temperature = 0.3,
+  max_tokens = 150
+)
+```
+
+## Identification de position
+
+```{r llm-position}
+# Prompt pour classification binaire
+prompt_position <- "
+#Contexte: Analyse de la position des acteurs sur l'impact de l'IA.
+
+#Instruction: Ce texte est-il plutôt:
+- OPTIMISTE (l'IA créera plus d'emplois qu'elle n'en détruira)
+- PESSIMISTE (l'IA détruira plus d'emplois qu'elle n'en créera)
+- NEUTRE (pas de position claire)
+
+#Format: Réponds UNIQUEMENT par OPTIMISTE, PESSIMISTE ou NEUTRE.
+
+#Texte:
+{readable}
+"
+
+positions <- LLM_Recode(
+  data = pages,
+  prompt = prompt_position,
+  temperature = 0.1,  # Très basse pour classification binaire
+  max_tokens = 10
+)
+
+# Analyse des positions
+table(positions$value)
+prop.table(table(positions$value)) * 100
+```
+
+## Validation croisée humain-machine
+
+**Méthodologie recommandée:**
+
+1. Coder manuellement 10-20% du corpus
+2. Comparer avec le recodage LLM
+3. Calculer le taux d'accord (Cohen's Kappa)
+4. Ajuster le prompt si nécessaire
+5. Documenter les désaccords
+
+```{r validation}
+# Exemple de validation
+manual_coding <- c("OPTIMISTE", "PESSIMISTE", "NEUTRE", "OPTIMISTE", "PESSIMISTE")
+llm_coding <- c("OPTIMISTE", "PESSIMISTE", "OPTIMISTE", "OPTIMISTE", "PESSIMISTE")
+
+# Taux d'accord simple
+agreement <- mean(manual_coding == llm_coding)
+cat(sprintf("Taux d'accord: %.1f%%\n", agreement * 100))
+
+# Cohen's Kappa (avec package irr)
+# install.packages("irr")
+# library(irr)
+# kappa2(cbind(manual_coding, llm_coding))
+```
+
+---
+
+# Analyse de Réseau
+
+## Chargement des données GEXF dans R
+
+```{r network-r, eval=FALSE}
+# Installation des packages réseau
+install.packages(c("igraph", "visNetwork", "networkD3"))
+
+# Charger le graphe
+library(igraph)
+graph <- read.graph("AI_Work_Impact_nodegexf.gexf", format = "graphml")
+
+# Métriques de base
+vcount(graph)  # Nombre de nœuds
+ecount(graph)  # Nombre d'arêtes
+edge_density(graph)  # Densité
+
+# Centralités
+degree_centrality <- degree(graph)
+betweenness_centrality <- betweenness(graph)
+closeness_centrality <- closeness(graph)
+
+# Top 10 nœuds par centralité
+head(sort(degree_centrality, decreasing = TRUE), 10)
+```
+
+## Détection de communautés
+
+```{r communities, eval=FALSE}
+# Détection de communautés (algorithme de Louvain)
+communities <- cluster_louvain(graph)
+
+# Nombre de communautés
+length(communities)
+
+# Modularité
+modularity(communities)
+
+# Attribution aux nœuds
+V(graph)$community <- membership(communities)
+```
+
+## Visualisation interactive
+
+```{r network-viz, eval=FALSE}
+# Visualisation interactive avec visNetwork
+library(visNetwork)
+
+# Convertir pour visNetwork
+nodes <- data.frame(
+  id = V(graph)$name,
+  label = V(graph)$name,
+  group = V(graph)$community,
+  value = degree_centrality
+)
+
+edges <- as.data.frame(as_edgelist(graph))
+names(edges) <- c("from", "to")
+
+# Créer la visualisation
+visNetwork(nodes, edges) %>%
+  visOptions(highlightNearest = TRUE, nodesIdSelection = TRUE) %>%
+  visPhysics(stabilization = FALSE)
+```
+
+---
+
+# Enrichissement des Données SEO
+
+## API SEO Rank
+
+L'API [SEO Rank](https://seo-rank.my-addr.com/) fournit des métriques de référencement :
+
+| Métrique | Source | Description |
+|----------|--------|-------------|
+| `pa` | Moz | Page Authority (0-100) |
+| `da` | Moz | Domain Authority (0-100) |
+| `mozrank` | Moz | MozRank (0-10) |
+| `fbshares` | Facebook | Nombre de partages |
+| `fbcomments` | Facebook | Nombre de commentaires |
+| `sr_rank` | SEMrush | Rang du domaine |
+| `sr_traffic` | SEMrush | Trafic mensuel estimé |
+
+```{r seo-enrichment, eval=FALSE}
+# Utiliser la fonction mwiR pour enrichissement SEO
+mwir_seorank(
+  filename = "ai_work_seo",
+  urls = pages$url,
+  api_key = Sys.getenv("SEORANK_API_KEY")
+)
+
+# Charger et fusionner les résultats
+seo_data <- read.csv("ai_work_seo.csv", stringsAsFactors = FALSE)
+pages_enriched <- merge(pages, seo_data, by = "url", all.x = TRUE)
+```
+
+## Agrégation par domaine
+
+```{r aggregate-domains}
+# Charger les données (si non déjà chargées)
+pages <- read.csv("AI_Work_Impact_fullpagecsv.csv", stringsAsFactors = FALSE)
+
+# Agrégation par domaine
+library(dplyr)
+
+domain_stats <- pages %>%
+  group_by(domain_name) %>%
+  summarise(
+    n_pages = n(),
+    avg_relevance = mean(relevance, na.rm = TRUE),
+    total_fbshares = sum(fbshares, na.rm = TRUE),
+    avg_pa = mean(pa, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  arrange(desc(n_pages))
+
+# Top 10 domaines
+head(domain_stats, 10)
+```
+
+---
+
+# Analyse Statistique et Transformation
+
+## Exploration des distributions
+
+```{r distributions}
+# Charger les données
+pages <- read.csv("AI_Work_Impact_fullpagecsv.csv", stringsAsFactors = FALSE)
+
+# Explorer la distribution de pertinence
+plotlog(
+  df = pages,
+  variables = c("relevance"),
+  trans_type = "log1p",
+  bins = "auto",
+  save = TRUE,
+  save_dir = "figures"
+)
+```
+
+## Transformation des variables
+
+```{r transform}
+# Transformer une variable avec queue lourde
+transformed_relevance <- transform_variable(
+  x = pages$relevance,
+  method = "yeojohnson",
+  winsorize = 0.01
+)
+
+# Examiner le résultat
+hist(transformed_relevance$values, main = "Relevance transformée", xlab = "Value")
+```
+
+## Discrétisation pour analyse qualitative
+
+```{r discretize}
+# Trouver des clusters naturels
+clusters <- find_clusters(
+  pages$relevance,
+  max_G = 4,
+  transform = "log1p",
+  return_breaks = TRUE
+)
+
+# Discrétiser en classes
+pages$relevance_class <- discretize_variable(
+  pages$relevance,
+  method = "manual",
+  breaks = clusters$breaks,
+  labels = c("Faible", "Moyen", "Élevé", "Très élevé")
+)
+
+# Distribution des classes
+table(pages$relevance_class)
+```
+
+## Analyse de loi de puissance
+
+Les distributions web suivent souvent des lois de puissance (Zipf, Pareto) :
+
+```{r powerlaw}
+# Analyser si la pertinence suit une loi de puissance
+powerlaw_result <- analyse_powerlaw(
+  pages$relevance,
+  type = "discrete",
+  candidate_models = c("powerlaw", "lognormal", "exponential"),
+  bootstrap_sims = 100,
+  threads = NULL  # Auto-détection du nombre optimal de cœurs
+)
+
+# Résultats
+print(powerlaw_result$best_model)
+print(powerlaw_result$comparisons)
+```
+
+### Optimisation de la parallélisation
+
+Le paramètre `threads = NULL` (par défaut) détecte automatiquement la configuration optimale :
+
+- **Apple Silicon (M1/M2/M3)** : Utilise uniquement les Performance cores (P-cores), évitant les Efficiency cores plus lents
+- **Autres systèmes** : Utilise la moitié des cœurs disponibles moins 1
+
+```{r system-info}
+# Afficher les informations système et le nombre de workers recommandé
+mwir_system_info()
+```
+
+Pour forcer un nombre spécifique de threads :
+
+```{r powerlaw-threads}
+# Forcer 4 threads
+powerlaw_result <- analyse_powerlaw(
+  pages$relevance,
+  type = "discrete",
+  bootstrap_sims = 100,
+  threads = 4L
+)
+```
+
+---
+
+# Détection de Langue
+
+```{r language-detection}
+# Détecter la langue des contenus
+pages$lang_detected <- mwiR_detectLang(
+  df = pages,
+  variables = c("title", "readable"),
+  engine = "cld3",
+  min_chars = 50,
+  conservative = TRUE
+)
+
+# Distribution des langues
+table(pages$lang_detected)
+```
+
+---
+
+# Workflow Complet Automatisé
+
+Voici un script complet qui automatise l'ensemble du workflow :
+
+```{r full-workflow, eval=FALSE}
+#' Workflow complet My Web Intelligence
+#' @param project_name Nom du projet
+#' @param seed_urls Vecteur d'URLs initiales
+#' @param terms Termes du dictionnaire
+#' @param crawl_iterations Nombre d'itérations de crawl
+
+run_mwi_workflow <- function(project_name, seed_urls, terms, crawl_iterations = 20) {
+
+  # 1. INITIALISATION
+  cat("=== 1. INITIALISATION ===\n")
+  library(mwiR)
+  initmwi()
+  db_setup()
+
+  # 2. CRÉATION DU PROJET
+  cat("=== 2. CRÉATION DU PROJET ===\n")
+  create_land(name = project_name,
+              desc = paste("Étude:", project_name),
+              lang = "en")
+
+  # 3. AJOUT DES TERMES
+  cat("=== 3. AJOUT DES TERMES ===\n")
+  addterm(project_name, terms)
+
+  # 4. AJOUT DES URLs
+  cat("=== 4. AJOUT DES URLs ===\n")
+  for (url in seed_urls) {
+    addurl(project_name, urls = url)
+  }
+
+  # 5. CRAWL
+  cat("=== 5. CRAWL ===\n")
+  for (i in 1:crawl_iterations) {
+    cat(sprintf("Iteration %d/%d\n", i, crawl_iterations))
+    crawlurls(project_name, limit = sample(10:30, 1))
+    Sys.sleep(runif(1, 1, 3))
+  }
+
+  # 6. CRAWL DOMAINES
+  cat("=== 6. CRAWL DOMAINES ===\n")
+  crawlDomain(100)
+
+  # 7. FILTRAGE
+  cat("=== 7. FILTRAGE ===\n")
+  deleteland(project_name, maxrel = 1)
+
+  # 8. EXPORT
+  cat("=== 8. EXPORT ===\n")
+  export_land(project_name, "pagecsv", minimum_relevance = 2)
+  export_land(project_name, "fullpagecsv", minimum_relevance = 2)
+  export_land(project_name, "nodegexf", minimum_relevance = 2)
+  export_land(project_name, "corpus", minimum_relevance = 3, ext = "md")
+
+  # 9. RÉSUMÉ
+  cat("=== 9. RÉSUMÉ ===\n")
+  listlands(project_name)
+
+  cat("\n=== WORKFLOW TERMINÉ ===\n")
+  return(invisible(TRUE))
+}
+
+# Exécuter le workflow
+run_mwi_workflow(
+  project_name = "AI_Work_Impact",
+  seed_urls = seed_urls,
+  terms = "artificial intelligence, AI, employment, job, automation, workforce",
+  crawl_iterations = 20
+)
+```
+
+---
+
+# Bonnes Pratiques et Éthique
+
+## Documentation méthodologique
+
+Chaque étude doit documenter :
+
+1. **Constitution du corpus**
+   - Méthode de collecte des URLs initiales
+   - Critères de sélection/exclusion
+   - Période de collecte
+
+2. **Paramètres de crawl**
+   - Nombre d'itérations
+   - Profondeur
+   - Gestion des erreurs
+
+3. **Recodage LLM**
+   - Modèle utilisé (version exacte)
+   - Prompts complets
+   - Température et paramètres
+   - Taux d'accord inter-annotateurs
+
+## Considérations éthiques
+
+- **Respect du robots.txt** : mwiR respecte les directives des sites
+- **Rate limiting** : Ne pas surcharger les serveurs
+- **Données personnelles** : Anonymiser si nécessaire
+- **Reproductibilité** : Documenter et partager le code
+- **Biais algorithmiques** : Croiser les sources, valider manuellement
+
+## Archivage et partage
+
+```{r archiving, eval=FALSE}
+# Sauvegarder la session R
+save.image(file = paste0(project_name, "_session.RData"))
+
+# Archiver le projet complet
+zip(
+  zipfile = paste0(project_name, "_archive.zip"),
+  files = c("mwi.db",
+            list.files(pattern = "\\.csv$"),
+            list.files(pattern = "\\.gexf$"),
+            paste0(project_name, "_corpus.zip"))
+)
+
+# Déposer sur un entrepôt de données (Zenodo, Nakala, Dataverse)
+```
+
+---
+
+# Exercices Pratiques
+
+## Exercice 1 : Constitution d'un corpus
+
+1. Choisissez un sujet de controverse (ex: vaccination, énergie nucléaire, cryptomonnaies)
+2. Identifiez 10 URLs de départ représentant différentes positions
+3. Définissez 15-20 termes pertinents
+4. Crawlez jusqu'à obtenir 100+ pages avec relevance > 2
+
+## Exercice 2 : Analyse de réseau
+
+1. Exportez votre corpus en GEXF
+2. Importez dans Gephi
+3. Identifiez les communautés
+4. Interprétez les clusters thématiquement
+
+## Exercice 3 : Recodage LLM
+
+1. Définissez une grille de codage (5-7 catégories)
+2. Codez manuellement 20 pages
+3. Appliquez le recodage LLM
+4. Calculez le taux d'accord
+5. Ajustez votre prompt
+
+## Exercice 4 : Rapport de recherche
+
+Rédigez un rapport incluant :
+
+1. **Introduction** : Question de recherche, hypothèses
+2. **Méthodologie** : Collecte, crawl, filtrage
+3. **Résultats** : Statistiques descriptives, réseaux, classifications
+4. **Discussion** : Interprétation, limites, perspectives
+5. **Annexes** : Code R, prompts LLM, fichiers GEXF
+
+---
+
+# Ressources Complémentaires
+
+## Documentation officielle
+
+- [GitHub mwiR](https://github.com/MyWebIntelligence/mwiR)
+- [Trafilatura Documentation](https://trafilatura.readthedocs.io/)
+- [SerpAPI Documentation](https://serpapi.com/docs)
+
+## Références méthodologiques
+
+- Rogers, R. (2019). *Doing Digital Methods*. SAGE.
+- Venturini, T. et al. (2018). *A reality check(list) for digital methods*. New Media & Society.
+- Marres, N. (2017). *Digital Sociology*. Polity Press.
+
+## Formations en ligne
+
+- [R for Data Science](https://r4ds.had.co.nz/)
+- [Gephi Tutorials](https://gephi.org/users/)
+- [Text Mining with R](https://www.tidytextmining.com/)
+
+---
+
+# Conclusion
+
+Ce cours vous a introduit aux **méthodes numériques** pour la recherche en sciences sociales. Avec mwiR, vous disposez d'un outil complet pour :
+
+✅ Collecter des corpus web de manière systématique
+✅ Extraire et qualifier du contenu textuel
+✅ Analyser les réseaux d'acteurs numériques
+✅ Recoder qualitativement avec l'assistance de LLM
+✅ Produire des exports exploitables dans d'autres outils
+
+La maîtrise de ces techniques vous permettra d'aborder des questions sociologiques contemporaines avec une approche empirique rigoureuse et reproductible.
+
+---
+
+**Contact & Support**
+
+- GitHub Issues : https://github.com/MyWebIntelligence/mwiR/issues
+- Documentation : https://mywebintelligence.github.io/mwiR/
+
+---
+
+*Dernière mise à jour : `r format(Sys.Date(), "%d %B %Y")`*
+
+```{r session-info}
+# Informations de session pour reproductibilité
+sessionInfo()
+```

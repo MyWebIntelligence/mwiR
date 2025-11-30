@@ -1,4 +1,4 @@
-# mwiR 0.9.0 (Beta) The R Package of My Web Intelligence Project
+# mwiR 0.4.0 The R Package of My Web Intelligence Project
 <!-- badges: start -->
 ![MyWebIntelligence Banner](man/figures/mwibanner.png)
 <!-- badges: end -->
@@ -793,17 +793,44 @@ powerlaw <- analyse_powerlaw(
   candidate_models = c("powerlaw", "lognormal", "exponential"),
   bootstrap_sims   = 200,
   winsorize        = 0.01,
-  threads          = 4
+  threads          = NULL  # Auto-detection (recommended)
 )
 ```
 
-- `analyse_powerlaw()` confronte plusieurs lois de queue pour tester la présence d’une véritable loi de puissance.
-- En mode `"discrete"`, les données sont arrondies et les valeurs < 1 exclues ; vérifie qu’il reste assez d’observations positives (`min_n` = 50 par défaut).
-- Ajuste `type`, `candidate_models`, `winsorize`, `xmin` et `threads` (nombre de cœurs utilisés pendant le bootstrap) selon tes besoins de robustesse et de temps de calcul.
-- `candidate_models` accepte `"powerlaw"`, `"lognormal"`, `"exponential"` (et `"weibull"` en continu). Tu peux fournir un sous-ensemble ciblé ou changer l’ordre selon les lois pertinentes pour ton terrain.
+- `analyse_powerlaw()` confronte plusieurs lois de queue pour tester la présence d'une véritable loi de puissance.
+- En mode `"discrete"`, les données sont arrondies et les valeurs < 1 exclues ; vérifie qu'il reste assez d'observations positives (`min_n` = 50 par défaut).
+- Ajuste `type`, `candidate_models`, `winsorize`, `xmin` et `threads` selon tes besoins de robustesse et de temps de calcul.
+- **Parallélisation automatique** : `threads = NULL` (défaut) détecte automatiquement le nombre optimal de cœurs :
+  - Sur Apple Silicon (M1/M2/M3), utilise uniquement les Performance cores (P-cores) pour éviter les E-cores plus lents
+  - Sur autres systèmes, utilise la moitié des cœurs disponibles moins 1
+  - Utilise `mwir_system_info()` pour voir la configuration détectée
+- `candidate_models` accepte `"powerlaw"`, `"lognormal"`, `"exponential"` (et `"weibull"` en continu). Tu peux fournir un sous-ensemble ciblé ou changer l'ordre selon les lois pertinentes pour ton terrain.
 - `bootstrap_sims` contrôle le nombre de simulations KS, `bootstrap_models` restreint la liste des modèles simulés. Diminue `bootstrap_sims` pour un résultat rapide, augmente-le pour plus de précision.
 - La sortie regroupe `best_model`, les paramètres (`best_fit`), les comparaisons de vraisemblance (`comparisons`), les diagnostics bootstrap (`bootstrap`) et un `data_summary` directement mobilisable dans les rapports.
 - Bonnes pratiques : essayer plusieurs `winsorize`, surveiller `best_fit$n_tail`, examiner les p-values bootstrap et justifier le `xmin` retenu.
+
+### 5. System Information for Parallelization
+
+```r
+# Display system info and recommended worker count
+mwir_system_info()
+
+# Example output on Apple Silicon Mac:
+# === mwiR System Info ===
+# OS: Darwin
+# Architecture: arm64
+# Total cores: 10
+# Performance cores: 8
+# Efficiency cores: 2
+# Recommended workers: 7
+# Apple Silicon: Yes
+```
+
+`mwir_system_info()` displays hardware detection results and the recommended number of parallel workers. Useful for:
+
+- Verifying Apple Silicon detection
+- Understanding why `threads = NULL` chose a specific worker count
+- Troubleshooting parallelization issues
 
 ## Step 8: Leverage AI Assistance Responsibly
 
