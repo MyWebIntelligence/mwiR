@@ -327,21 +327,77 @@ mwiR can integrate with external services that require API keys:
 2. Get your API key from the dashboard
 3. In R, when prompted or set manually:
 
+**Option 1: Set temporarily in R session**
 ```r
-# Option 1: Set in session
 Sys.setenv(SERPAPI_KEY = "your_api_key_here")
+```
+This works but you'll need to run it each time you start R.
 
-# Option 2: Add to .Renviron file (persistent)
-# Create/edit ~/.Renviron and add:
-# SERPAPI_KEY=your_api_key_here
+**Option 2: Save permanently in .Renviron file (Recommended)**
+
+The `.Renviron` file stores environment variables that R loads automatically at startup.
+
+**How to create/edit .Renviron:**
+
+*Method A - Using R (easiest):*
+```r
+# This opens the file in your default editor
+usethis::edit_r_environ()
+
+# Or create it manually:
+file.edit("~/.Renviron")
+```
+
+*Method B - Manual creation:*
+
+| OS | File location |
+|----|---------------|
+| **Windows** | `C:\Users\YourUsername\Documents\.Renviron` |
+| **macOS** | `/Users/YourUsername/.Renviron` |
+| **Linux** | `/home/YourUsername/.Renviron` |
+
+**Windows step-by-step:**
+1. Open File Explorer
+2. Go to `C:\Users\YourUsername\Documents\`
+3. Create a new text file
+4. Rename it to `.Renviron` (no extension, just `.Renviron`)
+5. If Windows complains about no extension, confirm "Yes"
+6. Open with Notepad and add your keys
+
+**macOS/Linux step-by-step:**
+```bash
+# Open Terminal and run:
+nano ~/.Renviron
+# Add your keys, then Ctrl+O to save, Ctrl+X to exit
+```
+
+**Content of .Renviron file:**
+```
+SERPAPI_KEY=your_serpapi_key_here
+OPENAI_API_KEY=your_openai_key_here
+OPENROUTER_API_KEY=your_openrouter_key_here
+```
+
+**Important rules for .Renviron:**
+- One variable per line
+- No spaces around `=`
+- No quotes around values
+- Add an empty line at the end of the file
+- **Restart R/RStudio** after editing for changes to take effect
+
+**Verify your keys are loaded:**
+```r
+# After restarting R:
+Sys.getenv("SERPAPI_KEY")      # Should show your key
+Sys.getenv("OPENAI_API_KEY")   # Should show your key
 ```
 
 ### OpenAI/OpenRouter (for AI-assisted recoding)
 
-```r
-Sys.setenv(OPENAI_API_KEY = "your_openai_key")
-# Or for OpenRouter:
-Sys.setenv(OPENROUTER_API_KEY = "your_openrouter_key")
+Add these to your `.Renviron` file (see instructions above):
+```
+OPENAI_API_KEY=sk-your-openai-key
+OPENROUTER_API_KEY=sk-or-your-openrouter-key
 ```
 
 **Note:** If you don't have API keys yet, you can skip this step. You can still use mwiR's crawling and analysis features without them.
