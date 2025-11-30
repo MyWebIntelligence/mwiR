@@ -588,30 +588,48 @@ tasks.
 
 ### Export Land Data
 
-    #type = ['pagecsv', 'pagegexf', 'fullpagecsv', 'nodecsv', 'nodegexf', 'mediacsv', 'corpus']
+The `export_land()` function exports your research data in various formats.
 
-    # Exemple d'utilisation "le projet", "type d'export", "relevance", "file"
-    
-    export_land("giletsjaunes", "pagegexf", 3)
+**Parameters:**
+- `land_name`: Name of the land/project
+- `export_type`: Format to export (see below)
+- `minimum_relevance`: Minimum relevance score (default: 1)
+- `labase`: Database file (default: "mwi.db")
+- `ext`: For corpus export only - "md", "txt", or "pdf" (default: "md")
 
-The `export_land()` function manages the exportation of land data based
-on the specified export type.
+**Available export types:**
 
--   `land_name`: A character string specifying the name of the land.
--   `export_type`: A character string specifying the type of export.
-    Options include `"pagecsv"`, `"fullpagecsv"`, `"nodecsv"`,
-    `"mediacsv"`, `"pagegexf"`, `"nodegexf"`, or `"corpus"`.
--   `minimum_relevance`: A numeric value specifying the minimum
-    relevance score for inclusion in the export. Default is `1`.
--   `labase`: A character string specifying the name of the database
-    file. Default is `"mwi.db"`.
+| Type | Description | Output |
+|------|-------------|--------|
+| `pagecsv` | Basic page data | CSV file |
+| `fullpagecsv` | Complete page data with content | CSV file |
+| `nodecsv` | Domain nodes for network analysis | CSV file |
+| `nodegexf` | Domain network graph | GEXF file (Gephi) |
+| `pagegexf` | Page-level network graph | GEXF file (Gephi) |
+| `mediacsv` | Media/images extracted | CSV file |
+| `corpus` | Text corpus with metadata | ZIP of md/txt/pdf files |
 
-**Example:**
+**Examples:**
 
-This example demonstrates exporting data for the project “giletsjaunes”
-with a minimum relevance score of 3 into a GEXF file.
+```r
+# Export page data as CSV (minimum relevance = 3)
+export_land("AIWork", "pagecsv", 3)
 
-    export_land("giletsjaunes", "pagegexf", 3)
+# Export full content as CSV
+export_land("AIWork", "fullpagecsv", 2)
+
+# Export domain network for Gephi
+export_land("AIWork", "nodegexf", 3)
+
+# Export page network for Gephi
+export_land("AIWork", "pagegexf", 3)
+
+# Export text corpus as Markdown files
+export_land("AIWork", "corpus", 3, ext = "md")
+
+# Export text corpus as PDF files
+export_land("AIWork", "corpus", 3, ext = "pdf")
+```
 
 ## Step 4: Enrich Your Corpus with SerpAPI Helpers
 
