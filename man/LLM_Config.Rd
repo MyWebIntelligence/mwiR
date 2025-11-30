@@ -13,11 +13,15 @@ LLM_Config(
 )
 }
 \arguments{
-\item{provider}{Default LLM provider: "openai", "openrouter", "anthropic", or "ollama".}
+\item{provider}{Default LLM provider: "openai", "openrouter", "anthropic", or "ollama".
+When specified, checks if the corresponding API key is set. If missing and
+in an interactive session, prompts user to enter it.}
 
-\item{model}{Default model to use (NULL = provider default).}
+\item{model}{Default model to use (e.g., "gpt-4o", "claude-sonnet-4-20250514").
+NULL uses the provider's default model.}
 
-\item{api_key}{API key to store for the session.}
+\item{api_key}{API key to store for the session. If NULL and provider is
+specified, uses existing environment variable or prompts interactively.}
 
 \item{verbose}{Show progress messages (TRUE/FALSE).}
 
@@ -30,13 +34,20 @@ Invisibly returns NULL. Prints current configuration.
 Configure default settings for LLM_Recode that persist for the R session.
 This function is designed for social science researchers who want to set up
 their configuration once and reuse it across multiple analyses.
+
+If a provider is specified and no API key is found, the function will
+interactively prompt for the key (in interactive sessions) and store it
+for the duration of the R session.
 }
 \examples{
 \dontrun{
-# Configure for French users with OpenAI
+# Configure for French users with OpenAI (will prompt for API key if missing)
 LLM_Config(provider = "openai", lang = "fr")
 
-# Configure with API key
+# Configure with specific model
+LLM_Config(provider = "openai", model = "gpt-4o-mini", lang = "fr")
+
+# Configure with API key directly
 LLM_Config(provider = "openai", api_key = "sk-...")
 
 # View current configuration

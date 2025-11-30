@@ -2687,9 +2687,17 @@ annotatedData <- function(dataplus, table, champ, by, labase = "mwi.db") {
 #' This function is designed for social science researchers who want to set up
 #' their configuration once and reuse it across multiple analyses.
 #'
+#' If a provider is specified and no API key is found, the function will
+#' interactively prompt for the key (in interactive sessions) and store it
+#' for the duration of the R session.
+#'
 #' @param provider Default LLM provider: "openai", "openrouter", "anthropic", or "ollama".
-#' @param model Default model to use (NULL = provider default).
-#' @param api_key API key to store for the session.
+#'   When specified, checks if the corresponding API key is set. If missing and
+#'   in an interactive session, prompts user to enter it.
+#' @param model Default model to use (e.g., "gpt-4o", "claude-sonnet-4-20250514").
+#'   NULL uses the provider's default model.
+#' @param api_key API key to store for the session. If NULL and provider is
+#'   specified, uses existing environment variable or prompts interactively.
 #' @param verbose Show progress messages (TRUE/FALSE).
 #' @param lang Language for messages: "fr" (French) or "en" (English).
 #'
@@ -2697,10 +2705,13 @@ annotatedData <- function(dataplus, table, champ, by, labase = "mwi.db") {
 #'
 #' @examples
 #' \dontrun{
-#' # Configure for French users with OpenAI
+#' # Configure for French users with OpenAI (will prompt for API key if missing)
 #' LLM_Config(provider = "openai", lang = "fr")
 #'
-#' # Configure with API key
+#' # Configure with specific model
+#' LLM_Config(provider = "openai", model = "gpt-4o-mini", lang = "fr")
+#'
+#' # Configure with API key directly
 #' LLM_Config(provider = "openai", api_key = "sk-...")
 #'
 #' # View current configuration
@@ -2711,26 +2722,49 @@ annotatedData <- function(dataplus, table, champ, by, labase = "mwi.db") {
 LLM_Config <- function(provider = NULL, model = NULL, api_key = NULL,
                        verbose = NULL, lang = NULL) {
 
-  if (!is.null(provider)) {
-    if (!provider %in% names(.llm_providers)) {
-      stop("Provider must be one of: ", paste(names(.llm_providers), collapse = ", "))
-    }
-    options(mwiR.llm.preferred_provider = provider)
-  }
-
-  if (!is.null(model)) options(mwiR.llm.default_model = model)
-  if (!is.null(verbose)) options(mwiR.llm.verbose = verbose)
+  # Set lang first so messages are in the right language
   if (!is.null(lang)) {
     if (!lang %in% c("fr", "en")) stop("lang must be 'fr' or 'en'")
     options(mwiR.llm.lang = lang)
   }
 
-  if (!is.null(api_key) && !is.null(provider)) {
+  if (!is.null(provider)) {
+    if (!provider %in% names(.llm_providers)) {
+      stop("Provider must be one of: ", paste(names(.llm_providers), collapse = ", "))
+    }
+    options(mwiR.llm.preferred_provider = provider)
+
+    # Check if API key exists for selected provider, ask if missing
     env_key <- .llm_providers[[provider]]$env_key
     if (!is.null(env_key)) {
-      do.call(Sys.setenv, setNames(list(api_key), env_key))
+      current_key <- Sys.getenv(env_key, "")
+
+      if (!is.null(api_key)) {
+        # User provided api_key argument - use it
+        do.call(Sys.setenv, setNames(list(api_key), env_key))
+        message(.msg("key_saved"))
+      } else if (!nzchar(current_key)) {
+        # No API key set - ask interactively if possible
+        if (interactive()) {
+          message(.msg("no_api_key", provider = provider))
+          user_key <- readline(prompt = .msg("ask_key"))
+          if (nzchar(trimws(user_key))) {
+            do.call(Sys.setenv, setNames(list(trimws(user_key)), env_key))
+            message(.msg("key_saved"))
+          }
+        } else {
+          warning(.msg("no_api_key", provider = provider), call. = FALSE)
+        }
+      }
     }
+  } else if (!is.null(api_key)) {
+    # api_key provided without provider - warn user
+    warning("api_key provided but no provider specified. Use: LLM_Config(provider = 'openai', api_key = '...')",
+            call. = FALSE)
   }
+
+  if (!is.null(model)) options(mwiR.llm.default_model = model)
+  if (!is.null(verbose)) options(mwiR.llm.verbose = verbose)
 
   message(.msg("config_title"))
   message("  Provider: ", getOption("mwiR.llm.preferred_provider", "auto-detect"))
