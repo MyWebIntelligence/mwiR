@@ -1,0 +1,1579 @@
+---
+title: "Les Distributions à Queue Lourde : Problèmes et Solutions"
+subtitle: "Cours de Licence - Analyse de Données Web et Réseaux Sociaux"
+author: "Amar LAKEL - Université Bordeaux Montaigne"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 4
+    toc_float:
+      collapsed: false
+      smooth_scroll: true
+    number_sections: true
+    theme: flatly
+    highlight: tango
+    code_folding: show
+    df_print: paged
+  pdf_document:
+    toc: true
+    number_sections: true
+    latex_engine: xelatex
+editor_options:
+  markdown:
+    wrap: 140
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  eval = FALSE,
+  message = TRUE,
+  warning = TRUE,
+  fig.width = 10,
+  fig.height = 6,
+  cache = FALSE
+)
+```
+
+---
+
+# Introduction : Pourquoi ce cours ?
+
+## Le problème que vous allez rencontrer
+
+Imaginez que vous analysez des données issues du web :
+
+- Le nombre de followers sur Twitter
+- Le nombre de liens entrants vers des sites web
+- Le nombre de partages Facebook d'articles
+- La pertinence thématique de pages web
+
+**Question naïve** : "Quelle est la moyenne de followers ?"
+
+**Réponse surprenante** : Cette question n'a souvent **pas de sens** avec les données web !
+
+## Un exemple concret
+
+```{r exemple-intro, eval=TRUE, echo=FALSE}
+# Simuler des données réalistes de followers
+set.seed(42)
+followers <- c(
+  rpois(900, lambda = 50),           # 90% des utilisateurs : peu de followers
+  rpois(90, lambda = 500),           # 9% : followers modérés
+  rpois(9, lambda = 5000),           # 0.9% : beaucoup de followers
+  round(runif(1, 100000, 1000000))   # 0.1% : célébrité (outlier extrême)
+)
+followers <- pmax(followers, 1)  # Au moins 1 follower
+
+cat("=== Statistiques descriptives des followers ===\n")
+cat("Minimum:", min(followers), "\n")
+cat("Maximum:", max(followers), "\n")
+cat("Moyenne:", round(mean(followers), 2), "\n")
+cat("Médiane:", median(followers), "\n")
+cat("Écart-type:", round(sd(followers), 2), "\n")
+```
+
+**Observations troublantes :**
+
+1. La moyenne (≈1000) est **très éloignée** de la médiane (≈50)
+2. L'écart-type est **plus grand** que la moyenne
+3. Un seul individu (la célébrité) fait exploser les statistiques
+
+> **Conclusion** : Les statistiques classiques (moyenne, écart-type) sont **trompeuses** pour ce type de données.
+
+---
+
+# Partie 1 : Comprendre les distributions
+
+## Rappel : La distribution normale (Gaussienne)
+
+La distribution normale est celle que vous connaissez depuis le lycée. Elle a une forme de "cloche" symétrique.
+
+```{r normale-plot, eval=TRUE, echo=FALSE, fig.cap="Distribution normale : symétrique, sans valeurs extrêmes"}
+set.seed(123)
+x_normal <- rnorm(10000, mean = 100, sd = 15)
+hist(x_normal, breaks = 50, main = "Distribution Normale (QI par exemple)",
+     xlab = "Valeur", ylab = "Fréquence", col = "steelblue", border = "white")
+abline(v = mean(x_normal), col = "red", lwd = 2, lty = 2)
+legend("topright", legend = c("Moyenne"), col = "red", lty = 2, lwd = 2)
+```
+
+**Caractéristiques de la normale :**
+
+| Propriété | Valeur typique |
+|-----------|----------------|
+| Symétrie | Parfaite autour de la moyenne |
+| Moyenne ≈ Médiane | Oui, très proches |
+| Valeurs extrêmes | Très rares (< 0.3% au-delà de 3σ) |
+| Écart-type | Plus petit que la moyenne |
+
+**Exemples de données normales :**
+
+- Taille des individus adultes
+- Scores de QI
+- Erreurs de mesure en physique
+- Notes d'examen (souvent)
+
+## Les distributions à queue lourde (Heavy-tailed)
+
+### Définition intuitive
+
+Une distribution est dite **à queue lourde** quand :
+
+1. La plupart des valeurs sont petites
+2. Quelques valeurs sont **extrêmement grandes**
+3. Ces valeurs extrêmes ne sont **pas des erreurs** mais font partie du phénomène
+
+```{r queue-lourde-plot, eval=TRUE, echo=FALSE, fig.cap="Distribution à queue lourde : asymétrique, avec des valeurs extrêmes"}
+set.seed(456)
+x_heavy <- c(
+  rpois(9000, 10),
+  rpois(900, 100),
+  rpois(90, 1000),
+  round(runif(10, 5000, 50000))
+)
+hist(x_heavy, breaks = 100, main = "Distribution à Queue Lourde (Followers par exemple)",
+     xlab = "Valeur", ylab = "Fréquence", col = "coral", border = "white")
+abline(v = mean(x_heavy), col = "red", lwd = 2, lty = 2)
+abline(v = median(x_heavy), col = "blue", lwd = 2, lty = 1)
+legend("topright", legend = c("Moyenne", "Médiane"), col = c("red", "blue"), lty = c(2, 1), lwd = 2)
+```
+
+**Observation clé** : La moyenne (rouge) est tirée vers la droite par les valeurs extrêmes, tandis que la médiane (bleu) reste proche du "centre de masse" des données.
+
+### Définition mathématique (simplifiée)
+
+Une distribution a une **queue lourde** si la probabilité d'observer des valeurs extrêmes décroît **lentement** (polynomialement) plutôt que **rapidement** (exponentiellement).
+
+$$P(X > x) \sim x^{-\alpha} \quad \text{(queue lourde)}$$
+
+$$P(X > x) \sim e^{-\lambda x} \quad \text{(queue légère/exponentielle)}$$
+
+où $\alpha$ est l'**exposant de la queue** (typiquement entre 1 et 3 pour les données web).
+
+### Exemples concrets de données à queue lourde
+
+| Domaine | Variable | Explication |
+|---------|----------|-------------|
+| **Réseaux sociaux** | Nombre de followers | Quelques célébrités ont des millions de followers |
+| **Web** | Liens entrants (backlinks) | Google/Wikipedia ont des milliards de liens |
+| **Économie** | Revenus/Patrimoine | Les milliardaires tirent la moyenne |
+| **Linguistique** | Fréquence des mots | "Le", "de", "et" dominent (loi de Zipf) |
+| **Séismes** | Magnitude | La plupart sont faibles, quelques-uns catastrophiques |
+| **Pandémies** | Nombre de cas par foyer | Super-propagateurs |
+
+## La loi de puissance (Power Law)
+
+### Définition
+
+La **loi de puissance** (ou loi de Pareto) est le cas le plus célèbre de distribution à queue lourde :
+
+$$P(X = x) \propto x^{-\alpha}$$
+
+où $\alpha$ (alpha) est l'**exposant de la loi de puissance**, généralement compris entre 2 et 3.
+
+### Le principe de Pareto (80/20)
+
+Vilfredo Pareto (économiste italien, 1896) observa que :
+
+> **80% des terres en Italie appartenaient à 20% de la population**
+
+Ce principe se généralise :
+
+- 80% du trafic web va vers 20% des sites
+- 80% des citations vont vers 20% des articles
+- 80% des ventes viennent de 20% des produits
+
+### Représentation graphique : l'échelle log-log
+
+Le **test visuel** d'une loi de puissance : tracer les données en échelle **logarithmique** sur les deux axes.
+
+```{r loglog-plot, eval=TRUE, echo=FALSE, fig.cap="Échelle log-log : une droite indique une loi de puissance"}
+set.seed(789)
+# Simuler une vraie loi de puissance
+library(stats)
+n <- 1000
+alpha <- 2.5
+xmin <- 1
+x_powerlaw <- xmin * (1 - runif(n))^(-1/(alpha-1))
+x_powerlaw <- round(x_powerlaw)
+
+# Calculer la distribution empirique
+freq_table <- table(x_powerlaw)
+values <- as.numeric(names(freq_table))
+counts <- as.numeric(freq_table)
+
+par(mfrow = c(1, 2))
+
+# Échelle normale
+plot(values, counts, type = "h", lwd = 2, col = "steelblue",
+     main = "Échelle normale", xlab = "Valeur x", ylab = "Fréquence")
+
+# Échelle log-log
+plot(values, counts, type = "p", pch = 19, col = "coral",
+     log = "xy", main = "Échelle log-log (droite = loi de puissance)",
+     xlab = "log(x)", ylab = "log(fréquence)")
+# Ajouter une ligne de régression
+fit <- lm(log(counts) ~ log(values))
+abline(fit, col = "darkred", lwd = 2, lty = 2)
+legend("topright", legend = paste("Pente α ≈", round(-coef(fit)[2], 2)),
+       col = "darkred", lty = 2, lwd = 2)
+
+par(mfrow = c(1, 1))
+```
+
+**Interprétation** :
+
+- Si les points forment une **droite** en échelle log-log, les données suivent probablement une loi de puissance
+- La **pente** de cette droite est l'opposé de l'exposant α
+
+---
+
+# Partie 2 : Les problèmes causés par les queues lourdes
+
+## Problème 1 : La moyenne n'a pas de sens
+
+### Exemple dramatique
+
+Imaginez 10 personnes dans un bar :
+
+- 9 personnes gagnent 30 000 €/an
+- 1 personne (Bill Gates) entre avec 100 milliards €/an
+
+**Revenu moyen dans le bar** : ≈ 10 milliards €/an
+
+> Est-ce que cette moyenne représente quelque chose de réel ? **Non !**
+
+### Explication mathématique
+
+Pour une loi de puissance avec exposant α :
+
+| Valeur de α | Moyenne | Variance |
+|-------------|---------|----------|
+| α < 2 | **Infinie** | Infinie |
+| 2 < α < 3 | Finie | **Infinie** |
+| α > 3 | Finie | Finie |
+
+La plupart des données web ont α entre 2 et 3, donc :
+
+- La moyenne **existe** mais est très instable
+- La variance est **infinie** (l'écart-type aussi)
+
+## Problème 2 : Les tests statistiques classiques échouent
+
+### Le t-test suppose la normalité
+
+Le test de Student (t-test) suppose que les données suivent une distribution normale. Avec des données à queue lourde :
+
+```{r ttest-fail, eval=TRUE, echo=FALSE}
+set.seed(111)
+# Groupe 1 : données à queue lourde
+groupe1 <- c(rpois(100, 10), rpois(10, 100), rpois(2, 1000))
+# Groupe 2 : similaire mais légèrement décalé
+groupe2 <- c(rpois(100, 12), rpois(10, 120), rpois(2, 1200))
+
+# T-test classique
+result_ttest <- t.test(groupe1, groupe2)
+
+# Test non-paramétrique (Wilcoxon)
+result_wilcox <- wilcox.test(groupe1, groupe2)
+
+cat("=== Comparaison de deux groupes ===\n\n")
+cat("Groupe 1 - Moyenne:", round(mean(groupe1), 2), "| Médiane:", median(groupe1), "\n")
+cat("Groupe 2 - Moyenne:", round(mean(groupe2), 2), "| Médiane:", median(groupe2), "\n\n")
+
+cat("T-test (paramétrique):\n")
+cat("  p-value:", round(result_ttest$p.value, 4), "\n\n")
+
+cat("Wilcoxon (non-paramétrique):\n")
+cat("  p-value:", round(result_wilcox$p.value, 4), "\n")
+```
+
+**Risque** : Le t-test peut donner des résultats trompeurs (faux positifs ou faux négatifs).
+
+## Problème 3 : Les régressions linéaires sont biaisées
+
+Les valeurs extrêmes (outliers) ont une **influence disproportionnée** sur la droite de régression :
+
+```{r regression-outlier, eval=TRUE, echo=FALSE, fig.cap="Impact d'un outlier sur la régression"}
+set.seed(222)
+x <- 1:20
+y <- 2*x + rnorm(20, sd = 3)
+
+# Ajouter un outlier
+x_out <- c(x, 21)
+y_out <- c(y, 100)
+
+par(mfrow = c(1, 2))
+
+# Sans outlier
+plot(x, y, pch = 19, col = "steelblue", main = "Sans outlier",
+     xlim = c(0, 25), ylim = c(0, 110))
+abline(lm(y ~ x), col = "red", lwd = 2)
+
+# Avec outlier
+plot(x_out, y_out, pch = 19, col = "steelblue", main = "Avec UN outlier",
+     xlim = c(0, 25), ylim = c(0, 110))
+points(21, 100, pch = 19, col = "coral", cex = 2)
+abline(lm(y_out ~ x_out), col = "red", lwd = 2)
+abline(lm(y ~ x), col = "gray", lwd = 2, lty = 2)
+legend("topleft", legend = c("Avec outlier", "Sans outlier"),
+       col = c("red", "gray"), lty = c(1, 2), lwd = 2)
+
+par(mfrow = c(1, 1))
+```
+
+**Observation** : Un seul point peut complètement changer la pente de la régression !
+
+## Problème 4 : Les visualisations standard sont illisibles
+
+```{r viz-problem, eval=TRUE, echo=FALSE, fig.cap="Histogramme classique : la queue est invisible"}
+set.seed(333)
+data_heavy <- c(rpois(9900, 5), rpois(90, 50), rpois(10, 500))
+
+par(mfrow = c(1, 2))
+
+hist(data_heavy, breaks = 50, main = "Histogramme classique",
+     xlab = "Valeur", col = "steelblue", border = "white")
+
+hist(log1p(data_heavy), breaks = 50, main = "Histogramme après log(1+x)",
+     xlab = "log(1 + Valeur)", col = "coral", border = "white")
+
+par(mfrow = c(1, 1))
+```
+
+**À gauche** : Impossible de voir la structure des données - tout est écrasé à gauche
+
+**À droite** : La transformation logarithmique révèle la vraie distribution
+
+## Problème 5 : Le clustering échoue
+
+Les algorithmes de clustering (k-means, etc.) sont basés sur les distances euclidiennes, qui sont dominées par les valeurs extrêmes :
+
+```{r clustering-fail, eval=TRUE, echo=FALSE, fig.cap="K-means échoue avec les données à queue lourde"}
+set.seed(444)
+# Créer des données avec 3 clusters + outliers
+cluster1 <- data.frame(x = rnorm(100, 5, 1), y = rnorm(100, 5, 1))
+cluster2 <- data.frame(x = rnorm(100, 15, 1), y = rnorm(100, 5, 1))
+cluster3 <- data.frame(x = rnorm(100, 10, 1), y = rnorm(100, 15, 1))
+outliers <- data.frame(x = c(50, 55, 60), y = c(50, 55, 45))
+
+data_cluster <- rbind(cluster1, cluster2, cluster3, outliers)
+
+# K-means
+km <- kmeans(data_cluster, centers = 3, nstart = 10)
+
+par(mfrow = c(1, 2))
+
+# Données brutes
+plot(data_cluster, pch = 19, col = "steelblue", main = "Données originales",
+     xlab = "X", ylab = "Y")
+points(outliers, pch = 17, col = "coral", cex = 2)
+
+# Résultat k-means
+plot(data_cluster, pch = 19, col = km$cluster, main = "K-means (problématique)",
+     xlab = "X", ylab = "Y")
+points(km$centers, pch = 4, col = "black", cex = 3, lwd = 3)
+
+par(mfrow = c(1, 1))
+```
+
+**Problème** : Les outliers attirent un cluster entier vers eux, faussant la segmentation.
+
+---
+
+# Partie 3 : Les solutions avec mwiR
+
+Le package **mwiR** fournit un ensemble d'outils spécifiquement conçus pour gérer les distributions à queue lourde dans l'analyse de données web.
+
+## Installation et chargement
+
+```{r install-mwir}
+# Installation (une seule fois)
+# install.packages("remotes")
+# remotes::install_github("MyWebIntelligence/mwiR")
+
+# Chargement
+library(mwiR)
+
+# Initialisation (crée l'environnement Python pour trafilatura)
+initmwi()
+```
+
+## Préparation des données d'exemple
+
+Pour ce cours, nous utiliserons des données simulées représentant un corpus web crawlé :
+
+```{r donnees-exemple, eval=TRUE}
+set.seed(2024)
+
+# Simuler un dataset de pages web crawlées
+n_pages <- 1000
+
+# Score de pertinence : distribution à queue lourde typique du web
+# La plupart des pages ont une faible pertinence, quelques-unes sont très pertinentes
+relevance <- c(
+  rpois(700, lambda = 3),      # 70% : faible pertinence (bruit)
+  rpois(200, lambda = 15),     # 20% : pertinence moyenne
+  rpois(80, lambda = 50),      # 8% : bonne pertinence
+  rpois(15, lambda = 150),     # 1.5% : très pertinente
+  round(runif(5, 300, 500))    # 0.5% : pages exceptionnellement pertinentes
+)
+relevance <- pmax(relevance, 0)  # Pas de valeurs négatives
+
+# Nombre de liens entrants (backlinks) : loi de puissance
+backlinks <- round(rexp(n_pages, rate = 0.1))
+backlinks <- pmax(backlinks, 0)
+
+# Partages Facebook : distribution très asymétrique
+fb_shares <- c(
+  rep(0, 400),                 # 40% : aucun partage
+  rpois(400, lambda = 5),      # 40% : quelques partages
+  rpois(150, lambda = 50),     # 15% : partages modérés
+  rpois(40, lambda = 500),     # 4% : viral modéré
+  round(runif(10, 5000, 50000))# 1% : très viral
+)
+fb_shares <- sample(fb_shares, n_pages)
+
+# Créer le dataframe
+pages <- data.frame(
+  id = 1:n_pages,
+  url = paste0("https://example.com/page", 1:n_pages),
+  relevance = relevance,
+  backlinks = backlinks,
+  fb_shares = fb_shares
+)
+
+# Aperçu
+head(pages)
+```
+
+```{r stats-descriptives, eval=TRUE}
+# Statistiques descriptives
+cat("=== RELEVANCE ===\n")
+cat("Min:", min(pages$relevance), "| Max:", max(pages$relevance), "\n")
+cat("Moyenne:", round(mean(pages$relevance), 2), "| Médiane:", median(pages$relevance), "\n")
+cat("Écart-type:", round(sd(pages$relevance), 2), "\n\n")
+
+cat("=== BACKLINKS ===\n")
+cat("Min:", min(pages$backlinks), "| Max:", max(pages$backlinks), "\n")
+cat("Moyenne:", round(mean(pages$backlinks), 2), "| Médiane:", median(pages$backlinks), "\n")
+cat("Écart-type:", round(sd(pages$backlinks), 2), "\n\n")
+
+cat("=== FB_SHARES ===\n")
+cat("Min:", min(pages$fb_shares), "| Max:", max(pages$fb_shares), "\n")
+cat("Moyenne:", round(mean(pages$fb_shares), 2), "| Médiane:", median(pages$fb_shares), "\n")
+cat("Écart-type:", round(sd(pages$fb_shares), 2), "\n")
+```
+
+**Observations typiques des données web :**
+
+1. La **moyenne est très supérieure à la médiane** → asymétrie droite
+2. L'**écart-type est du même ordre que la moyenne** → grande dispersion
+3. Le **maximum est très éloigné de la moyenne** → présence de valeurs extrêmes
+
+---
+
+## Solution 1 : Visualiser correctement avec `plotlog()`
+
+### Pourquoi transformer avant de visualiser ?
+
+Les histogrammes classiques sont **illisibles** pour les distributions à queue lourde car :
+
+- 90% des données sont compressées dans les premières barres
+- La "queue" (les valeurs extrêmes) est invisible
+- On ne peut pas voir la structure réelle des données
+
+### La fonction `plotlog()`
+
+`plotlog()` génère des **histogrammes comparatifs** entre les données originales et transformées.
+
+```{r plotlog-basic}
+# Utilisation basique
+plotlog(
+  df = pages,
+  variables = "relevance"
+)
+```
+
+### Paramètres de `plotlog()` expliqués
+
+```{r plotlog-params}
+plotlog(
+  # === DONNÉES ===
+  df = pages,                    # Data frame contenant les données
+  variables = c("relevance", "backlinks", "fb_shares"),  # Variables à analyser
+                                 # Si NULL, toutes les colonnes numériques
+
+  # === TRANSFORMATIONS ===
+  trans_type = "log1p",          # Type de transformation :
+                                 # "none"   : pas de transformation
+                                 # "log"    : logarithme naturel (échoue si x ≤ 0)
+                                 # "log1p"  : log(1+x) (gère les zéros)
+                                 # "sqrt"   : racine carrée
+                                 # "rank"   : rangs (1er, 2ème, etc.)
+                                 # "zscore" : (x - moyenne) / écart-type
+
+  # === APPARENCE ===
+  bins = "auto",                 # Nombre de barres :
+                                 # Entier (ex: 30) ou règle automatique :
+                                 # "sturges", "fd", "scott", "sqrt", "auto"
+  colors = c("steelblue", "coral"),  # Couleurs [original, transformé]
+  alpha = 0.6,                   # Transparence (0 = invisible, 1 = opaque)
+  theme = ggplot2::theme_minimal(),  # Thème ggplot2
+
+  # === OPTIONS AVANCÉES ===
+  density = FALSE,               # Ajouter une courbe de densité ?
+  show_rug = FALSE,              # Afficher les points individuels en bas ?
+  na_rm = TRUE,                  # Supprimer les NA ?
+  min_non_missing = 5,           # Minimum de valeurs non-manquantes requises
+  shift_constant = 1,            # Constante ajoutée avant log/sqrt si min ≤ 0
+
+  # === SAUVEGARDE ===
+  display = TRUE,                # Afficher le graphique ?
+  save = TRUE,                   # Sauvegarder en fichier ?
+  save_dir = "figures",          # Dossier de destination
+  save_format = "png",           # Format : "png", "pdf", "jpg"
+  save_dpi = 300,                # Résolution (dots per inch)
+  device_width = 10,             # Largeur en pouces
+  device_height = 6,             # Hauteur en pouces
+
+  # === MESSAGES ===
+  verbose = TRUE                 # Afficher les messages de progression ?
+)
+```
+
+### Exemple pratique commenté
+
+```{r plotlog-exemple}
+# Analyser plusieurs variables avec différentes transformations
+plotlog(
+  df = pages,
+  variables = list(
+    relevance = "log1p",      # Log pour la pertinence
+    backlinks = "sqrt",       # Racine carrée pour les backlinks
+    fb_shares = "rank"        # Rangs pour les partages (beaucoup de zéros)
+  ),
+  bins = "fd",                # Règle de Freedman-Diaconis (robuste)
+  density = TRUE,             # Ajouter les courbes de densité
+  show_rug = TRUE,            # Montrer les points individuels
+  save = TRUE,
+  save_dir = "output/figures",
+  verbose = TRUE
+)
+```
+
+### Quelle transformation choisir ?
+
+| Situation | Transformation recommandée | Justification |
+|-----------|---------------------------|---------------|
+| Données strictement positives | `"log"` | Compresse les grandes valeurs |
+| Données avec des zéros | `"log1p"` | log(0) = -Inf, mais log(1+0) = 0 |
+| Données avec des valeurs négatives | `"sqrt"` ou `"zscore"` | Le log échoue |
+| Beaucoup de zéros (> 50%) | `"rank"` | Conserve l'ordre, ignore les valeurs absolues |
+| Distribution bimodale | `"none"` puis clustering | La transformation peut masquer les modes |
+
+---
+
+## Solution 2 : Transformer robustement avec `transform_variable()`
+
+### Pourquoi transformer les données ?
+
+Les transformations permettent de :
+
+1. **Normaliser** les données pour les tests statistiques
+2. **Stabiliser** la variance (homoscédasticité)
+3. **Réduire** l'influence des valeurs extrêmes
+4. **Rendre** les données compatibles avec les modèles linéaires
+
+### La fonction `transform_variable()`
+
+```{r transform-basic}
+# Transformation de base
+transformed <- transform_variable(
+  x = pages$relevance,
+  method = "yeojohnson"
+)
+
+# Résultat : une liste avec les valeurs transformées et les métadonnées
+str(transformed)
+```
+
+### Paramètres de `transform_variable()` expliqués
+
+```{r transform-params}
+transformed <- transform_variable(
+  # === DONNÉES ===
+  x = pages$relevance,           # Vecteur numérique à transformer
+
+  # === MÉTHODE ===
+  method = "yeojohnson",         # Méthode de transformation :
+                                 # "auto"      : choix automatique (bestNormalize)
+                                 # "none"      : pas de transformation
+                                 # "center"    : x - moyenne
+                                 # "zscore"    : (x - moyenne) / écart-type
+                                 # "robust_z"  : (x - médiane) / MAD
+                                 # "log"       : log(x) - échoue si x ≤ 0
+                                 # "log1p"     : log(1 + x)
+                                 # "sqrt"      : racine carrée
+                                 # "boxcox"    : Box-Cox (x > 0 requis)
+                                 # "yeojohnson": Yeo-Johnson (accepte tout x)
+                                 # "ranknorm"  : transformation par rangs + normale
+
+  # === TRAITEMENT DES OUTLIERS ===
+  winsorize = 0.01,              # Proportion de la queue à "écrêter"
+                                 # 0.01 = remplace les 1% extrêmes de chaque côté
+                                 # NULL = pas de winsorisation
+                                 # Valeur entre 0 et 0.5
+
+  # === OPTIONS ===
+  shift_constant = 1,            # Constante ajoutée avant log/sqrt si min ≤ 0
+  handle_na = "keep",            # Gestion des NA : "keep" ou "omit"
+
+  # === PARAMÈTRES AVANCÉS (bestNormalize) ===
+  ...                            # Autres paramètres passés à bestNormalize
+)
+```
+
+### Les différentes méthodes de transformation
+
+#### Méthode `"zscore"` (standardisation)
+
+$$z = \frac{x - \mu}{\sigma}$$
+
+```{r zscore-exemple, eval=TRUE}
+# Standardisation classique
+original <- c(10, 20, 30, 40, 1000)  # Avec un outlier
+zscore <- (original - mean(original)) / sd(original)
+
+cat("Original:", original, "\n")
+cat("Z-score:", round(zscore, 2), "\n")
+cat("Moyenne des z-scores:", round(mean(zscore), 2), "\n")
+cat("Écart-type des z-scores:", round(sd(zscore), 2), "\n")
+```
+
+**Problème** : L'outlier (1000) tire la moyenne et l'écart-type, rendant les z-scores des valeurs "normales" très négatifs.
+
+#### Méthode `"robust_z"` (standardisation robuste)
+
+$$z_{robust} = \frac{x - \text{médiane}}{\text{MAD}}$$
+
+où MAD = Median Absolute Deviation (déviation absolue médiane)
+
+```{r robust-z-exemple, eval=TRUE}
+# Standardisation robuste
+original <- c(10, 20, 30, 40, 1000)
+mediane <- median(original)
+mad <- mad(original, constant = 1)  # MAD sans facteur de correction
+robust_z <- (original - mediane) / mad
+
+cat("Original:", original, "\n")
+cat("Médiane:", mediane, "| MAD:", mad, "\n")
+cat("Z-score robuste:", round(robust_z, 2), "\n")
+```
+
+**Avantage** : L'outlier a un z-score robuste très élevé (identifiable), mais ne perturbe pas les autres valeurs.
+
+#### Méthode `"boxcox"` (transformation de Box-Cox)
+
+$$y = \begin{cases} \frac{x^\lambda - 1}{\lambda} & \text{si } \lambda \neq 0 \\ \log(x) & \text{si } \lambda = 0 \end{cases}$$
+
+- Le paramètre λ est **estimé automatiquement** pour maximiser la normalité
+- **Contrainte** : x doit être strictement positif (x > 0)
+
+#### Méthode `"yeojohnson"` (transformation de Yeo-Johnson)
+
+Extension de Box-Cox qui accepte les valeurs **négatives et nulles** :
+
+$$y = \begin{cases} \frac{(x+1)^\lambda - 1}{\lambda} & \text{si } \lambda \neq 0, x \geq 0 \\ \log(x+1) & \text{si } \lambda = 0, x \geq 0 \\ -\frac{(-x+1)^{2-\lambda} - 1}{2-\lambda} & \text{si } \lambda \neq 2, x < 0 \\ -\log(-x+1) & \text{si } \lambda = 2, x < 0 \end{cases}$$
+
+**Recommandation** : `"yeojohnson"` est le choix le plus **robuste** et **polyvalent**.
+
+#### Méthode `"ranknorm"` (transformation par rangs normaux)
+
+1. Convertir les données en rangs (1, 2, 3, ...)
+2. Convertir les rangs en quantiles normaux
+
+```{r ranknorm-exemple, eval=TRUE}
+# Transformation par rangs normaux
+original <- c(1, 2, 3, 4, 1000)  # Avec un outlier extrême
+n <- length(original)
+rangs <- rank(original)
+ranknorm <- qnorm((rangs - 0.5) / n)
+
+cat("Original:", original, "\n")
+cat("Rangs:", rangs, "\n")
+cat("Rangs normaux:", round(ranknorm, 2), "\n")
+```
+
+**Avantage** : L'outlier (1000) est traité comme "la plus grande valeur" (rang 5), pas comme une valeur 1000x plus grande.
+
+### Exemple pratique complet
+
+```{r transform-complet}
+# Transformer la variable relevance avec différentes méthodes
+results <- list()
+
+# Méthode 1 : Yeo-Johnson avec winsorisation
+results$yeojohnson <- transform_variable(
+  x = pages$relevance,
+  method = "yeojohnson",
+  winsorize = 0.01
+)
+
+# Méthode 2 : Rangs normaux (très robuste aux outliers)
+results$ranknorm <- transform_variable(
+  x = pages$relevance,
+  method = "ranknorm",
+  winsorize = NULL  # Pas besoin avec les rangs
+)
+
+# Méthode 3 : Z-score robuste
+results$robust_z <- transform_variable(
+  x = pages$relevance,
+  method = "robust_z",
+  winsorize = 0.02
+)
+
+# Comparer les résultats
+cat("=== Comparaison des transformations ===\n")
+for (name in names(results)) {
+  vals <- results[[name]]$values
+  cat(name, ":\n")
+  cat("  Moyenne:", round(mean(vals, na.rm = TRUE), 2), "\n")
+  cat("  Écart-type:", round(sd(vals, na.rm = TRUE), 2), "\n")
+  cat("  Min/Max:", round(min(vals, na.rm = TRUE), 2), "/",
+      round(max(vals, na.rm = TRUE), 2), "\n\n")
+}
+```
+
+### La winsorisation : écrêter les extrêmes
+
+La **winsorisation** remplace les valeurs extrêmes par des seuils :
+
+```{r winsorize-exemple, eval=TRUE}
+# Exemple de winsorisation à 5%
+original <- c(1, 2, 3, 4, 5, 6, 7, 8, 9, 100)
+n <- length(original)
+
+# Seuils à 5% de chaque côté
+lower_idx <- ceiling(n * 0.05)   # 1
+upper_idx <- floor(n * (1-0.05)) # 9
+
+sorted <- sort(original)
+lower_threshold <- sorted[max(1, lower_idx)]
+upper_threshold <- sorted[min(n, upper_idx)]
+
+# Winsoriser
+winsorized <- pmax(pmin(original, upper_threshold), lower_threshold)
+
+cat("Original:", original, "\n")
+cat("Seuils: [", lower_threshold, ",", upper_threshold, "]\n")
+cat("Winsorisé:", winsorized, "\n")
+```
+
+**Attention** : Ne pas abuser de la winsorisation ! Elle modifie les données. Documenter toujours le niveau utilisé.
+
+---
+
+## Solution 3 : Trouver des groupes naturels avec `find_clusters()`
+
+### Pourquoi chercher des clusters ?
+
+Les données à queue lourde contiennent souvent des **sous-populations distinctes** :
+
+- Pages peu visitées vs pages virales
+- Utilisateurs occasionnels vs influenceurs
+- Produits de niche vs best-sellers
+
+### La fonction `find_clusters()`
+
+`find_clusters()` utilise des **modèles de mélange gaussien** (Gaussian Mixture Models, GMM) pour identifier automatiquement ces sous-groupes.
+
+```{r clusters-basic}
+# Recherche de clusters
+clusters <- find_clusters(
+  x = pages$relevance,
+  max_G = 5,
+  return_breaks = TRUE
+)
+
+# Résultat
+print(clusters)
+```
+
+### Paramètres de `find_clusters()` expliqués
+
+```{r clusters-params}
+clusters <- find_clusters(
+  # === DONNÉES ===
+  x = pages$relevance,           # Vecteur numérique
+
+  # === MODÈLE ===
+  max_G = 5,                     # Nombre maximum de clusters à tester
+                                 # L'algorithme teste 1, 2, ..., max_G clusters
+                                 # et choisit le meilleur selon le critère
+
+  criterion = "bic",             # Critère de sélection du nombre de clusters :
+                                 # "bic" : Bayesian Information Criterion
+                                 #         (privilégie la parcimonie)
+                                 # "icl" : Integrated Complete-data Likelihood
+                                 #         (privilégie des clusters bien séparés)
+
+  # === TRANSFORMATION ===
+  transform = "log1p",           # Transformation avant clustering :
+                                 # "none", "log1p", "yeojohnson", "zscore", "auto"
+                                 # IMPORTANT : le GMM suppose des données
+                                 # approximativement normales !
+
+  winsorize = 0.01,              # Winsorisation avant clustering
+
+  # === OPTIONS ===
+  return_breaks = TRUE,          # Retourner les bornes entre clusters ?
+  min_n = 30,                    # Minimum d'observations requises
+  verbose = TRUE,                # Messages de progression ?
+
+  # === SORTIE ===
+  # Si return_breaks = TRUE, retourne une liste avec :
+  # - classification : cluster de chaque observation
+  # - posterior : probabilités d'appartenance
+  # - n_clusters : nombre optimal trouvé
+  # - breaks : bornes pour discrétisation
+  # - diagnostics : BIC, critère, etc.
+)
+```
+
+### Comprendre le BIC et l'ICL
+
+#### BIC (Bayesian Information Criterion)
+
+$$BIC = -2 \cdot \log(L) + k \cdot \log(n)$$
+
+où :
+- L = vraisemblance du modèle
+- k = nombre de paramètres
+- n = nombre d'observations
+
+**Interprétation** : Le BIC pénalise la complexité. Un modèle avec plus de clusters doit significativement mieux expliquer les données pour être préféré.
+
+#### ICL (Integrated Complete-data Likelihood)
+
+$$ICL = BIC - 2 \cdot \text{Entropie}$$
+
+**Interprétation** : L'ICL ajoute une pénalité pour l'incertitude de classification. Il préfère des clusters bien séparés où chaque observation appartient clairement à un groupe.
+
+**Recommandation** :
+- Utilisez **BIC** par défaut (plus stable)
+- Utilisez **ICL** si vous voulez des clusters très distincts
+
+### Exemple pratique avec visualisation
+
+```{r clusters-visualisation, eval=TRUE}
+set.seed(2024)
+
+# Données simulées avec 3 groupes distincts
+group1 <- rnorm(500, mean = 10, sd = 3)   # Petites valeurs
+group2 <- rnorm(300, mean = 50, sd = 10)  # Moyennes valeurs
+group3 <- rnorm(100, mean = 150, sd = 30) # Grandes valeurs
+x_mixed <- c(group1, group2, group3)
+
+# Mélanger
+x_mixed <- sample(x_mixed)
+
+# Trouver les clusters (simulation de find_clusters)
+library(mclust)
+mc_fit <- Mclust(log1p(x_mixed), G = 1:5, modelNames = "V")
+
+# Visualisation
+par(mfrow = c(1, 2))
+
+# Histogramme coloré par cluster
+hist(x_mixed, breaks = 50, col = "lightgray", main = "Données originales",
+     xlab = "Valeur", border = "white")
+
+# BIC par nombre de clusters
+plot(mc_fit, what = "BIC", main = "Choix du nombre de clusters")
+
+par(mfrow = c(1, 1))
+
+cat("Nombre optimal de clusters:", mc_fit$G, "\n")
+cat("Proportions par cluster:", round(mc_fit$parameters$pro, 3), "\n")
+```
+
+---
+
+## Solution 4 : Discrétiser intelligemment avec `discretize_variable()`
+
+### Pourquoi discrétiser ?
+
+La **discrétisation** convertit une variable continue en catégories ordonnées :
+
+| Variable continue | Variable discrète |
+|-------------------|-------------------|
+| Pertinence = 3.7 | "Faible" |
+| Pertinence = 45.2 | "Moyenne" |
+| Pertinence = 287 | "Très élevée" |
+
+**Avantages** :
+- Facilite l'interprétation pour les non-statisticiens
+- Permet des analyses croisées (tableaux de contingence)
+- Réduit l'impact des erreurs de mesure
+- Compatible avec les méthodes qualitatives
+
+**Inconvénients** :
+- Perte d'information (irréversible)
+- Choix arbitraire des bornes
+- Peut masquer des relations non-linéaires
+
+### La fonction `discretize_variable()`
+
+```{r discretize-basic}
+# Discrétisation basique
+classes <- discretize_variable(
+  x = pages$relevance,
+  method = "quantile",
+  n_classes = 4
+)
+
+# Résultat
+table(classes)
+```
+
+### Paramètres de `discretize_variable()` expliqués
+
+```{r discretize-params}
+classes <- discretize_variable(
+  # === DONNÉES ===
+  x = pages$relevance,           # Vecteur numérique à discrétiser
+
+  # === MÉTHODE ===
+  method = "quantile",           # Méthode de découpage :
+                                 # "equal_width" : intervalles de même largeur
+                                 #   [0-100], [100-200], [200-300]
+                                 # "equal_freq"  : même nombre d'observations
+                                 #   (synonyme de "quantile")
+                                 # "quantile"    : par quantiles
+                                 # "jenks"       : ruptures naturelles (Jenks)
+                                 # "kmeans"      : k-means 1D
+                                 # "gmm"         : mélange gaussien
+                                 # "manual"      : bornes personnalisées
+
+  # === PARAMÈTRES SELON LA MÉTHODE ===
+  n_classes = 4,                 # Nombre de classes (pour toutes sauf "manual")
+
+  breaks = NULL,                 # Bornes manuelles (pour method = "manual")
+                                 # Exemple : c(0, 10, 50, 200, Inf)
+
+  labels = NULL,                 # Noms des classes (optionnel)
+                                 # Exemple : c("Faible", "Moyen", "Élevé", "Très élevé")
+                                 # Si NULL, génère automatiquement des labels
+
+  # === OPTIONS ===
+  include_lowest = TRUE,         # Inclure la borne inférieure dans la première classe ?
+  right = TRUE,                  # Intervalles fermés à droite ? (a, b]
+  ordered = TRUE,                # Retourner un facteur ordonné ?
+
+  # === SORTIE ===
+  # Un facteur (ordonné si ordered = TRUE)
+  # Avec un attribut "discretize_meta" contenant :
+  # - breaks : les bornes utilisées
+  # - counts : effectifs par classe
+  # - warnings : avertissements éventuels
+)
+```
+
+### Comparaison des méthodes de discrétisation
+
+#### Méthode `"equal_width"` (intervalles égaux)
+
+```{r equal-width, eval=TRUE}
+x <- c(1, 2, 3, 4, 5, 6, 7, 8, 9, 100)
+
+# Découpage en 3 classes de même largeur
+breaks <- seq(min(x), max(x), length.out = 4)
+cat("Bornes (equal_width):", round(breaks, 1), "\n")
+cat("Largeur de chaque intervalle:", round(diff(breaks)[1], 1), "\n")
+
+# Problème : presque toutes les données dans la première classe !
+classes <- cut(x, breaks = breaks, include.lowest = TRUE)
+cat("Distribution:", table(classes), "\n")
+```
+
+**Problème** : Avec des données à queue lourde, la plupart des observations se retrouvent dans la première classe.
+
+#### Méthode `"quantile"` (effectifs égaux)
+
+```{r quantile-method, eval=TRUE}
+x <- c(1, 2, 3, 4, 5, 6, 7, 8, 9, 100)
+
+# Découpage par quantiles (effectifs égaux)
+breaks <- quantile(x, probs = c(0, 0.33, 0.66, 1))
+cat("Bornes (quantile):", round(breaks, 1), "\n")
+
+classes <- cut(x, breaks = breaks, include.lowest = TRUE)
+cat("Distribution:", table(classes), "\n")
+```
+
+**Avantage** : Chaque classe contient (approximativement) le même nombre d'observations.
+
+#### Méthode `"jenks"` (ruptures naturelles)
+
+L'algorithme de **Jenks** (ou Natural Breaks) cherche à :
+- **Minimiser** la variance **intra-classe**
+- **Maximiser** la variance **inter-classes**
+
+```{r jenks-concept, eval=TRUE, echo=FALSE}
+cat("L'algorithme de Jenks cherche les 'sauts' naturels dans les données.\n")
+cat("Idéal pour des données avec des groupes distincts.\n")
+```
+
+#### Méthode `"manual"` avec `find_clusters()`
+
+La méthode recommandée : utiliser les bornes trouvées par `find_clusters()` !
+
+```{r manual-from-clusters}
+# Étape 1 : Trouver les clusters
+clusters <- find_clusters(
+  x = pages$relevance,
+  max_G = 4,
+  transform = "log1p",
+  return_breaks = TRUE
+)
+
+# Étape 2 : Utiliser les bornes pour discrétiser
+classes <- discretize_variable(
+  x = pages$relevance,
+  method = "manual",
+  breaks = clusters$breaks,
+  labels = c("Faible", "Moyen", "Élevé", "Très élevé")
+)
+
+# Résultat
+table(classes)
+```
+
+### Exemple complet : pipeline de discrétisation
+
+```{r discretize-pipeline}
+# Pipeline complet de discrétisation intelligente
+
+# 1. Visualiser les données
+plotlog(
+  df = pages,
+  variables = "relevance",
+  trans_type = "log1p"
+)
+
+# 2. Identifier les clusters naturels
+clusters <- find_clusters(
+  x = pages$relevance,
+  max_G = 5,
+  transform = "log1p",
+  criterion = "bic",
+  return_breaks = TRUE,
+  verbose = TRUE
+)
+
+# 3. Examiner les bornes proposées
+cat("Nombre de clusters optimal:", clusters$n_clusters, "\n")
+cat("Bornes suggérées:", clusters$breaks, "\n")
+
+# 4. Discrétiser avec des labels parlants
+pages$relevance_class <- discretize_variable(
+  x = pages$relevance,
+  method = "manual",
+  breaks = clusters$breaks,
+  labels = c("Bruit", "Pertinence faible", "Pertinence moyenne", "Très pertinent"),
+  ordered = TRUE
+)
+
+# 5. Vérifier la distribution
+cat("\n=== Distribution des classes ===\n")
+print(table(pages$relevance_class))
+print(prop.table(table(pages$relevance_class)) * 100)
+```
+
+---
+
+## Solution 5 : Tester les lois de puissance avec `analyse_powerlaw()`
+
+### Pourquoi tester formellement ?
+
+Il ne suffit pas de voir une "droite" en échelle log-log pour conclure à une loi de puissance. Plusieurs distributions peuvent ressembler à une loi de puissance :
+
+- Loi log-normale
+- Loi exponentielle tronquée
+- Mélange de distributions
+
+### La fonction `analyse_powerlaw()`
+
+`analyse_powerlaw()` utilise le package **poweRlaw** pour :
+
+1. Ajuster une loi de puissance aux données
+2. Estimer le paramètre xmin (seuil de la queue)
+3. Comparer avec des modèles alternatifs
+4. Effectuer un test de goodness-of-fit (bootstrap)
+
+```{r powerlaw-basic}
+# Analyse de loi de puissance
+result <- analyse_powerlaw(
+  x = pages$relevance,
+  type = "discrete",
+  candidate_models = c("powerlaw", "lognormal", "exponential"),
+  bootstrap_sims = 100
+)
+
+# Résultats
+print(result$best_model)
+print(result$comparisons)
+```
+
+### Paramètres de `analyse_powerlaw()` expliqués
+
+```{r powerlaw-params}
+result <- analyse_powerlaw(
+  # === DONNÉES ===
+  x = pages$relevance,           # Vecteur numérique (positif)
+
+  # === TYPE DE DONNÉES ===
+  type = "discrete",             # Type de distribution :
+                                 # "discrete"  : données entières (comptages)
+                                 # "continuous": données continues
+
+  # === MODÈLES À COMPARER ===
+  candidate_models = c(          # Liste des modèles candidats :
+    "powerlaw",                  # Loi de puissance (Pareto)
+    "lognormal",                 # Loi log-normale
+    "exponential"                # Loi exponentielle
+    # "weibull"                  # Weibull (continu seulement)
+  ),
+
+  # === PARAMÈTRES DE LA LOI DE PUISSANCE ===
+  xmin = NULL,                   # Seuil minimal de la queue
+                                 # NULL = estimation automatique
+                                 # Valeur = forcer ce seuil
+
+  # === BOOTSTRAP (test de goodness-of-fit) ===
+  bootstrap_sims = 100,          # Nombre de simulations bootstrap
+                                 # Plus c'est grand, plus c'est précis
+                                 # (mais plus c'est long)
+                                 # Recommandé : 100 (rapide) à 1000 (précis)
+
+  bootstrap_models = NULL,       # Modèles pour lesquels faire le bootstrap
+                                 # NULL = tous les candidate_models
+
+  # === PRÉTRAITEMENT ===
+  winsorize = NULL,              # Winsorisation avant analyse
+                                 # Peut réduire l'influence des outliers extrêmes
+
+  min_n = 50,                    # Nombre minimum d'observations requises
+
+  # === PARALLÉLISATION ===
+  threads = NULL,                # Nombre de cœurs pour le bootstrap
+                                 # NULL = auto-détection optimale
+                                 # (voir mwir_system_info())
+
+  # === MESSAGES ===
+  verbose = TRUE,                # Afficher la progression ?
+
+  # === SORTIE ===
+  # Une liste contenant :
+  # - best_model : nom du meilleur modèle
+  # - best_fit : paramètres du meilleur ajustement
+  # - comparisons : tableau de comparaison des modèles
+  # - bootstrap : résultats du test bootstrap
+  # - data_summary : statistiques des données
+)
+```
+
+### Comprendre les résultats
+
+#### Le paramètre xmin
+
+Le xmin est le **seuil à partir duquel** la loi de puissance s'applique :
+
+```
+Données : [1, 2, 3, 4, 5, 10, 20, 50, 100, 500, 1000]
+                           ^
+                           xmin = 20
+
+La loi de puissance ne s'applique qu'à la "queue" : [20, 50, 100, 500, 1000]
+```
+
+**Pourquoi ?** La loi de puissance décrit le comportement des **grandes valeurs**, pas des petites.
+
+#### L'exposant alpha (α)
+
+$$P(X \geq x) \propto x^{-\alpha}$$
+
+| Valeur de α | Interprétation |
+|-------------|----------------|
+| α ≈ 2 | Queue très lourde, forte inégalité |
+| α ≈ 2.5 | Typique du web (Pareto classique) |
+| α ≈ 3 | Queue modérée |
+| α > 3 | Queue légère, proche de l'exponentielle |
+
+#### Le test bootstrap
+
+Le bootstrap teste si la loi de puissance est **plausible** :
+
+- **p-value > 0.1** : La loi de puissance ne peut pas être rejetée
+- **p-value < 0.1** : La loi de puissance est probablement inadéquate
+
+**Attention** : Une p-value élevée ne **prouve pas** que c'est une loi de puissance, elle indique simplement que les données sont **compatibles** avec cette hypothèse.
+
+#### La comparaison des modèles
+
+Le test de rapport de vraisemblance compare chaque paire de modèles :
+
+| Résultat | Interprétation |
+|----------|----------------|
+| LR > 0, p < 0.05 | Le premier modèle est significativement meilleur |
+| LR < 0, p < 0.05 | Le second modèle est significativement meilleur |
+| p > 0.05 | Pas de différence significative |
+
+### Exemple pratique complet
+
+```{r powerlaw-exemple-complet}
+# Charger les données
+library(mwiR)
+
+# Analyser la distribution des backlinks
+powerlaw_result <- analyse_powerlaw(
+  x = pages$backlinks,
+  type = "discrete",
+  candidate_models = c("powerlaw", "lognormal", "exponential"),
+  bootstrap_sims = 200,
+  threads = NULL,  # Auto-détection (Apple Silicon optimisé)
+  verbose = TRUE
+)
+
+# === RÉSULTATS ===
+
+# 1. Meilleur modèle
+cat("=== MEILLEUR MODÈLE ===\n")
+cat("Modèle:", powerlaw_result$best_model, "\n")
+
+# 2. Paramètres de l'ajustement
+cat("\n=== PARAMÈTRES ===\n")
+cat("xmin (seuil):", powerlaw_result$best_fit$xmin, "\n")
+cat("Alpha (exposant):", round(powerlaw_result$best_fit$alpha, 3), "\n")
+cat("N observations dans la queue:", powerlaw_result$best_fit$n_tail, "\n")
+
+# 3. Test bootstrap
+cat("\n=== TEST BOOTSTRAP ===\n")
+cat("p-value:", round(powerlaw_result$bootstrap$p_value, 4), "\n")
+if (powerlaw_result$bootstrap$p_value > 0.1) {
+  cat("Interprétation: La loi de puissance ne peut pas être rejetée.\n")
+} else {
+  cat("Interprétation: La loi de puissance est probablement inadéquate.\n")
+}
+
+# 4. Comparaisons
+cat("\n=== COMPARAISONS DES MODÈLES ===\n")
+print(powerlaw_result$comparisons)
+```
+
+### Parallélisation et performances
+
+Le bootstrap est l'étape la plus longue. `analyse_powerlaw()` utilise la parallélisation pour l'accélérer.
+
+```{r parallelisation}
+# Voir les informations système
+mwir_system_info()
+
+# Forcer un nombre de threads
+result <- analyse_powerlaw(
+  x = pages$relevance,
+  type = "discrete",
+  bootstrap_sims = 500,
+  threads = 4  # Forcer 4 threads
+)
+
+# Auto-détection (recommandé)
+result <- analyse_powerlaw(
+  x = pages$relevance,
+  type = "discrete",
+  bootstrap_sims = 500,
+  threads = NULL  # Détection automatique
+)
+```
+
+**Sur Apple Silicon (M1/M2/M3)** : L'auto-détection utilise uniquement les **Performance cores** (P-cores), évitant les Efficiency cores plus lents.
+
+---
+
+# Partie 4 : Workflow complet
+
+## Pipeline d'analyse recommandé
+
+```{r workflow-complet}
+# === WORKFLOW D'ANALYSE DES DONNÉES WEB ===
+
+# 0. PRÉPARATION
+library(mwiR)
+initmwi()
+
+# Charger vos données
+pages <- read.csv("mon_corpus.csv", stringsAsFactors = FALSE)
+
+# 1. EXPLORATION VISUELLE
+# Commencer par visualiser AVANT toute transformation
+plotlog(
+  df = pages,
+  variables = c("relevance", "backlinks", "fb_shares"),
+  trans_type = "log1p",
+  save = TRUE,
+  save_dir = "figures/exploration"
+)
+
+# 2. DIAGNOSTICS STATISTIQUES
+# Pour chaque variable d'intérêt
+for (var in c("relevance", "backlinks", "fb_shares")) {
+  cat("\n=== Analyse de", var, "===\n")
+  x <- pages[[var]]
+
+  # Statistiques de base
+  cat("N:", length(x), "\n")
+  cat("Moyenne:", round(mean(x, na.rm = TRUE), 2), "\n")
+  cat("Médiane:", median(x, na.rm = TRUE), "\n")
+  cat("Ratio moyenne/médiane:", round(mean(x, na.rm = TRUE) / median(x, na.rm = TRUE), 2), "\n")
+  cat("Écart-type:", round(sd(x, na.rm = TRUE), 2), "\n")
+  cat("CV (coef. variation):", round(sd(x, na.rm = TRUE) / mean(x, na.rm = TRUE), 2), "\n")
+}
+
+# 3. TEST DE LOI DE PUISSANCE
+# Pour la variable principale
+powerlaw_result <- analyse_powerlaw(
+  x = pages$relevance,
+  type = "discrete",
+  candidate_models = c("powerlaw", "lognormal", "exponential"),
+  bootstrap_sims = 200,
+  verbose = TRUE
+)
+
+# Documenter les résultats
+cat("\n=== RÉSULTAT : Loi de puissance ? ===\n")
+cat("Meilleur modèle:", powerlaw_result$best_model, "\n")
+cat("Bootstrap p-value:", round(powerlaw_result$bootstrap$p_value, 4), "\n")
+
+# 4. TRANSFORMATION ADAPTÉE
+# Choisir la méthode selon les résultats
+if (powerlaw_result$best_model == "powerlaw") {
+  # Queue lourde confirmée : utiliser log ou ranknorm
+  method <- "ranknorm"
+} else if (powerlaw_result$best_model == "lognormal") {
+  # Log-normale : log simple suffit
+  method <- "log1p"
+} else {
+  # Autre : Yeo-Johnson universel
+  method <- "yeojohnson"
+}
+
+transformed <- transform_variable(
+  x = pages$relevance,
+  method = method,
+  winsorize = 0.01
+)
+
+pages$relevance_transformed <- transformed$values
+
+# 5. CLUSTERING ET DISCRÉTISATION
+clusters <- find_clusters(
+  x = pages$relevance,
+  max_G = 5,
+  transform = "log1p",
+  return_breaks = TRUE
+)
+
+pages$relevance_class <- discretize_variable(
+  x = pages$relevance,
+  method = "manual",
+  breaks = clusters$breaks,
+  labels = paste0("Groupe_", 1:clusters$n_clusters)
+)
+
+# 6. RAPPORT FINAL
+cat("\n=== RÉSUMÉ ===\n")
+cat("Distribution:", powerlaw_result$best_model, "\n")
+cat("Transformation appliquée:", method, "\n")
+cat("Nombre de clusters:", clusters$n_clusters, "\n")
+cat("\nDistribution des classes:\n")
+print(table(pages$relevance_class))
+
+# 7. SAUVEGARDE
+write.csv(pages, "mon_corpus_analyse.csv", row.names = FALSE)
+```
+
+## Checklist de bonnes pratiques
+
+### Avant l'analyse
+
+- [ ] Vérifier les valeurs manquantes (NA)
+- [ ] Vérifier les valeurs négatives/nulles
+- [ ] Documenter la source des données
+- [ ] Sauvegarder les données brutes
+
+### Pendant l'analyse
+
+- [ ] Toujours visualiser avant de transformer
+- [ ] Documenter chaque choix (méthode, paramètres)
+- [ ] Tester plusieurs transformations
+- [ ] Vérifier les résultats visuellement
+
+### Après l'analyse
+
+- [ ] Interpréter les résultats dans le contexte métier
+- [ ] Documenter les limites
+- [ ] Rendre le code reproductible
+- [ ] Sauvegarder les résultats intermédiaires
+
+---
+
+# Partie 5 : Exercices pratiques
+
+## Exercice 1 : Exploration (Niveau débutant)
+
+**Objectif** : Maîtriser `plotlog()`
+
+1. Chargez un jeu de données avec des variables numériques
+2. Utilisez `plotlog()` pour visualiser 3 variables
+3. Testez différentes transformations (`"log1p"`, `"sqrt"`, `"rank"`)
+4. Identifiez visuellement quelle variable a la queue la plus lourde
+
+**Questions** :
+- Quelle transformation rend la distribution la plus symétrique ?
+- Pourquoi `"rank"` est-il utile pour les données avec beaucoup de zéros ?
+
+## Exercice 2 : Transformation (Niveau intermédiaire)
+
+**Objectif** : Comparer les méthodes de transformation
+
+1. Créez un vecteur avec des données à queue lourde :
+```{r ex2-data}
+set.seed(123)
+x <- c(rpois(900, 5), rpois(90, 50), rpois(10, 500))
+```
+
+2. Appliquez 4 transformations différentes :
+   - `"zscore"`
+   - `"robust_z"`
+   - `"yeojohnson"`
+   - `"ranknorm"`
+
+3. Pour chaque transformation :
+   - Calculez le coefficient d'asymétrie (skewness)
+   - Faites un test de normalité (Shapiro-Wilk)
+
+**Questions** :
+- Quelle transformation produit la meilleure normalité ?
+- Quelle est l'impact de la winsorisation ?
+
+## Exercice 3 : Clustering (Niveau intermédiaire)
+
+**Objectif** : Utiliser `find_clusters()` et `discretize_variable()`
+
+1. Simulez des données avec 3 groupes distincts :
+```{r ex3-data}
+set.seed(456)
+x <- c(rnorm(300, 10, 2), rnorm(200, 50, 10), rnorm(100, 200, 30))
+x <- sample(x)  # Mélanger
+```
+
+2. Utilisez `find_clusters()` avec `max_G = 5`
+3. Comparez les critères BIC et ICL
+4. Discrétisez avec les bornes trouvées
+
+**Questions** :
+- Combien de clusters sont détectés avec chaque critère ?
+- Les bornes correspondent-elles aux moyennes des groupes originaux ?
+
+## Exercice 4 : Loi de puissance (Niveau avancé)
+
+**Objectif** : Maîtriser `analyse_powerlaw()`
+
+1. Téléchargez des données réelles (au choix) :
+   - Nombre de citations d'articles scientifiques
+   - Population des villes
+   - Nombre de followers Twitter
+
+2. Appliquez `analyse_powerlaw()` avec 500 simulations bootstrap
+
+3. Répondez aux questions :
+   - La loi de puissance est-elle plausible (p-value) ?
+   - Quel est le xmin estimé ?
+   - Combien d'observations sont dans la "queue" ?
+   - Le modèle log-normal est-il meilleur ?
+
+4. Produisez un graphique log-log avec la droite de régression
+
+## Exercice 5 : Projet intégré (Niveau avancé)
+
+**Objectif** : Workflow complet sur données réelles
+
+1. Utilisez mwiR pour crawler 100 pages web sur un sujet de votre choix
+2. Analysez la variable `relevance` :
+   - Visualisation
+   - Test de loi de puissance
+   - Transformation optimale
+   - Clustering
+
+3. Rédigez un rapport de 2 pages incluant :
+   - Description des données
+   - Résultats de l'analyse de distribution
+   - Justification des choix méthodologiques
+   - Limites et perspectives
+
+---
+
+# Conclusion
+
+## Ce que vous avez appris
+
+1. **Reconnaître** les distributions à queue lourde
+2. **Comprendre** pourquoi les statistiques classiques échouent
+3. **Visualiser** correctement avec des transformations
+4. **Transformer** les données de manière robuste
+5. **Identifier** des sous-groupes naturels
+6. **Tester** formellement les lois de puissance
+
+## Points clés à retenir
+
+> **La moyenne n'a souvent pas de sens** pour les données web. Utilisez la médiane.
+
+> **Toujours visualiser avant d'analyser**. Un histogramme peut révéler des problèmes invisibles dans les statistiques.
+
+> **La transformation n'est pas de la triche**. C'est une pratique standard pour rendre les données compatibles avec les méthodes statistiques.
+
+> **Une loi de puissance n'est pas une malédiction**. C'est une caractéristique naturelle des systèmes sociaux et web.
+
+## Pour aller plus loin
+
+### Références bibliographiques
+
+- Clauset, A., Shalizi, C. R., & Newman, M. E. J. (2009). Power-law distributions in empirical data. *SIAM Review*, 51(4), 661-703.
+- Barabási, A. L. (2016). *Network Science*. Cambridge University Press.
+- Box, G. E. P., & Cox, D. R. (1964). An analysis of transformations. *Journal of the Royal Statistical Society B*, 26(2), 211-252.
+
+### Packages R utiles
+
+- `poweRlaw` : Test de lois de puissance
+- `mclust` : Modèles de mélange gaussien
+- `bestNormalize` : Choix automatique de transformation
+- `moments` : Calcul du skewness et kurtosis
+
+### Cours en ligne
+
+- [Network Science de Barabási](http://networksciencebook.com/) (gratuit)
+- [Power Laws in Empirical Data](https://aaronclauset.github.io/powerlaws/) (code et tutoriels)
+
+---
+
+*Ce cours a été conçu pour les étudiants de Licence en Sciences Sociales et Sciences de l'Information et de la Communication.*
+
+*Dernière mise à jour : `r format(Sys.Date(), "%d %B %Y")`*
+
+```{r session-info-final}
+sessionInfo()
+```
