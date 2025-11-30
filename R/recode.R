@@ -1931,11 +1931,14 @@ analyse_powerlaw <- function(x,
     for (i in seq_along(bootstrap_targets)) {
       target <- bootstrap_targets[i]
       mod <- candidates[[target]]$object
-      boot <- .safe_bootstrap_p(
-        model = mod,
-        no_of_sims = bootstrap_sims,
-        threads = threads,
-        verbose = verbose
+      # Suppress all warnings from poweRlaw during bootstrap
+      boot <- suppressWarnings(
+        .safe_bootstrap_p(
+          model = mod,
+          no_of_sims = bootstrap_sims,
+          threads = threads,
+          verbose = verbose
+        )
       )
       p_val <- boot$p
       se_val <- if (!is.null(boot$se)) boot$se else NA_real_
