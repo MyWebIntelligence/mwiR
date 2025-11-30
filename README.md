@@ -422,6 +422,50 @@ related_query("intelligence artificielle", lang = "fr", country = "France")
 
 `related_query()` returns the "People also search for" block as a tidy data frame. Typical workflow: collect the suggestions, inspect them quickly in R, fold the most relevant ones back into `addterm()`, and archive the CSV for methodological transparency.
 
+**Common language codes (`lang` parameter):**
+
+| Code | Language | Code | Language |
+|------|----------|------|----------|
+| `en` | English | `it` | Italian |
+| `fr` | French | `pt` | Portuguese |
+| `de` | German | `pt-br` | Portuguese (Brazil) |
+| `es` | Spanish | `nl` | Dutch |
+| `es-419` | Spanish (Latin America) | `pl` | Polish |
+| `ar` | Arabic | `ru` | Russian |
+| `zh-cn` | Chinese (Simplified) | `ja` | Japanese |
+| `zh-tw` | Chinese (Traditional) | `ko` | Korean |
+
+**Common country values (`country` parameter):**
+
+| Country | Country | Country |
+|---------|---------|---------|
+| `France` | `Germany` | `Spain` |
+| `United States` | `United Kingdom` | `Canada` |
+| `Belgium` | `Switzerland` | `Italy` |
+| `Brazil` | `Mexico` | `Argentina` |
+| `Japan` | `Australia` | `Netherlands` |
+
+**Usage examples:**
+
+```r
+# French search in France
+related_query("intelligence artificielle", lang = "fr", country = "France")
+
+# English search in United States
+related_query("artificial intelligence", lang = "en", country = "United States")
+
+# Spanish search in Spain
+related_query("inteligencia artificial", lang = "es", country = "Spain")
+
+# German search in Germany
+related_query("künstliche Intelligenz", lang = "de", country = "Germany")
+
+# Portuguese search in Brazil
+related_query("inteligência artificial", lang = "pt-br", country = "Brazil")
+```
+
+Full list available at: [SerpAPI Languages](https://serpapi.com/google-languages) and [SerpAPI Countries](https://serpapi.com/google-countries)
+
 ### 2. Capture Google, DuckDuckGo, and Bing Result Lists
 
 ```r
