@@ -62,9 +62,19 @@ related_query <- function(query, lang = "fr", country = "France") {
     "ar" = "google.com", "es-419" = "google.com"
   )
 
+  # Map country names to gl (geolocation) codes
+  gl_map <- c(
+    "France" = "fr", "Germany" = "de", "Spain" = "es",
+    "United States" = "us", "United Kingdom" = "uk", "Canada" = "ca",
+    "Belgium" = "be", "Switzerland" = "ch", "Italy" = "it",
+    "Brazil" = "br", "Mexico" = "mx", "Argentina" = "ar",
+    "Japan" = "jp", "Australia" = "au", "Netherlands" = "nl",
+    "Portugal" = "pt", "Poland" = "pl", "Russia" = "ru"
+  )
+
   # Basic parameters
   google_domain <- if (lang %in% names(domain_map)) domain_map[lang] else paste0("google.", lang)
-  gl <- lang
+  gl <- if (country %in% names(gl_map)) gl_map[country] else tolower(substr(country, 1, 2))
   hl <- lang
   lr <- paste("lang_", lang, sep = "")
   safe <- "off"
@@ -160,9 +170,17 @@ urlist_Google <- function(query, datestart, dateend,
       "ar" = "google.com", "es-419" = "google.com"
     )
 
+    # Map language codes to default gl (geolocation) codes
+    gl_from_lang <- c(
+      "en" = "us", "fr" = "fr", "de" = "de", "es" = "es",
+      "it" = "it", "pt" = "pt", "pt-br" = "br", "nl" = "nl",
+      "pl" = "pl", "ru" = "ru", "ja" = "jp", "ko" = "kr",
+      "zh-cn" = "cn", "zh-tw" = "tw", "ar" = "sa", "es-419" = "mx"
+    )
+
     # Basic parameters
     google_domain <- if (lang %in% names(domain_map)) domain_map[lang] else paste0("google.", lang)
-    gl <- lang
+    gl <- if (lang %in% names(gl_from_lang)) gl_from_lang[lang] else lang
     hl <- lang
     lr <- paste("lang_", lang, sep = "")
     safe <- "off"
