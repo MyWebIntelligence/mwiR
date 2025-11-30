@@ -19,7 +19,9 @@ crawlurls(
 
 \item{limit}{An optional integer specifying the limit on the number of URLs to crawl.}
 
-\item{http_status}{An optional character string specifying the HTTP status to filter URLs.}
+\item{http_status}{An optional integer specifying the HTTP status to filter URLs for re-crawling.
+When specified, the function will select URLs that already have this http_status code
+(e.g., 403, 429) and attempt to re-crawl them. This is useful for retrying failed URLs.}
 
 \item{db_name}{A character string representing the name of the database (default is "mwi.db").}
 }
@@ -28,4 +30,16 @@ An integer indicating the number of URLs processed.
 }
 \description{
 This function crawls URLs for a specific land, updates the database, and calculates relevance scores.
+}
+\examples{
+\dontrun{
+# Normal crawl (only unfetched URLs)
+crawlurls("MyProject", limit = 100)
+
+# Re-crawl URLs that got 403 Forbidden errors
+crawlurls("MyProject", limit = 50, http_status = 403)
+
+# Re-crawl URLs that got 429 Too Many Requests errors
+crawlurls("MyProject", limit = 20, http_status = 429)
+}
 }

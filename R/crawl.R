@@ -875,9 +875,22 @@ expression_relevance <- function(dictionary, expression, language = "fr") {
 #' @param land_name A character string representing the name of the land.
 #' @param urlmax An integer specifying the maximum number of URLs to be processed (default is 50).
 #' @param limit An optional integer specifying the limit on the number of URLs to crawl.
-#' @param http_status An optional character string specifying the HTTP status to filter URLs.
+#' @param http_status An optional integer specifying the HTTP status to filter URLs for re-crawling.
+#'   When specified, the function will select URLs that already have this http_status code
+#'   (e.g., 403, 429) and attempt to re-crawl them. This is useful for retrying failed URLs.
 #' @param db_name A character string representing the name of the database (default is "mwi.db").
 #' @return An integer indicating the number of URLs processed.
+#' @examples
+#' \dontrun{
+#' # Normal crawl (only unfetched URLs)
+#' crawlurls("MyProject", limit = 100)
+#'
+#' # Re-crawl URLs that got 403 Forbidden errors
+#' crawlurls("MyProject", limit = 50, http_status = 403)
+#'
+#' # Re-crawl URLs that got 429 Too Many Requests errors
+#' crawlurls("MyProject", limit = 20, http_status = 429)
+#' }
 #' @import DBI RSQLite
 #' @export
 crawlurls <- function(land_name, urlmax=50, limit = NULL, http_status = NULL, db_name = "mwi.db") {
@@ -904,13 +917,17 @@ crawlurls <- function(land_name, urlmax=50, limit = NULL, http_status = NULL, db
   # Extract keywords associated with the land from the database
   dictionary <- dbGetQuery(con, "SELECT lemma FROM LandDictionary JOIN Word ON word_id = id WHERE land_id = ?", params = list(land_id))
 
-  sql_query <- "SELECT id, url FROM Expression WHERE approved_at IS NULL AND fetched_at IS NULL AND land_id = ?"
-
   params <- list(land_id)
 
+  # When http_status is specified, we want to RE-crawl URLs with that status
+  # (they already have fetched_at set, so we don't require fetched_at IS NULL)
   if (!is.null(http_status)) {
-    sql_query <- paste0(sql_query, " AND http_status = ?")
+    sql_query <- "SELECT id, url FROM Expression WHERE approved_at IS NULL AND land_id = ? AND http_status = ?"
     params <- c(params, http_status)
+    message("Re-crawling URLs with http_status = ", http_status)
+  } else {
+    # Normal crawl: only URLs that haven't been fetched yet
+    sql_query <- "SELECT id, url FROM Expression WHERE approved_at IS NULL AND fetched_at IS NULL AND land_id = ?"
   }
 
   # Add ORDER BY
