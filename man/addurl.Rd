@@ -23,15 +23,24 @@ This function adds one or more URLs to a specified land in the SQLite database.
 URLs can be provided directly as a comma-separated string, read from a file, or imported interactively.
 }
 \details{
+When importing from a CSV file (e.g., from urlist_Google/Duck/Bing), the function will also
+import title and date columns if available. The expected column names are:
+- `link` or `url`: the URL (required)
+- `title`: the page title (optional)
+- `date`: the publication date (optional)
+
+
 The function performs the following steps:
 1. Checks if the specified land exists in the Land table.
 2. Retrieves the current date and time.
-3. Adds the URLs from the provided list or file to the Expression table if they do not already exist.
-4. Increments a counter for each new URL added and displays a message.
+3. Reads URLs from the provided list or file (CSV with link/title/date columns supported).
+4. Adds the URLs to the Expression table if they do not already exist.
+5. If title and date are available in the file, they are also added to the Expression table.
 }
 \examples{
 \dontrun{
 addurl("Climate Research", "http://example.com, http://example.org")
 addurl("Climate Research", path = "urls.txt")
+addurl("Climate Research", path = "serp_results.csv")  # CSV with link, title, date columns
 }
 }

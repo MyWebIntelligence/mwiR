@@ -942,7 +942,8 @@ crawlurls <- function(land_name, urlmax=50, limit = NULL, http_status = NULL, db
           crawl_http_status <- if (!is.null(url_data$http_status)) url_data$http_status[1] else NA
 
           # Use safe_scalar to ensure all params are single values (fixes "Parameter X does not have length 1" error)
-          dbExecute(con, "UPDATE Expression SET title = ?, readable = ?, domain_id = ?, description = ?, published_at = ?, approved_at = ?, lang = ?, relevance = ?, http_status = ? WHERE id = ?",
+          # Use COALESCE to preserve existing title/published_at from SERP import (don't overwrite with crawled values)
+          dbExecute(con, "UPDATE Expression SET title = COALESCE(title, ?), readable = ?, domain_id = ?, description = ?, published_at = COALESCE(published_at, ?), approved_at = ?, lang = ?, relevance = ?, http_status = ? WHERE id = ?",
                     params = list(
                       safe_scalar(url_data$title),
                       safe_scalar(url_data$text),

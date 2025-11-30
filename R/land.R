@@ -377,6 +377,12 @@ addterm <- function(land_name, terms) {
 #' This function adds one or more URLs to a specified land in the SQLite database.
 #' URLs can be provided directly as a comma-separated string, read from a file, or imported interactively.
 #'
+#' When importing from a CSV file (e.g., from urlist_Google/Duck/Bing), the function will also
+#' import title and date columns if available. The expected column names are:
+#' - `link` or `url`: the URL (required)
+#' - `title`: the page title (optional)
+#' - `date`: the publication date (optional)
+#'
 #' @param land_name A string specifying the name of the land.
 #' @param urls A comma-separated string of URLs to add. Default is NULL.
 #' @param path A string specifying the path to a file containing URLs. Default is NULL.
@@ -386,18 +392,21 @@ addterm <- function(land_name, terms) {
 #' The function performs the following steps:
 #' 1. Checks if the specified land exists in the Land table.
 #' 2. Retrieves the current date and time.
-#' 3. Adds the URLs from the provided list or file to the Expression table if they do not already exist.
-#' 4. Increments a counter for each new URL added and displays a message.
+#' 3. Reads URLs from the provided list or file (CSV with link/title/date columns supported).
+#' 4. Adds the URLs to the Expression table if they do not already exist.
+#' 5. If title and date are available in the file, they are also added to the Expression table.
 #'
 #' @examples
 #' \dontrun{
 #' addurl("Climate Research", "http://example.com, http://example.org")
 #' addurl("Climate Research", path = "urls.txt")
+#' addurl("Climate Research", path = "serp_results.csv")  # CSV with link, title, date columns
 #' }
 #' @export
 addurl <- function(land_name, urls = NULL, path = NULL, db_name = "mwi.db") {
   # Establish a connection to the SQLite database
   con <- dbConnect(SQLite(), dbname = db_name)
+  on.exit(dbDisconnect(con), add = TRUE)
 
   # Check if the "land" exists
   query <- "SELECT id FROM Land WHERE name = ?"
@@ -405,7 +414,6 @@ addurl <- function(land_name, urls = NULL, path = NULL, db_name = "mwi.db") {
 
   if (nrow(res) == 0) {
     message("Land ", land_name, " not found")
-    dbDisconnect(con)
     return(0)
   }
 
@@ -414,28 +422,119 @@ addurl <- function(land_name, urls = NULL, path = NULL, db_name = "mwi.db") {
   # Get the current date and time
   current_time <- format(Sys.time(), "%Y-%m-%d %H:%M:%S")
 
-  # Add URLs from the list or file
+  # Prepare data frame for URLs with optional title and date
+  url_data <- NULL
+
   if (!is.null(urls)) {
+    # Direct URL input as comma-separated string
     url_list <- strsplit(urls, ",")[[1]]
     url_list <- trimws(url_list)
+    url_data <- data.frame(link = url_list, title = NA_character_, date = NA_character_, stringsAsFactors = FALSE)
   } else if (!is.null(path)) {
-    url_list <- readLines(path, warn = FALSE)
+    # Read from file
+    ext <- tolower(tools::file_ext(path))
+    if (ext %in% c("csv", "txt")) {
+      # Try to read as CSV first (with headers)
+      tryCatch({
+        file_data <- read.csv(path, stringsAsFactors = FALSE, header = TRUE)
+        # Check for expected columns (link or url)
+        if ("link" %in% names(file_data)) {
+          url_col <- "link"
+        } else if ("url" %in% names(file_data)) {
+          url_col <- "url"
+        } else {
+          # No recognizable URL column, treat as simple URL list
+          url_list <- readLines(path, warn = FALSE)
+          url_list <- trimws(url_list[url_list != ""])
+          url_data <- data.frame(link = url_list, title = NA_character_, date = NA_character_, stringsAsFactors = FALSE)
+          url_col <- NULL
+        }
+
+        if (!is.null(url_col)) {
+          url_data <- data.frame(
+            link = file_data[[url_col]],
+            title = if ("title" %in% names(file_data)) file_data$title else NA_character_,
+            date = if ("date" %in% names(file_data)) file_data$date else NA_character_,
+            stringsAsFactors = FALSE
+          )
+        }
+      }, error = function(e) {
+        # If CSV parsing fails, read as simple text file
+        url_list <- readLines(path, warn = FALSE)
+        url_list <- trimws(url_list[url_list != ""])
+        url_data <<- data.frame(link = url_list, title = NA_character_, date = NA_character_, stringsAsFactors = FALSE)
+      })
+    } else {
+      # Unknown extension, read as text
+      url_list <- readLines(path, warn = FALSE)
+      url_list <- trimws(url_list[url_list != ""])
+      url_data <- data.frame(link = url_list, title = NA_character_, date = NA_character_, stringsAsFactors = FALSE)
+    }
   } else {
-    url_list <- importFile()
+    # Interactive import
+    imported <- importFile()
+    if (is.data.frame(imported)) {
+      if ("link" %in% names(imported)) {
+        url_data <- data.frame(
+          link = imported$link,
+          title = if ("title" %in% names(imported)) imported$title else NA_character_,
+          date = if ("date" %in% names(imported)) imported$date else NA_character_,
+          stringsAsFactors = FALSE
+        )
+      } else if ("url" %in% names(imported)) {
+        url_data <- data.frame(
+          link = imported$url,
+          title = if ("title" %in% names(imported)) imported$title else NA_character_,
+          date = if ("date" %in% names(imported)) imported$date else NA_character_,
+          stringsAsFactors = FALSE
+        )
+      } else {
+        url_data <- data.frame(link = as.character(imported[[1]]), title = NA_character_, date = NA_character_, stringsAsFactors = FALSE)
+      }
+    } else {
+      url_data <- data.frame(link = as.character(imported), title = NA_character_, date = NA_character_, stringsAsFactors = FALSE)
+    }
+  }
+
+  # Remove empty URLs
+  url_data <- url_data[!is.na(url_data$link) & url_data$link != "", ]
+
+  # Check if we have title/date columns with data
+  has_titles <- !all(is.na(url_data$title))
+  has_dates <- !all(is.na(url_data$date))
+
+  if (has_titles || has_dates) {
+    message("Importing with metadata: title=", has_titles, ", date=", has_dates)
   }
 
   # Initialize the counter for new URLs
   new_urls_count <- 0
 
   dbWithTransaction(con, {
-    for (url in url_list) {
+    for (i in seq_len(nrow(url_data))) {
+      url <- url_data$link[i]
+      title <- url_data$title[i]
+      pub_date <- url_data$date[i]
+
       # Check if the URL already exists for this land
       query <- "SELECT 1 FROM Expression WHERE land_id = ? AND url = ?"
       existing_url <- dbGetQuery(con, query, params = list(land_id, url))
 
       if (nrow(existing_url) == 0) {
-        dbExecute(con, "INSERT INTO Expression (land_id, url, created_at, depth) VALUES (?, ?, ?, 1)",
-                  params = list(land_id, url, current_time))
+        # Build INSERT query with available fields
+        if (!is.na(title) && !is.na(pub_date)) {
+          dbExecute(con, "INSERT INTO Expression (land_id, url, title, published_at, created_at, depth) VALUES (?, ?, ?, ?, ?, 1)",
+                    params = list(land_id, url, title, pub_date, current_time))
+        } else if (!is.na(title)) {
+          dbExecute(con, "INSERT INTO Expression (land_id, url, title, created_at, depth) VALUES (?, ?, ?, ?, 1)",
+                    params = list(land_id, url, title, current_time))
+        } else if (!is.na(pub_date)) {
+          dbExecute(con, "INSERT INTO Expression (land_id, url, published_at, created_at, depth) VALUES (?, ?, ?, ?, 1)",
+                    params = list(land_id, url, pub_date, current_time))
+        } else {
+          dbExecute(con, "INSERT INTO Expression (land_id, url, created_at, depth) VALUES (?, ?, ?, 1)",
+                    params = list(land_id, url, current_time))
+        }
         # Increment the counter for new URLs
         new_urls_count <- new_urls_count + 1
         # Print the message for the new URL
@@ -443,9 +542,6 @@ addurl <- function(land_name, urls = NULL, path = NULL, db_name = "mwi.db") {
       }
     }
   })
-
-  # Close the connection
-  dbDisconnect(con)
 
   # Print the total number of new URLs added
   message("Total number of new URLs added: ", new_urls_count)
