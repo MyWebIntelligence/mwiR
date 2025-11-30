@@ -853,13 +853,13 @@ expression_relevance <- function(dictionary, expression, language = "fr") {
 crawlurls <- function(land_name, urlmax=50, limit = NULL, http_status = NULL, db_name = "mwi.db") {
 
   con <- dbConnect(SQLite(), dbname = db_name)
+  on.exit(dbDisconnect(con), add = TRUE)
   dbBegin(con)
 
   res <- dbGetQuery(con, "SELECT id, lang FROM Land WHERE name = ?", params = list(land_name))
 
   if (nrow(res) == 0) {
     message("Land ", land_name, " not found")
-    dbDisconnect(con)
     return(0)
   }
 
@@ -898,7 +898,6 @@ crawlurls <- function(land_name, urlmax=50, limit = NULL, http_status = NULL, db
   if (nrow(urls_to_crawl) == 0) {
     message("No URLs to crawl for land ", land_name)
     dbCommit(con)
-    dbDisconnect(con)
     return(0)
   }
 
@@ -972,7 +971,6 @@ crawlurls <- function(land_name, urlmax=50, limit = NULL, http_status = NULL, db
   }
 
   dbCommit(con)
-  dbDisconnect(con)
 
   message("Crawling completed for land ", land_name)
   return(1)

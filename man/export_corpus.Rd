@@ -4,7 +4,7 @@
 \alias{export_corpus}
 \title{Export Corpus}
 \usage{
-export_corpus(con, land_name, minimum_relevance)
+export_corpus(con, land_name, minimum_relevance, ext = "md")
 }
 \arguments{
 \item{con}{A database connection object.}
@@ -12,6 +12,8 @@ export_corpus(con, land_name, minimum_relevance)
 \item{land_name}{A character string specifying the name of the land.}
 
 \item{minimum_relevance}{A numeric value specifying the minimum relevance score for inclusion in the export.}
+
+\item{ext}{A character string specifying the file extension ("md" or "txt"). Default is "md".}
 }
 \description{
 This function exports the corpus data from the specified land, including metadata, to text files and compresses them into a zip file.

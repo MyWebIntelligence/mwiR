@@ -510,9 +510,15 @@ Source: \"%s\"\n
 #' @param con A database connection object.
 #' @param land_name A character string specifying the name of the land.
 #' @param minimum_relevance A numeric value specifying the minimum relevance score for inclusion in the export.
+#' @param ext A character string specifying the file extension ("md" or "txt"). Default is "md".
 #' @import DBI utils
 #' @export
-export_corpus <- function(con, land_name, minimum_relevance) {
+export_corpus <- function(con, land_name, minimum_relevance, ext = "md") {
+  # Validate extension
+  ext <- tolower(ext)
+  if (!ext %in% c("md", "txt")) {
+    stop("Invalid extension. Use 'md' or 'txt'.")
+  }
   # Retrieve the land ID from the name
   land_id <- get_land_id(con, land_name)
 
@@ -542,7 +548,7 @@ export_corpus <- function(con, land_name, minimum_relevance) {
   # Write each record to a text file
   for (i in 1:nrow(result)) {
     lignes <- result[i,]
-    file_name <- paste0(slugify(paste(land_name, "_", lignes$id, sep="")), ".txt")
+    file_name <- paste0(slugify(paste(land_name, "_", lignes$id, sep="")), ".", ext)
     file_path <- file.path(dir_name, file_name)
     metadata <- to_metadata(lignes)
     content <- paste(metadata, lignes$readable)
@@ -566,11 +572,12 @@ export_corpus <- function(con, land_name, minimum_relevance) {
 #' @param export_type A character string specifying the type of export ("pagecsv", "fullpagecsv", "nodecsv", "mediacsv", "pagegexf", "nodegexf", or "corpus").
 #' @param minimum_relevance A numeric value specifying the minimum relevance score for inclusion in the export. Default is 1.
 #' @param labase A character string specifying the name of the database file. Default is "mwi.db".
+#' @param ext A character string specifying the file extension for corpus export ("md" or "txt"). Default is "md".
 #' @import DBI RSQLite
 #' @export
-export_land <- function(land_name, export_type, minimum_relevance = 1, labase = "mwi.db") {
+export_land <- function(land_name, export_type, minimum_relevance = 1, labase = "mwi.db", ext = "md") {
   con <- dbConnect(SQLite(), labase)
-
+  on.exit(dbDisconnect(con), add = TRUE)
 
   if (export_type == 'pagecsv') {
     filename <- paste0(land_name, "_", export_type,".csv")
@@ -591,11 +598,8 @@ export_land <- function(land_name, export_type, minimum_relevance = 1, labase = 
     filename <- paste0(land_name, "_", export_type,".gexf")
     export_nodegexf(con, land_name, minimum_relevance, filename)
   } else if (export_type == 'corpus') {
-    export_corpus(con, land_name, minimum_relevance)
+    export_corpus(con, land_name, minimum_relevance, ext)
   } else {
     message("Unknown export type. Waz it that ?")
   }
-
-  # dont forget to close the con
-  dbDisconnect(con)
 }

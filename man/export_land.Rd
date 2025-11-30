@@ -4,7 +4,13 @@
 \alias{export_land}
 \title{Export Land Data}
 \usage{
-export_land(land_name, export_type, minimum_relevance = 1, labase = "mwi.db")
+export_land(
+  land_name,
+  export_type,
+  minimum_relevance = 1,
+  labase = "mwi.db",
+  ext = "md"
+)
 }
 \arguments{
 \item{land_name}{A character string specifying the name of the land.}
@@ -14,6 +20,8 @@ export_land(land_name, export_type, minimum_relevance = 1, labase = "mwi.db")
 \item{minimum_relevance}{A numeric value specifying the minimum relevance score for inclusion in the export. Default is 1.}
 
 \item{labase}{A character string specifying the name of the database file. Default is "mwi.db".}
+
+\item{ext}{A character string specifying the file extension for corpus export ("md" or "txt"). Default is "md".}
 }
 \description{
 This function manages the exportation of land data based on the specified export type.
