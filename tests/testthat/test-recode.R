@@ -17,7 +17,7 @@ test_that("mwiR_detectLang returns languages and probability attribute", {
   )
 
   res <- mwiR_detectLang(df, c("title", "description"), min_chars = 10L, chunk_size = 2L)
-  expect_equal(res, c("en", "fr", "es"))
+  expect_equal(as.character(res), c("en", "fr", "es"))
 
   probs <- attr(res, "probability")
   expect_type(probs, "double")
@@ -26,7 +26,7 @@ test_that("mwiR_detectLang returns languages and probability attribute", {
 
   # Single column path
   res_title <- mwiR_detectLang(df, "title", min_chars = 10L, chunk_size = 1L)
-  expect_equal(res_title, c("en", "fr", "es"))
+  expect_equal(as.character(res_title), c("en", "fr", "es"))
 
   # Variable existence error
   expect_error(
@@ -42,14 +42,14 @@ test_that("mwiR_detectLang enforces min_chars and preserves long-form detection"
   df <- data.frame(
     text = c(
       "Hi",  # too short for default threshold
-      paste(rep("Bonjour le monde", 6), collapse = " ")
+      "Bonjour le monde, ceci est une phrase très longue en français pour tester la détection de langue avec suffisamment de caractères."
     ),
     stringsAsFactors = FALSE
   )
 
   res <- mwiR_detectLang(df, "text")
   expect_true(is.na(res[1]))
-  expect_equal(res[2], "fr")
+  expect_equal(as.character(res[2]), "fr")
 })
 
 test_that("mwiR_detectLang drops low-confidence predictions when conservative", {

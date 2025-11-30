@@ -1033,6 +1033,83 @@ transform_variable <- function(x,
 
 
 # ------------------------------------------------------------------------------
+# 2b. DIAGNOSTIC DE VARIABLE
+# ------------------------------------------------------------------------------
+#' Diagnose a Numeric Variable
+#'
+#' @description Computes descriptive statistics and normality tests for a numeric
+#'   vector. Returns a list with count of valid observations, skewness, kurtosis,
+#'   and Shapiro-Wilk p-value.
+#'
+#' @param x Numeric vector to diagnose.
+#' @param na.rm Logical; if TRUE, NA values are removed before computation.
+#'
+#' @return A list with:
+#' \describe{
+#'   \item{n_valid}{Number of non-NA finite values.}
+#'   \item{n_missing}{Number of NA values.}
+#'   \item{mean}{Mean of valid values.}
+#'   \item{sd}{Standard deviation of valid values.}
+#'   \item{min}{Minimum value.}
+#'   \item{max}{Maximum value.}
+#'   \item{skewness}{Skewness (requires at least 3 valid values).}
+#'   \item{kurtosis}{Kurtosis (requires at least 4 valid values).}
+#'   \item{shapiro_wilk_p}{Shapiro-Wilk test p-value (requires 3-5000 values).}
+#' }
+#'
+#' @export
+diagnose_variable <- function(x, na.rm = TRUE) {
+  if (!is.numeric(x)) {
+    stop("'x' must be numeric.")
+
+  }
+
+  x_valid <- x[is.finite(x)]
+  n_valid <- length(x_valid)
+  n_missing <- sum(is.na(x))
+
+  result <- list(
+    n_valid = n_valid,
+    n_missing = n_missing,
+    mean = if (n_valid > 0) mean(x_valid) else NA_real_,
+    sd = if (n_valid > 1) stats::sd(x_valid) else NA_real_,
+    min = if (n_valid > 0) min(x_valid) else NA_real_,
+    max = if (n_valid > 0) max(x_valid) else NA_real_,
+    skewness = NA_real_,
+    kurtosis = NA_real_,
+    shapiro_wilk_p = NA_real_
+  )
+
+  # Skewness requires at least 3 values
+
+if (n_valid >= 3) {
+    if (requireNamespace("moments", quietly = TRUE)) {
+      result$skewness <- moments::skewness(x_valid)
+    }
+  }
+
+  # Kurtosis requires at least 4 values
+  if (n_valid >= 4) {
+    if (requireNamespace("moments", quietly = TRUE)) {
+      result$kurtosis <- moments::kurtosis(x_valid)
+    }
+  }
+
+  # Shapiro-Wilk test requires 3-5000 observations
+  if (n_valid >= 3 && n_valid <= 5000) {
+    tryCatch({
+      sw_test <- stats::shapiro.test(x_valid)
+      result$shapiro_wilk_p <- sw_test$p.value
+    }, error = function(e) {
+      # Keep NA if test fails
+    })
+  }
+
+  result
+}
+
+
+# ------------------------------------------------------------------------------
 # 3. DISCRÉTISATION
 # ------------------------------------------------------------------------------
 #' @title Discrétiser un vecteur numérique
@@ -1129,10 +1206,11 @@ discretize_variable <- function(x,
 
   add_warning <- function(msg) {
     meta$warnings <<- unique(c(meta$warnings, msg))
+    warning(msg, call. = FALSE)
   }
 
   if (length(x_finite) < min_unique || length(unique(x_finite)) < min_unique) {
-    add_warning("Pas assez de valeurs distinctes pour discrétiser.")
+    add_warning("Not enough unique values to discretize.")
     return(if (return_factor) {
       result <- factor(rep(NA_character_, n_total))
       attr(result, "discretize_meta") <- meta
@@ -1270,7 +1348,7 @@ discretize_variable <- function(x,
   tmp <- cut(
     x,
     breaks = breaks_vec,
-    include.lowest = include_lowest,
+    include.lowest = include.lowest,
     right = right,
     labels = labels
   )
@@ -1764,10 +1842,17 @@ analyse_powerlaw <- function(x,
     type = type
   )
 
+  # Extract convenience fields from the best model
+  best <- candidates[[best_name]]
+
   list(
     data_summary = data_summary,
     best_model = best_name,
-    best_fit = candidates[[best_name]],
+    best_fit = best,
+    # Top-level convenience fields for common access patterns
+    xmin = best$xmin,
+    alpha = best$alpha,
+    gof_p_value = if (!is.null(best$gof)) best$gof else NA_real_,
     candidates = candidates,
     comparisons = comparison_table,
     bootstrap = bootstrap_results,
