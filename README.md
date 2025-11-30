@@ -711,6 +711,14 @@ Beyond `export_land()`, the family of dedicated exporters gives you fine-grained
 - `export_nodecsv()` / `export_nodegexf()` for network analysis.
 - `export_mediacsv()` to audit associated media.
 - `export_pagegexf()` for expression-level graphs.
-- `export_corpus()` to assemble text files plus metadata headers (ideal for CAQDAS tools).
+- `export_corpus()` to assemble text files plus metadata headers (ideal for CAQDAS tools). Supports multiple formats: `ext = "md"` (Markdown, default), `ext = "txt"` (plain text), `ext = "pdf"` (PDF, requires rmarkdown + pandoc).
 
 Each exporter accepts `minimum_relevance`, so you can balance breadth and focus depending on the audience.
+
+### 5. Technical Notes
+
+**User-Agent Rotation**: The crawler uses a pool of 10 realistic browser User-Agents (Chrome, Firefox, Safari, Edge) randomly selected for each request to reduce 403 errors from anti-scraping systems.
+
+**SERP Metadata Preservation**: When importing URLs from `urlist_Google()`, `urlist_DuckDuckGo()`, or `urlist_Bing()` via `addurl()`, the title and publication date from search results are preserved. During crawling, these values are not overwritten, ensuring SERP metadata integrity.
+
+**Archive.org Fallback**: If a website blocks the crawler (403/503 errors), the system automatically attempts to fetch content from Archive.org's Wayback Machine.

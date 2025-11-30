@@ -44,10 +44,13 @@ Imports:
     bestNormalize,
     poweRlaw,
     moments,
-    tibble
+    tibble,
+    zip
 RoxygenNote: 7.3.2
-Suggests: 
-    testthat (>= 3.0.0)
+Suggests:
+    testthat (>= 3.0.0),
+    rmarkdown,
+    tinytex
 Config/testthat/edition: 3
 URL: https://github.com/MyWebIntelligence/mwiR
 BugReports: https://github.com/MyWebIntelligence/mwiR/issues
