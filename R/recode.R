@@ -2150,7 +2150,13 @@ annotatedData <- function(dataplus, table, champ, by, labase = "mwi.db") {
 # -----------------------------------------------------------------------------
 # Null-coalescing operator (internal)
 # -----------------------------------------------------------------------------
-`%||%` <- function(a, b) if (!is.null(a) && length(a) > 0L && !is.na(a[1])) a else b
+`%||%` <- function(a, b) {
+  if (!is.null(a) && length(a) > 0L) {
+    if (is.function(a) || !is.na(a[1])) a else b
+  } else {
+    b
+  }
+}
 
 # -----------------------------------------------------------------------------
 # Provider registry (internal)
