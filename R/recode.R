@@ -2195,7 +2195,24 @@ annotatedData <- function(dataplus, table, champ, by, labase = "mwi.db") {
     processing = "Traitement de {n} \u00e9l\u00e9ments avec {provider}...",
     config_title = "Configuration LLM actuelle:",
     get_key_urls = "Vous pouvez obtenir une cl\u00e9 sur:",
-    failed_rows = "Lignes en erreur: {rows}"
+    failed_rows = "Lignes en erreur: {rows}",
+    # API error messages
+    api_error_title = "[ERREUR API {provider}]",
+    api_error_401 = "Cl\u00e9 API invalide ou expir\u00e9e. V\u00e9rifiez votre cl\u00e9 avec LLM_Config(provider = '{provider}', api_key = '...').",
+    api_error_403 = "Acc\u00e8s refus\u00e9. Votre cl\u00e9 API n'a pas les permissions n\u00e9cessaires.",
+    api_error_404 = "Mod\u00e8le '{model}' non trouv\u00e9. V\u00e9rifiez le nom du mod\u00e8le.",
+    api_error_429 = "Limite de requ\u00eates d\u00e9pass\u00e9e. Attendez ou r\u00e9duisez la fr\u00e9quence des appels.",
+    api_error_500 = "Erreur serveur du provider. R\u00e9essayez plus tard.",
+    api_error_502 = "Le provider est temporairement indisponible (Bad Gateway).",
+    api_error_503 = "Le provider est en surcharge. R\u00e9essayez dans quelques minutes.",
+    api_error_quota = "Quota d\u00e9pass\u00e9. V\u00e9rifiez votre solde/cr\u00e9dit sur le site du provider.",
+    api_error_model = "Le mod\u00e8le '{model}' n'existe pas ou n'est pas accessible avec votre cl\u00e9.",
+    api_error_context = "Le texte d\u00e9passe la limite de tokens du mod\u00e8le ({model}).",
+    api_error_timeout = "Timeout: le serveur n'a pas r\u00e9pondu dans le d\u00e9lai ({timeout}s).",
+    api_error_network = "Erreur r\u00e9seau: impossible de contacter {provider}.",
+    api_error_unknown = "Erreur HTTP {status}: {message}",
+    api_check_key = "V\u00e9rifiez votre cl\u00e9: Sys.getenv('{env_key}')",
+    api_check_model = "Mod\u00e8les disponibles: {models}"
   ),
   en = list(
     no_api_key = "No API key found for {provider}.",
@@ -2210,7 +2227,24 @@ annotatedData <- function(dataplus, table, champ, by, labase = "mwi.db") {
     processing = "Processing {n} items with {provider}...",
     config_title = "Current LLM configuration:",
     get_key_urls = "You can get a key at:",
-    failed_rows = "Failed rows: {rows}"
+    failed_rows = "Failed rows: {rows}",
+    # API error messages
+    api_error_title = "[API ERROR {provider}]",
+    api_error_401 = "Invalid or expired API key. Check your key with LLM_Config(provider = '{provider}', api_key = '...').",
+    api_error_403 = "Access denied. Your API key doesn't have the required permissions.",
+    api_error_404 = "Model '{model}' not found. Check the model name.",
+    api_error_429 = "Rate limit exceeded. Wait or reduce request frequency.",
+    api_error_500 = "Provider server error. Try again later.",
+    api_error_502 = "Provider temporarily unavailable (Bad Gateway).",
+    api_error_503 = "Provider is overloaded. Try again in a few minutes.",
+    api_error_quota = "Quota exceeded. Check your balance/credits on the provider's website.",
+    api_error_model = "Model '{model}' doesn't exist or isn't accessible with your key.",
+    api_error_context = "Text exceeds the model's token limit ({model}).",
+    api_error_timeout = "Timeout: server didn't respond within {timeout}s.",
+    api_error_network = "Network error: unable to reach {provider}.",
+    api_error_unknown = "HTTP Error {status}: {message}",
+    api_check_key = "Check your key: Sys.getenv('{env_key}')",
+    api_check_model = "Available models: {models}"
   )
 )
 
@@ -2222,6 +2256,92 @@ annotatedData <- function(dataplus, table, champ, by, labase = "mwi.db") {
   if (!lang %in% names(.llm_messages)) lang <- "fr"
   template <- .llm_messages[[lang]][[key]] %||% .llm_messages[["en"]][[key]] %||% key
   glue::glue(template, ..., .envir = parent.frame())
+}
+
+# -----------------------------------------------------------------------------
+# Format API error with clear diagnostic (internal)
+# -----------------------------------------------------------------------------
+.format_api_error <- function(status_code, error_body, provider, model, config = NULL) {
+  # Parse error body to extract message
+  error_msg <- tryCatch({
+    if (is.character(error_body)) {
+      parsed <- jsonlite::fromJSON(error_body, simplifyVector = FALSE)
+      # Different providers have different error structures
+      parsed$error$message %||% parsed$error %||% parsed$message %||% error_body
+    } else {
+      as.character(error_body)
+    }
+  }, error = function(e) as.character(error_body))
+
+  # Truncate long messages
+  if (nchar(error_msg) > 200) error_msg <- paste0(substr(error_msg, 1, 200), "...")
+
+  env_key <- .llm_providers[[provider]]$env_key %||% "API_KEY"
+
+  # Build diagnostic message based on status code
+  diagnostic <- switch(as.character(status_code),
+    "401" = .msg("api_error_401", provider = provider),
+    "403" = {
+      # Check if it's a quota/billing issue (common in error messages)
+      if (grepl("quota|billing|credit|insufficient", error_msg, ignore.case = TRUE)) {
+        .msg("api_error_quota")
+      } else {
+        .msg("api_error_403")
+      }
+    },
+    "404" = {
+      if (grepl("model|not found", error_msg, ignore.case = TRUE)) {
+        .msg("api_error_model", model = model)
+      } else {
+        .msg("api_error_404", model = model)
+      }
+    },
+    "429" = .msg("api_error_429"),
+    "500" = .msg("api_error_500"),
+    "502" = .msg("api_error_502"),
+    "503" = .msg("api_error_503"),
+    .msg("api_error_unknown", status = status_code, message = error_msg)
+  )
+
+  # Detect specific error patterns in message
+  if (grepl("invalid.*key|api.?key|authentication|unauthorized", error_msg, ignore.case = TRUE)) {
+    diagnostic <- .msg("api_error_401", provider = provider)
+  } else if (grepl("model.*not.*found|does not exist|invalid model", error_msg, ignore.case = TRUE)) {
+    diagnostic <- .msg("api_error_model", model = model)
+  } else if (grepl("context.*length|token.*limit|max.*tokens", error_msg, ignore.case = TRUE)) {
+    diagnostic <- .msg("api_error_context", model = model)
+  } else if (grepl("quota|billing|credit|insufficient.*funds", error_msg, ignore.case = TRUE)) {
+    diagnostic <- .msg("api_error_quota")
+  }
+
+  # Provider-specific model suggestions
+  model_suggestions <- switch(provider,
+    openai = "gpt-4o, gpt-4o-mini, gpt-3.5-turbo",
+    openrouter = "openai/gpt-4o, anthropic/claude-3.5-sonnet, google/gemini-pro",
+    anthropic = "claude-sonnet-4-20250514, claude-3-5-sonnet-20241022, claude-3-haiku-20240307",
+    ollama = "llama3, mistral, codellama",
+    "check provider documentation"
+  )
+
+  # Build full error message
+  lines <- c(
+    .msg("api_error_title", provider = toupper(provider)),
+    paste0("  Status: HTTP ", status_code),
+    paste0("  Model: ", model),
+    paste0("  Message: ", error_msg),
+    "",
+    paste0("  -> ", diagnostic)
+  )
+
+  # Add helpful hints based on error type
+  if (status_code %in% c(401, 403)) {
+    lines <- c(lines, paste0("  -> ", .msg("api_check_key", env_key = env_key)))
+  }
+  if (status_code == 404 || grepl("model", error_msg, ignore.case = TRUE)) {
+    lines <- c(lines, paste0("  -> ", .msg("api_check_model", models = model_suggestions)))
+  }
+
+  paste(lines, collapse = "\n")
 }
 
 # -----------------------------------------------------------------------------
@@ -2353,12 +2473,16 @@ annotatedData <- function(dataplus, table, champ, by, labase = "mwi.db") {
 
   status <- httr::status_code(resp)
   body <- httr::content(resp, as = "text", encoding = "UTF-8")
-  parsed <- jsonlite::fromJSON(body, simplifyVector = FALSE)
+  parsed <- tryCatch(
+    jsonlite::fromJSON(body, simplifyVector = FALSE),
+    error = function(e) list()
+  )
 
   list(
     status_code = status,
     content = if (status == 200) parsed$choices[[1]]$message$content else NULL,
     error = if (status != 200) (parsed$error$message %||% body) else NULL,
+    error_body = if (status != 200) body else NULL,
     tokens = parsed$usage$total_tokens %||% NA_integer_
   )
 }
@@ -2404,12 +2528,16 @@ annotatedData <- function(dataplus, table, champ, by, labase = "mwi.db") {
 
   status <- httr::status_code(resp)
   body <- httr::content(resp, as = "text", encoding = "UTF-8")
-  parsed <- jsonlite::fromJSON(body, simplifyVector = FALSE)
+  parsed <- tryCatch(
+    jsonlite::fromJSON(body, simplifyVector = FALSE),
+    error = function(e) list()
+  )
 
   list(
     status_code = status,
     content = if (status == 200) parsed$choices[[1]]$message$content else NULL,
     error = if (status != 200) (parsed$error$message %||% body) else NULL,
+    error_body = if (status != 200) body else NULL,
     tokens = parsed$usage$total_tokens %||% NA_integer_
   )
 }
@@ -2443,12 +2571,16 @@ annotatedData <- function(dataplus, table, champ, by, labase = "mwi.db") {
 
   status <- httr::status_code(resp)
   body <- httr::content(resp, as = "text", encoding = "UTF-8")
-  parsed <- jsonlite::fromJSON(body, simplifyVector = FALSE)
+  parsed <- tryCatch(
+    jsonlite::fromJSON(body, simplifyVector = FALSE),
+    error = function(e) list()
+  )
 
   list(
     status_code = status,
     content = if (status == 200) parsed$content[[1]]$text else NULL,
     error = if (status != 200) (parsed$error$message %||% body) else NULL,
+    error_body = if (status != 200) body else NULL,
     tokens = (parsed$usage$input_tokens %||% 0L) + (parsed$usage$output_tokens %||% 0L)
   )
 }
@@ -2480,12 +2612,16 @@ annotatedData <- function(dataplus, table, champ, by, labase = "mwi.db") {
 
   status <- httr::status_code(resp)
   body <- httr::content(resp, as = "text", encoding = "UTF-8")
-  parsed <- jsonlite::fromJSON(body, simplifyVector = FALSE)
+  parsed <- tryCatch(
+    jsonlite::fromJSON(body, simplifyVector = FALSE),
+    error = function(e) list()
+  )
 
   list(
     status_code = status,
     content = if (status == 200) parsed$message$content else NULL,
     error = if (status != 200) (parsed$error %||% body) else NULL,
+    error_body = if (status != 200) body else NULL,
     tokens = (parsed$prompt_eval_count %||% 0L) + (parsed$eval_count %||% 0L)
   )
 }
@@ -2509,13 +2645,22 @@ annotatedData <- function(dataplus, table, champ, by, labase = "mwi.db") {
 .call_with_retry <- function(prompt, sysprompt, provider, config) {
   delay <- config$retry_delay
   last_error <- NULL
+  last_error_body <- NULL
+  last_status <- NA
   verbose <- getOption("mwiR.llm.verbose", TRUE)
 
   for (attempt in seq_len(config$max_retries)) {
     result <- tryCatch({
       .call_llm(prompt, sysprompt, provider, config)
     }, error = function(e) {
-      list(status_code = NA, content = NULL, error = conditionMessage(e), tokens = NA)
+      # Network/timeout errors
+      err_msg <- conditionMessage(e)
+      if (grepl("timeout|timed out", err_msg, ignore.case = TRUE)) {
+        err_msg <- .msg("api_error_timeout", timeout = config$timeout)
+      } else if (grepl("resolve|connection|network", err_msg, ignore.case = TRUE)) {
+        err_msg <- .msg("api_error_network", provider = provider)
+      }
+      list(status_code = NA, content = NULL, error = err_msg, error_body = NULL, tokens = NA)
     })
 
     if (!is.na(result$status_code) && result$status_code == 200 && !is.null(result$content)) {
@@ -2529,12 +2674,26 @@ annotatedData <- function(dataplus, table, champ, by, labase = "mwi.db") {
     }
 
     last_error <- result$error %||% "Unknown error"
+    last_error_body <- result$error_body
+    last_status <- result$status_code
+
+    # On first error, show detailed diagnostic (only once)
+    if (verbose && attempt == 1 && !is.na(last_status)) {
+      formatted_error <- .format_api_error(last_status, last_error_body %||% last_error,
+                                           provider, config$model, config)
+      message("\n", formatted_error, "\n")
+    }
 
     if (verbose && attempt < config$max_retries) {
       message(.msg("retry", attempt = attempt, max = config$max_retries, error = substr(last_error, 1, 50)))
     }
 
-    if (!is.na(result$status_code) && result$status_code == 429) {
+    # Don't retry on fatal errors (invalid key, model not found)
+    if (!is.na(last_status) && last_status %in% c(401, 403, 404)) {
+      break
+    }
+
+    if (!is.na(last_status) && last_status == 429) {
       delay <- min(delay * config$backoff_multiplier, 60)
       if (verbose) message(.msg("rate_limit", delay = round(delay, 1)))
     }
