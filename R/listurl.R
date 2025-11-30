@@ -143,6 +143,7 @@ urlist_Google <- function(query, datestart, dateend,
   api_key <- get_serp_key()
 
   # Convert the query to lowercase and replace spaces with '+'
+  original_query <- query
   query <- tolower(query)
   query <- gsub(" ", "+", query)
 
@@ -152,6 +153,16 @@ urlist_Google <- function(query, datestart, dateend,
   # Create a dataframe for the search dates
   date_seq <- seq(from = as.Date(datestart), to = as.Date(dateend), by = timestep)
   datesearch <- data.frame(datestart = date_seq, dateend = date_seq + lubridate::period(1, units = timestep) - lubridate::days(1))
+
+  # Progress tracking
+  total_urls <- 0
+  message("=== SerpAPI Google Search ===")
+  message("Query: ", original_query)
+  message("Period: ", datestart, " to ", dateend, " (", timestep, ")")
+  message("Language: ", lang)
+  message("Output file: ", filename)
+  message("Periods to process: ", nrow(datesearch))
+  message("-----------------------------")
 
   # Loop through all dates in the datesearch dataframe
   for (i in 1:nrow(datesearch)) {
@@ -188,6 +199,9 @@ urlist_Google <- function(query, datestart, dateend,
     num <- 100
     start <- 0
     sort_by <- "date"
+
+    # Counter for this period
+    period_urls <- 0
 
     # Loop to paginate through results until an error is returned
     while (TRUE) {
@@ -255,6 +269,9 @@ urlist_Google <- function(query, datestart, dateend,
         if (!file_exists) {
           file_exists <- TRUE
         }
+
+        # Count URLs
+        period_urls <- period_urls + 1
       }
 
       # Update the start point for the next page
@@ -263,7 +280,16 @@ urlist_Google <- function(query, datestart, dateend,
       # Pause to avoid rate-limiting
       Sys.sleep(sleep_seconds * runif(1, min = 0.80, max = 1.20))
     }
+
+    # Report progress for this period
+    total_urls <- total_urls + period_urls
+    message("[", i, "/", nrow(datesearch), "] ", datesearch$datestart[i], " to ", datesearch$dateend[i], ": ", period_urls, " URLs")
   }
+
+  # Final summary
+  message("-----------------------------")
+  message("Done! Total URLs collected: ", total_urls)
+  message("Results saved to: ", filename)
 }
 
 #' Retrieve URLs with SerpAPI DuckDuckGo Search
