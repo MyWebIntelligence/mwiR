@@ -148,56 +148,203 @@ and discourses. The R package developed from this project is an
 essential tool for researchers and practitioners, enabling them to fully
 exploit web data for in-depth and relevant analyses.
 
-# Using mwiR : a study case
+# Using mwiR: A Step-by-Step Guide
 
-## Installation
+## Prerequisites (Before Installing mwiR)
 
-You can install the development version of mwiR from
-[GitHub](https://github.com/) with:
+Before installing mwiR, you need to set up your system with R and Python. Follow the instructions for your operating system.
 
-   
+### 1. Install R (Required)
 
-## Project (‘land’) Setup
+**Windows:**
+1. Go to https://cran.r-project.org/bin/windows/base/
+2. Download the latest R installer (e.g., `R-4.4.1-win.exe`)
+3. Run the installer, accept all defaults
+4. Verify: Open Command Prompt and type `R --version`
 
-This is a basic example which shows you how to solve a common problem:
+**macOS:**
+1. Go to https://cran.r-project.org/bin/macosx/
+2. Download the `.pkg` file for your Mac (Intel or Apple Silicon)
+3. Double-click to install
+4. Verify: Open Terminal and type `R --version`
 
-    install.packages("remotes")  # si nécessaire
-    remotes::install_git("https://github.com/MyWebIntelligence/mwiR.git")
+**Linux (Ubuntu/Debian):**
+```bash
+sudo apt update
+sudo apt install r-base r-base-dev
+```
 
-    library(mwiR)
+### 2. Install RStudio (Recommended)
 
+RStudio provides a user-friendly interface for R.
 
-### Python/Trafilatura Setup (Automatic)
+1. Go to https://posit.co/download/rstudio-desktop/
+2. Download the installer for your OS
+3. Install and launch RStudio
 
-Trafilatura is a Python library used for web content extraction. **mwiR handles this automatically** - you don't need to install it manually.
+### 3. Install Python 3 (Required for Web Crawling)
+
+mwiR uses Python's trafilatura library for web content extraction. **Python 3.8 or higher is required.**
+
+**Windows (Important - Read Carefully):**
+1. Go to https://www.python.org/downloads/windows/
+2. Download "Windows installer (64-bit)" for Python 3.11 or 3.12
+3. **CRITICAL:** During installation, check ✅ "Add Python to PATH"
+4. Click "Install Now"
+5. Verify installation:
+   - Open Command Prompt (cmd)
+   - Type: `python --version` → Should show `Python 3.x.x`
+   - Type: `pip --version` → Should show pip version
+
+**If `python` command not found on Windows:**
+- The command might be `python3` or `py` instead
+- Or reinstall Python with "Add to PATH" checked
+
+**macOS:**
+```bash
+# Check if Python 3 is installed
+python3 --version
+
+# If not installed, use Homebrew:
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+brew install python3
+
+# Verify
+python3 --version
+pip3 --version
+```
+
+**Linux (Ubuntu/Debian):**
+```bash
+sudo apt update
+sudo apt install python3 python3-pip python3-venv
+python3 --version
+```
+
+### 4. Install Git (Required for Package Installation)
+
+**Windows:**
+1. Go to https://git-scm.com/download/win
+2. Download and run the installer
+3. Accept all defaults (important: keep "Git from command line" selected)
+4. Verify: Open Command Prompt and type `git --version`
+
+**macOS:**
+```bash
+# Git is usually pre-installed. If not:
+xcode-select --install
+# Or with Homebrew:
+brew install git
+```
+
+**Linux:**
+```bash
+sudo apt install git
+```
+
+### 5. Verify Your Setup
+
+Open R or RStudio and run these commands to verify everything is ready:
+
+```r
+# Check R version (should be >= 4.0)
+R.version.string
+
+# Check if Python is accessible from R
+Sys.which("python3")  # macOS/Linux
+Sys.which("python")   # Windows
+```
+
+---
+
+## Installation of mwiR
+
+Once prerequisites are installed, open RStudio (or R console) and run:
+
+```r
+# Step 1: Install the remotes package (if not already installed)
+install.packages("remotes")
+
+# Step 2: Install mwiR from GitHub
+remotes::install_github("MyWebIntelligence/mwiR")
+
+# Step 3: Load the package
+library(mwiR)
+```
+
+**Alternative installation method (if GitHub access issues):**
+```r
+# Using install_git with full URL
+remotes::install_git("https://github.com/MyWebIntelligence/mwiR.git")
+```
+
+**Note:** The installation may take a few minutes as it downloads and installs all dependencies.
+
+---
+
+## Python/Trafilatura Setup (Automatic)
+
+Trafilatura is the Python library used for web content extraction. **mwiR handles this automatically** - you don't need to install it manually.
 
 When you run `initmwi()` for the first time:
 1. mwiR creates a dedicated Python virtual environment (isolated from your system)
 2. Trafilatura is automatically installed in this environment
 3. The setup is cached, so subsequent sessions start instantly
 
-**Troubleshooting Python Setup:**
+### Troubleshooting Python Setup
 
 ```r
-# Check current status
+# Check current Python/trafilatura status
 check_python_status()
 
-# Force reinstall if needed
+# If problems, force reinstall
 setup_python(force = TRUE)
 
-# Complete reset
+# Complete reset (if all else fails)
 remove_python_env()
 setup_python()
 ```
 
-**Requirements:** Python 3 must be available on your system. On most systems it's pre-installed. If not:
-- macOS: `brew install python3`
-- Ubuntu/Debian: `sudo apt install python3 python3-venv`
-- Windows: Download from https://www.python.org/downloads/
+### Common Issues and Solutions
 
-For 'Enter your SERP API key or press Enter:'
-The serp_api function is a future feature. For now, you can just press Enter.
-In future versions, this feature will allow the use of an API key to interact with search engine results pages (SERP).
+| Problem | Solution |
+|---------|----------|
+| "Python not found" | Verify Python is in PATH (see prerequisites) |
+| "pip not found" | Reinstall Python with pip included |
+| "Permission denied" (Windows) | Run RStudio as Administrator |
+| "venv module not found" (Linux) | `sudo apt install python3-venv` |
+| trafilatura errors | Run `setup_python(force = TRUE)` |
+
+---
+
+## API Keys Setup (Optional)
+
+mwiR can integrate with external services that require API keys:
+
+### SerpAPI (for Google/Bing/DuckDuckGo search)
+
+1. Create an account at https://serpapi.com/
+2. Get your API key from the dashboard
+3. In R, when prompted or set manually:
+
+```r
+# Option 1: Set in session
+Sys.setenv(SERPAPI_KEY = "your_api_key_here")
+
+# Option 2: Add to .Renviron file (persistent)
+# Create/edit ~/.Renviron and add:
+# SERPAPI_KEY=your_api_key_here
+```
+
+### OpenAI/OpenRouter (for AI-assisted recoding)
+
+```r
+Sys.setenv(OPENAI_API_KEY = "your_openai_key")
+# Or for OpenRouter:
+Sys.setenv(OPENROUTER_API_KEY = "your_openrouter_key")
+```
+
+**Note:** If you don't have API keys yet, you can skip this step. You can still use mwiR's crawling and analysis features without them.
 
 ## Step 1: Creating the Research Project
 
