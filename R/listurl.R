@@ -52,8 +52,18 @@ related_query <- function(query, lang = "fr", country = "France") {
 
   related_searches_df <- data.frame(block_position = integer(), query = character(), link = character(), serpapi_link = character(), stringsAsFactors = FALSE)
 
+  # Map language codes to Google domains
+  domain_map <- c(
+    "en" = "google.com", "fr" = "google.fr", "de" = "google.de",
+    "es" = "google.es", "it" = "google.it", "pt" = "google.pt",
+    "pt-br" = "google.com.br", "nl" = "google.nl", "pl" = "google.pl",
+    "ru" = "google.ru", "ja" = "google.co.jp", "ko" = "google.co.kr",
+    "zh-cn" = "google.com.hk", "zh-tw" = "google.com.tw",
+    "ar" = "google.com", "es-419" = "google.com"
+  )
+
   # Basic parameters
-  google_domain <- paste("google.", lang, sep = "")
+  google_domain <- if (lang %in% names(domain_map)) domain_map[lang] else paste0("google.", lang)
   gl <- lang
   hl <- lang
   lr <- paste("lang_", lang, sep = "")
@@ -140,8 +150,18 @@ urlist_Google <- function(query, datestart, dateend,
     datestart_str <- format(datesearch$datestart[i], "%m/%d/%Y")
     dateend_str <- format(datesearch$dateend[i], "%m/%d/%Y")
 
+    # Map language codes to Google domains
+    domain_map <- c(
+      "en" = "google.com", "fr" = "google.fr", "de" = "google.de",
+      "es" = "google.es", "it" = "google.it", "pt" = "google.pt",
+      "pt-br" = "google.com.br", "nl" = "google.nl", "pl" = "google.pl",
+      "ru" = "google.ru", "ja" = "google.co.jp", "ko" = "google.co.kr",
+      "zh-cn" = "google.com.hk", "zh-tw" = "google.com.tw",
+      "ar" = "google.com", "es-419" = "google.com"
+    )
+
     # Basic parameters
-    google_domain <- paste0("google.", lang)
+    google_domain <- if (lang %in% names(domain_map)) domain_map[lang] else paste0("google.", lang)
     gl <- lang
     hl <- lang
     lr <- paste("lang_", lang, sep = "")
