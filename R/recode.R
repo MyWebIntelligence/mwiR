@@ -1892,15 +1892,30 @@ analyse_powerlaw <- function(x,
     for (i in seq_len(ncol(combos))) {
       m1 <- candidates[[combos[1L, i]]]
       m2 <- candidates[[combos[2L, i]]]
-      res <- try(
-        poweRlaw::compare_distributions(m1$object, m2$object),
-        silent = TRUE
+
+      # compare_distributions requires both models to have the same xmin
+      # We use the xmin from the first model and re-fit the second model
+      m2_copy <- m2$object$copy()
+      m2_copy$setXmin(m1$object$getXmin())
+      m2_pars <- tryCatch(
+        poweRlaw::estimate_pars(m2_copy),
+        error = function(e) NULL
       )
+
+      res <- NULL
+      if (!is.null(m2_pars)) {
+        m2_copy$setPars(m2_pars)
+        res <- tryCatch(
+          poweRlaw::compare_distributions(m1$object, m2_copy),
+          error = function(e) NULL
+        )
+      }
+
       comp_rows[[i]] <- data.frame(
         model_1 = combos[1L, i],
         model_2 = combos[2L, i],
-        loglik_ratio = if (inherits(res, "try-error")) NA_real_ else res$test_statistic,
-        p_two_sided = if (inherits(res, "try-error")) NA_real_ else res$p_two_sided,
+        loglik_ratio = if (is.null(res)) NA_real_ else res$test_statistic,
+        p_two_sided = if (is.null(res)) NA_real_ else res$p_two_sided,
         stringsAsFactors = FALSE
       )
     }
