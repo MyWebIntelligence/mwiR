@@ -21,7 +21,7 @@ export_land(
 
 \item{labase}{A character string specifying the name of the database file. Default is "mwi.db".}
 
-\item{ext}{A character string specifying the file extension for corpus export ("md" or "txt"). Default is "md".}
+\item{ext}{A character string specifying the file extension for corpus export ("md", "txt", or "pdf"). Default is "md". PDF requires rmarkdown and pandoc.}
 }
 \description{
 This function manages the exportation of land data based on the specified export type.

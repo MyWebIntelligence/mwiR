@@ -510,15 +510,26 @@ Source: \"%s\"\n
 #' @param con A database connection object.
 #' @param land_name A character string specifying the name of the land.
 #' @param minimum_relevance A numeric value specifying the minimum relevance score for inclusion in the export.
-#' @param ext A character string specifying the file extension ("md" or "txt"). Default is "md".
+#' @param ext A character string specifying the file extension ("md", "txt", or "pdf"). Default is "md".
 #' @import DBI utils
 #' @export
 export_corpus <- function(con, land_name, minimum_relevance, ext = "md") {
   # Validate extension
   ext <- tolower(ext)
-  if (!ext %in% c("md", "txt")) {
-    stop("Invalid extension. Use 'md' or 'txt'.")
+  if (!ext %in% c("md", "txt", "pdf")) {
+    stop("Invalid extension. Use 'md', 'txt', or 'pdf'.")
   }
+
+  # Check for PDF dependencies
+  if (ext == "pdf") {
+    if (!requireNamespace("rmarkdown", quietly = TRUE)) {
+      stop("Package 'rmarkdown' is required for PDF export. Install with: install.packages('rmarkdown')")
+    }
+    if (!rmarkdown::pandoc_available()) {
+      stop("Pandoc is required for PDF export. Install RStudio or pandoc separately.")
+    }
+  }
+
   # Retrieve the land ID from the name
   land_id <- get_land_id(con, land_name)
 
@@ -545,22 +556,46 @@ export_corpus <- function(con, land_name, minimum_relevance, ext = "md") {
 
   result <- dbGetQuery(con, sql, params = list(land_id, minimum_relevance))
 
-  # Write each record to a text file
+  # Write each record to a file
   for (i in 1:nrow(result)) {
     lignes <- result[i,]
-    file_name <- paste0(slugify(paste(land_name, "_", lignes$id, sep="")), ".", ext)
-    file_path <- file.path(dir_name, file_name)
+    base_name <- slugify(paste(land_name, "_", lignes$id, sep=""))
     metadata <- to_metadata(lignes)
     content <- paste(metadata, lignes$readable)
-    write(content, file = file_path)
+
+    if (ext == "pdf") {
+      # For PDF: create temp markdown, convert to PDF
+      md_file <- file.path(dir_name, paste0(base_name, ".md"))
+      pdf_file <- file.path(dir_name, paste0(base_name, ".pdf"))
+
+      # Add YAML header for better PDF formatting
+      title_safe <- gsub('"', '\\"', lignes$title)
+      yaml_header <- sprintf('---\ntitle: "%s"\noutput: pdf_document\n---\n\n', title_safe)
+      write(paste0(yaml_header, content), file = md_file)
+
+      # Convert to PDF
+      tryCatch({
+        rmarkdown::render(md_file, output_format = "pdf_document",
+                          output_file = basename(pdf_file), quiet = TRUE)
+        # Remove temp markdown file
+        file.remove(md_file)
+      }, error = function(e) {
+        message("PDF conversion failed for ", base_name, ": ", e$message)
+        # Keep markdown as fallback
+      })
+    } else {
+      # For md/txt: write directly
+      file_name <- paste0(base_name, ".", ext)
+      file_path <- file.path(dir_name, file_name)
+      write(content, file = file_path)
+    }
   }
 
-  # Compress all text files into a zip file
-  # List of all files in the directory
+  # Compress all files into a zip file
   file_paths <- list.files(dir_name, full.names = TRUE)
-
-  # Create a zip file containing all the files
   zip::zip(zipfile = paste0(dir_name, ".zip"), files = file_paths)
+
+  message("Corpus exported to: ", dir_name, ".zip (", length(file_paths), " files)")
 }
 
 
@@ -572,7 +607,7 @@ export_corpus <- function(con, land_name, minimum_relevance, ext = "md") {
 #' @param export_type A character string specifying the type of export ("pagecsv", "fullpagecsv", "nodecsv", "mediacsv", "pagegexf", "nodegexf", or "corpus").
 #' @param minimum_relevance A numeric value specifying the minimum relevance score for inclusion in the export. Default is 1.
 #' @param labase A character string specifying the name of the database file. Default is "mwi.db".
-#' @param ext A character string specifying the file extension for corpus export ("md" or "txt"). Default is "md".
+#' @param ext A character string specifying the file extension for corpus export ("md", "txt", or "pdf"). Default is "md". PDF requires rmarkdown and pandoc.
 #' @import DBI RSQLite
 #' @export
 export_land <- function(land_name, export_type, minimum_relevance = 1, labase = "mwi.db", ext = "md") {
