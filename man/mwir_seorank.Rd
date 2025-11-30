@@ -4,7 +4,15 @@
 \alias{mwir_seorank}
 \title{Fetch SEO Rank Data for URLs}
 \usage{
-mwir_seorank(filename = NULL, urls = NULL, api_key = NULL)
+mwir_seorank(
+  filename = NULL,
+  urls = NULL,
+  api_key = NULL,
+  parallel = TRUE,
+  workers = NULL,
+  progress = TRUE,
+  rate_limit_delay = 0.2
+)
 }
 \arguments{
 \item{filename}{A character string specifying the name of the output CSV file
@@ -15,26 +23,38 @@ the function will stop and prompt for input.}
 
 \item{api_key}{A character string containing the API key for the SEO Rank API.
 If NULL, the function will stop and prompt for input.}
+
+\item{parallel}{Logical. If TRUE (default), use parallel processing with multiple
+workers. Set to FALSE for sequential processing.}
+
+\item{workers}{Integer. Number of parallel workers. If NULL (default), uses
+`availableCores() - 1`. Ignored if `parallel = FALSE`.}
+
+\item{progress}{Logical. If TRUE (default), display a progress bar.}
+
+\item{rate_limit_delay}{Numeric. Delay in seconds between API calls (default 0.2).
+Used only in sequential mode; parallel mode relies on natural distribution.}
 }
 \value{
-This function does not return a value. It writes the fetched data to a CSV file
-  and prints messages to the console about the progress.
+Invisibly returns a data frame with all fetched data. Also writes the
+  results to a CSV file.
 }
 \description{
 This function retrieves SEO rank data for a list of URLs using the SEO Rank API
-and writes the results to a CSV file.
+and writes the results to a CSV file. Supports parallel processing for faster
+execution on large URL lists.
 }
 \details{
-The function performs the following steps:
-1. Validates input parameters.
-2. Initializes an empty data frame to store column names.
-3. For each URL, it fetches data from the SEO Rank API.
-4. Dynamically creates columns based on the API response.
-5. Writes each row of data to the specified CSV file.
-6. Adds a small delay between API calls to avoid overwhelming the server.
+The function supports two processing modes:
+\itemize{
+  \item \strong{Parallel mode} (default): Uses `future` and `furrr` packages to
+    process multiple URLs simultaneously. Significantly faster for large URL lists.
+  \item \strong{Sequential mode}: Processes URLs one at a time with configurable
+    delay between requests.
+}
 
-If the API call fails for a URL, a warning message is printed, and the function
-continues with the next URL.
+Results are written to CSV in a single batch operation after all URLs are processed,
+which is more efficient than row-by-row writing.
 }
 \note{
 This function requires an active internet connection and a valid API key from
@@ -42,11 +62,14 @@ https://seo-rank.my-addr.com/.
 }
 \examples{
 \dontrun{
-# Fetch data for two URLs
+# Parallel fetch (default, fastest)
 mwir_seorank("my_seo_data", c("example.com", "example.org"), "YOUR_API_KEY")
 
-# Fetch data for a single URL
-mwir_seorank("single_url_data", "example.net", "YOUR_API_KEY")
+# Sequential fetch with progress
+mwir_seorank("my_seo_data", urls, "YOUR_API_KEY", parallel = FALSE)
+
+# Parallel with custom worker count
+mwir_seorank("my_seo_data", urls, "YOUR_API_KEY", workers = 4)
 }
 
 }

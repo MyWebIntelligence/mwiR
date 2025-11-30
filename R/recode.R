@@ -1862,10 +1862,45 @@ analyse_powerlaw <- function(x,
 
 
 
+#' Fetch SEO data for a single URL (internal helper)
+#'
+#' @param url URL to fetch SEO data for
+#' @param api_key API key for SEO Rank service
+#' @return A data frame with SEO metrics or error information
+#' @keywords internal
+.fetch_seo_single <- function(url, api_key) {
+  api_url <- paste0("https://seo-rank.my-addr.com/api2/moz+sr+fb/", api_key, "/", url)
+
+  tryCatch({
+    response <- httr::GET(api_url, httr::timeout(30))
+    if (httr::status_code(response) == 200) {
+      data <- jsonlite::fromJSON(httr::content(response, "text", encoding = "UTF-8"))
+      # Convert all fields to character and add metadata
+      result <- as.data.frame(lapply(data, as.character), stringsAsFactors = FALSE)
+      result$url <- url
+      result$fetch_status <- "success"
+      result
+    } else {
+      data.frame(
+        url = url,
+        fetch_status = paste0("http_error_", httr::status_code(response)),
+        stringsAsFactors = FALSE
+      )
+    }
+  }, error = function(e) {
+    data.frame(
+      url = url,
+      fetch_status = paste0("error: ", e$message),
+      stringsAsFactors = FALSE
+    )
+  })
+}
+
 #' Fetch SEO Rank Data for URLs
 #'
 #' This function retrieves SEO rank data for a list of URLs using the SEO Rank API
-#' and writes the results to a CSV file.
+#' and writes the results to a CSV file. Supports parallel processing for faster
+#' execution on large URL lists.
 #'
 #' @param filename A character string specifying the name of the output CSV file
 #'   (without extension). If NULL, the function will stop and prompt for input.
@@ -1873,21 +1908,28 @@ analyse_powerlaw <- function(x,
 #'   the function will stop and prompt for input.
 #' @param api_key A character string containing the API key for the SEO Rank API.
 #'   If NULL, the function will stop and prompt for input.
+#' @param parallel Logical. If TRUE (default), use parallel processing with multiple
+#'   workers. Set to FALSE for sequential processing.
+#' @param workers Integer. Number of parallel workers. If NULL (default), uses
+#'   `availableCores() - 1`. Ignored if `parallel = FALSE`.
+#' @param progress Logical. If TRUE (default), display a progress bar.
+#' @param rate_limit_delay Numeric. Delay in seconds between API calls (default 0.2).
+#'   Used only in sequential mode; parallel mode relies on natural distribution.
 #'
-#' @return This function does not return a value. It writes the fetched data to a CSV file
-#'   and prints messages to the console about the progress.
+#' @return Invisibly returns a data frame with all fetched data. Also writes the
+#'   results to a CSV file.
 #'
 #' @details
-#' The function performs the following steps:
-#' 1. Validates input parameters.
-#' 2. Initializes an empty data frame to store column names.
-#' 3. For each URL, it fetches data from the SEO Rank API.
-#' 4. Dynamically creates columns based on the API response.
-#' 5. Writes each row of data to the specified CSV file.
-#' 6. Adds a small delay between API calls to avoid overwhelming the server.
+#' The function supports two processing modes:
+#' \itemize{
+#'   \item \strong{Parallel mode} (default): Uses `future` and `furrr` packages to
+#'     process multiple URLs simultaneously. Significantly faster for large URL lists.
+#'   \item \strong{Sequential mode}: Processes URLs one at a time with configurable
+#'     delay between requests.
+#' }
 #'
-#' If the API call fails for a URL, a warning message is printed, and the function
-#' continues with the next URL.
+#' Results are written to CSV in a single batch operation after all URLs are processed,
+#' which is more efficient than row-by-row writing.
 #'
 #' @note
 #' This function requires an active internet connection and a valid API key from
@@ -1895,80 +1937,115 @@ analyse_powerlaw <- function(x,
 #'
 #' @examples
 #' \dontrun{
-#' # Fetch data for two URLs
+#' # Parallel fetch (default, fastest)
 #' mwir_seorank("my_seo_data", c("example.com", "example.org"), "YOUR_API_KEY")
 #'
-#' # Fetch data for a single URL
-#' mwir_seorank("single_url_data", "example.net", "YOUR_API_KEY")
+#' # Sequential fetch with progress
+#' mwir_seorank("my_seo_data", urls, "YOUR_API_KEY", parallel = FALSE)
+#'
+#' # Parallel with custom worker count
+#' mwir_seorank("my_seo_data", urls, "YOUR_API_KEY", workers = 4)
 #' }
 #'
-#' @importFrom httr GET status_code content
+#' @importFrom httr GET status_code content timeout
 #' @importFrom jsonlite fromJSON
 #' @importFrom readr write_csv
 #'
 #' @export
-mwir_seorank <- function(filename=NULL, urls=NULL, api_key=NULL) {
+mwir_seorank <- function(filename = NULL,
+                         urls = NULL,
+                         api_key = NULL,
+                         parallel = TRUE,
+                         workers = NULL,
+                         progress = TRUE,
+                         rate_limit_delay = 0.2) {
 
-  # Input validation for filename
-  while (is.null(filename) || !is.character(filename) || nchar(filename) == 0) {
-    stop("filename needed for export. Please enter a filename ex. 'myproject' without extention")
+  # Input validation
+  if (is.null(filename) || !is.character(filename) || nchar(filename) == 0) {
+    stop("filename needed for export. Please enter a filename ex. 'myproject' without extension")
   }
 
-  # Input validation for urls
-  while (is.null(urls) || !is.character(urls) || length(urls) == 0) {
+  if (is.null(urls) || !is.character(urls) || length(urls) == 0) {
     stop("no urls given")
   }
 
-  # Input validation for api_key
-  while (is.null(api_key) || !is.character(api_key) || nchar(api_key) == 0) {
+  if (is.null(api_key) || !is.character(api_key) || nchar(api_key) == 0) {
     stop("need an api key for 'https://seo-rank.my-addr.com/' API services")
   }
 
-  # Initialize an empty data frame to store column names
-  result_template <- data.frame(url = character())
+  n <- length(urls)
+  message("=== SEO Rank Fetch ===")
+  message("URLs to process: ", n)
+  message("Mode: ", if (parallel) paste0("parallel (", workers %||% (future::availableCores() - 1), " workers)") else "sequential")
+  message("----------------------")
 
-  for (url in urls) {
-    api_url <- paste0("https://seo-rank.my-addr.com/api2/moz+sr+fb/", api_key, "/", url)
+  results <- vector("list", n)
 
-    tryCatch({
-      response <- GET(api_url)
-      if (status_code(response) == 200) {
-        data <- fromJSON(content(response, "text"))
+  if (parallel && n > 1) {
+    # Parallel processing with future + furrr
+    if (is.null(workers)) workers <- max(1, future::availableCores() - 1)
+    oplan <- future::plan(future::multisession, workers = workers)
+    on.exit(future::plan(oplan), add = TRUE)
 
-        # Create a new row with the current URL
-        new_row <- data.frame(url = url)
+    if (progress) {
+      progressr::handlers(global = TRUE)
+      results <- progressr::with_progress({
+        p <- progressr::progressor(steps = n)
+        furrr::future_map(urls, function(url) {
+          p()
+          .fetch_seo_single(url, api_key)
+        }, .options = furrr::furrr_options(seed = TRUE))
+      })
+    } else {
+      results <- furrr::future_map(urls, function(url) {
+        .fetch_seo_single(url, api_key)
+      }, .options = furrr::furrr_options(seed = TRUE))
+    }
+  } else {
+    # Sequential processing with progress bar
+    pb <- NULL
+    if (progress && interactive()) {
+      pb <- utils::txtProgressBar(min = 0, max = n, style = 3)
+      on.exit(if (!is.null(pb)) close(pb), add = TRUE)
+    }
 
-        # Dynamically add columns based on API response
-        for (col_name in names(data)) {
-          new_row[[col_name]] <- as.character(data[[col_name]])
-          if (!(col_name %in% names(result_template))) {
-            result_template[[col_name]] <- character()
-          }
-        }
-
-        # Ensure all columns are present in the new row
-        for (col_name in names(result_template)) {
-          if (!(col_name %in% names(new_row))) {
-            new_row[[col_name]] <- NA
-          }
-        }
-
-        # Write to CSV (append if file exists, create if it doesn't)
-        write_csv(new_row, paste0(filename, ".csv"), append = file.exists(paste0(filename, ".csv")))
-
-        message(paste("Data fetched and written for URL:", url))
-      } else {
-        warning(paste("Failed to fetch data for URL:", url, "Status code:", status_code(response)))
+    for (i in seq_len(n)) {
+      if (rate_limit_delay > 0 && i > 1) {
+        Sys.sleep(rate_limit_delay)
       }
-    }, error = function(e) {
-      warning(paste("Error fetching data for URL:", url, "Error:", e$message))
-    })
 
-    # Add a small delay to avoid overwhelming the API
-    Sys.sleep(1)
+      results[[i]] <- .fetch_seo_single(urls[i], api_key)
+
+      if (!is.null(pb)) utils::setTxtProgressBar(pb, i)
+    }
   }
 
-  message("Data fetching and CSV writing completed.")
+  # Combine all results into a single data frame
+  # Handle varying columns by using dplyr::bind_rows or base R equivalent
+  all_cols <- unique(unlist(lapply(results, names)))
+  combined <- do.call(rbind, lapply(results, function(df) {
+    missing_cols <- setdiff(all_cols, names(df))
+    for (col in missing_cols) {
+      df[[col]] <- NA_character_
+    }
+    df[, all_cols, drop = FALSE]
+  }))
+
+  # Write to CSV (single batch write)
+  output_file <- paste0(filename, ".csv")
+  readr::write_csv(combined, output_file)
+
+  # Summary
+  success_count <- sum(combined$fetch_status == "success", na.rm = TRUE)
+  error_count <- n - success_count
+  message("----------------------")
+  message("Done! ", success_count, "/", n, " URLs fetched successfully")
+  if (error_count > 0) {
+    message("Errors: ", error_count, " (see fetch_status column)")
+  }
+  message("Results saved to: ", output_file)
+
+  invisible(combined)
 }
 
 #' Update Database Table with Externally Modified Data
