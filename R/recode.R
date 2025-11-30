@@ -1573,7 +1573,7 @@ find_clusters <- function(x,
 
   # Check parameters are set
   if (is.null(m_copy$getPars()) || is.null(m_copy$getXmin())) {
-    est <- poweRlaw::estimate_xmin(m_copy)
+    est <- suppressWarnings(poweRlaw::estimate_xmin(m_copy))
     m_copy$setXmin(est)
   }
 
@@ -1616,7 +1616,8 @@ find_clusters <- function(x,
 
       # Fit model on bootstrap sample
       m_boot <- m_copy$getRefClass()$new(q)
-      est_boot <- poweRlaw::estimate_xmin(m_boot)
+      # Suppress "xmin search space truncated" warnings during bootstrap
+      est_boot <- suppressWarnings(poweRlaw::estimate_xmin(m_boot))
 
       gof_values[i] <- if (!is.null(est_boot$gof) && !is.na(est_boot$gof)) {
         est_boot$gof
@@ -1809,9 +1810,11 @@ analyse_powerlaw <- function(x,
 
     tail_xmin <- xmin
     if (is.null(tail_xmin)) {
-      est_xmin <- suppressPackageStartupMessages(
-        suppressMessages(
-          poweRlaw::estimate_xmin(model_obj, xmax = max(x_pos))
+      est_xmin <- suppressWarnings(
+        suppressPackageStartupMessages(
+          suppressMessages(
+            poweRlaw::estimate_xmin(model_obj, xmax = max(x_pos))
+          )
         )
       )
       tail_xmin <- est_xmin$xmin
