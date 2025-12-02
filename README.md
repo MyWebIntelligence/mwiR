@@ -266,6 +266,8 @@ Once prerequisites are installed, open RStudio (or R console) and run:
 install.packages("remotes")
 
 # Step 2: Install mwiR from GitHub
+## Désactiver temporairement le PAT pour cette session
+Sys.unsetenv("GITHUB_PAT")
 remotes::install_github("MyWebIntelligence/mwiR")
 
 # Step 3: Load the package
