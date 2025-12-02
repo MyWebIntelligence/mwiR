@@ -10,6 +10,12 @@ NULL
 # Package-level environment for caching Python objects
 .mwi_python_cache <- new.env(parent = emptyenv())
 
+#' Check if running on Windows
+#' @keywords internal
+is_windows <- function() {
+  .Platform$OS.type == "windows"
+}
+
 #' Get mwiR Virtual Environment Path
 #'
 #' Returns the path to the dedicated Python virtual environment for mwiR.
@@ -159,14 +165,27 @@ setup_python <- function(force = FALSE, quiet = FALSE) {
     python_path <- find_system_python()
 
     if (is.null(python_path)) {
-      stop(
-        "Python 3 not found on your system.\n",
-        "Please install Python 3:\n",
-        "  - macOS: brew install python3\n",
-        "  - Ubuntu/Debian: sudo apt install python3 python3-venv\n",
-        "  - Windows: https://www.python.org/downloads/",
-        call. = FALSE
-      )
+      if (is_windows()) {
+        stop(
+          "Python 3 not found on your system.\n\n",
+          "Note: The Windows Store version of Python cannot be used with mwiR.\n",
+          "Please install Python 3 from one of these sources:\n",
+          "  1. Official installer: https://www.python.org/downloads/\n",
+          "     (Check 'Add Python to PATH' during installation)\n",
+          "  2. Or use reticulate: reticulate::install_python()\n\n",
+          "After installing, restart R and run: mwiR::setup_python()",
+          call. = FALSE
+        )
+      } else {
+        stop(
+          "Python 3 not found on your system.\n",
+          "Please install Python 3:\n",
+          "  - macOS: brew install python3\n",
+          "  - Ubuntu/Debian: sudo apt install python3 python3-venv\n",
+          "  - Or use: reticulate::install_python()",
+          call. = FALSE
+        )
+      }
     }
 
     if (!quiet) message("Using Python: ", python_path)
@@ -175,13 +194,30 @@ setup_python <- function(force = FALSE, quiet = FALSE) {
     tryCatch({
       reticulate::virtualenv_create(venv_path, python = python_path)
     }, error = function(e) {
-      stop(
-        "Failed to create virtual environment: ", e$message, "\n",
-        "Try installing python3-venv:\n",
-        "  - Ubuntu/Debian: sudo apt install python3-venv\n",
-        "  - macOS: brew reinstall python3",
-        call. = FALSE
-      )
+      if (is_windows()) {
+        stop(
+          "Failed to create virtual environment: ", e$message, "\n\n",
+          "This may happen if you're using Windows Store Python.\n",
+          "Solutions:\n",
+          "  1. Install Python from https://www.python.org/downloads/\n",
+          "     (Check 'Add Python to PATH' during installation)\n",
+          "  2. Or run: reticulate::install_python()\n",
+          "  3. Disable Windows Store Python aliases:\n",
+          "     Settings > Apps > Advanced app settings > App execution aliases\n",
+          "     Turn off 'python.exe' and 'python3.exe'\n\n",
+          "After fixing, restart R and run: mwiR::setup_python(force = TRUE)",
+          call. = FALSE
+        )
+      } else {
+        stop(
+          "Failed to create virtual environment: ", e$message, "\n",
+          "Try installing python3-venv:\n",
+          "  - Ubuntu/Debian: sudo apt install python3-venv\n",
+          "  - macOS: brew reinstall python3\n",
+          "  - Or use: reticulate::install_python()",
+          call. = FALSE
+        )
+      }
     })
   }
 
@@ -227,23 +263,31 @@ setup_python <- function(force = FALSE, quiet = FALSE) {
 
 #' Find System Python 3
 #'
-#' Searches for Python 3 executable on the system.
+#' Searches for a valid Python 3 executable on the system.
+#' On Windows, filters out Windows Store Python aliases that cannot create
+#' virtual environments.
 #'
 #' @return Path to Python 3 executable or NULL if not found.
 #' @keywords internal
 find_system_python <- function() {
-  # Common Python 3 executable names
   python_names <- c("python3", "python")
 
-  # Platform-specific paths
-  if (.Platform$OS.type == "windows") {
+  # Platform-specific search paths
+  if (is_windows()) {
     extra_paths <- c(
+      # pyenv-win installations
+      file.path(Sys.getenv("USERPROFILE"), ".pyenv", "pyenv-win", "versions"),
+      # Official Python.org installer locations
       file.path(Sys.getenv("LOCALAPPDATA"), "Programs", "Python"),
-      "C:/Python3",
-      "C:/Python39",
-      "C:/Python310",
+      # Common installation directories
+      "C:/Program Files/Python313",
+      "C:/Program Files/Python312",
+      "C:/Program Files/Python311",
+      "C:/Python313",
+      "C:/Python312",
       "C:/Python311",
-      "C:/Python312"
+      "C:/Python310",
+      "C:/Python39"
     )
   } else {
     extra_paths <- c(
@@ -254,27 +298,48 @@ find_system_python <- function() {
     )
   }
 
-  # Try each name in PATH first
+  # Collect all candidate Python paths
+  candidates <- character(0)
+
+  # Try PATH first
   for (name in python_names) {
     path <- Sys.which(name)
-    if (path != "" && is_python3(path)) {
-      return(path)
+    if (path != "") {
+      candidates <- c(candidates, path)
     }
   }
 
-  # Try extra paths
+  # Try extra paths (with subdirectory search for Windows Python versions)
   for (dir in extra_paths) {
     if (dir.exists(dir)) {
-      for (name in python_names) {
-        path <- file.path(dir, name)
-        if (.Platform$OS.type == "windows") {
-          path <- paste0(path, ".exe")
-        }
-        if (file.exists(path) && is_python3(path)) {
-          return(path)
+      # On Windows, Python.org installs in versioned subdirectories
+      subdirs <- c(dir, list.dirs(dir, recursive = FALSE, full.names = TRUE))
+      for (subdir in subdirs) {
+        for (name in python_names) {
+          path <- file.path(subdir, name)
+          if (is_windows()) path <- paste0(path, ".exe")
+          if (file.exists(path)) {
+            candidates <- c(candidates, path)
+          }
         }
       }
     }
+  }
+
+  # Filter and validate candidates
+  # Skip Windows Store aliases, verify Python 3, and check venv capability
+  for (path in unique(candidates)) {
+    # Skip Windows Store Python aliases (critical for Windows users)
+    if (is_windows_store_python(path)) next
+
+    # Verify it's Python 3
+    if (!is_python3(path)) next
+
+    # On Windows, also verify venv capability
+    if (is_windows() && !can_create_virtualenv(path)) next
+
+    # Found a valid Python
+    return(normalizePath(path, winslash = "/", mustWork = FALSE))
   }
 
   return(NULL)
@@ -290,6 +355,74 @@ is_python3 <- function(python_path) {
     result <- system2(python_path, "--version", stdout = TRUE, stderr = TRUE)
     grepl("^Python 3", result[1])
   }, error = function(e) FALSE)
+}
+
+#' Check if Python is Windows Store Alias
+#'
+#' Detects Windows Store Python aliases (App Execution Aliases) that cannot
+#' create virtual environments. These are stub executables that redirect to
+#' the Microsoft Store instead of running Python.
+#'
+#' @param python_path Path to Python executable.
+#' @return Logical indicating if this is a Windows Store Python alias.
+#' @keywords internal
+is_windows_store_python <- function(python_path) {
+  if (!is_windows()) return(FALSE)
+
+  # Normalize path to expand short names like MICROS~1
+  normalized <- tryCatch(
+    normalizePath(python_path, winslash = "/", mustWork = FALSE),
+    error = function(e) python_path
+  )
+
+  # Convert to lowercase for case-insensitive matching on Windows
+  normalized_lower <- tolower(normalized)
+
+  # Pattern 1: Official WindowsApps location (PythonSoftwareFoundation)
+  if (grepl("program files/windowsapps/pythonsoftwarefoundation",
+            normalized_lower, fixed = TRUE)) {
+    return(TRUE)
+  }
+
+  # Pattern 2: User-level WindowsApps (App Execution Aliases)
+  if (grepl("/microsoft/windowsapps/", normalized_lower, fixed = TRUE)) {
+    return(TRUE)
+  }
+
+  # Pattern 3: Zero-byte stub files are Windows Store aliases
+tryCatch({
+    info <- file.info(python_path)
+    if (!is.na(info$size) && info$size == 0) return(TRUE)
+  }, error = function(e) NULL)
+
+  FALSE
+}
+
+#' Check if Python Can Create Virtual Environments
+#'
+#' Validates that a Python executable can create virtual environments.
+#' This filters out Windows Store Python aliases and Python installations
+#' missing the venv module.
+#'
+#' @param python_path Path to Python executable.
+#' @return Logical indicating if Python can create virtualenvs.
+#' @keywords internal
+can_create_virtualenv <- function(python_path) {
+  # Skip Windows Store aliases immediately
+  if (is_windows_store_python(python_path)) return(FALSE)
+
+  # Test if venv module is available
+  tryCatch({
+    result <- system2(
+      python_path,
+      c("-c", shQuote("import venv; print('ok')")),
+      stdout = TRUE,
+      stderr = TRUE
+    )
+    status <- attr(result, "status")
+    if (!is.null(status) && status != 0) return(FALSE)
+    any(grepl("ok", result))
+  }, error = function(e) FALSE, warning = function(w) FALSE)
 }
 
 #' Get Trafilatura Module (Cached)

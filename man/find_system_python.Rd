@@ -10,6 +10,8 @@ find_system_python()
 Path to Python 3 executable or NULL if not found.
 }
 \description{
-Searches for Python 3 executable on the system.
+Searches for a valid Python 3 executable on the system.
+On Windows, filters out Windows Store Python aliases that cannot create
+virtual environments.
 }
 \keyword{internal}
