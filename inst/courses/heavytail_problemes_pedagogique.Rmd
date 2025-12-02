@@ -1,0 +1,1460 @@
+---
+title: "Comprendre les Distributions à Queue Lourde"
+subtitle: "Un guide pas à pas pour les Sciences Sociales"
+author: "Amar LAKEL - Université Bordeaux Montaigne"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 4
+    toc_float:
+      collapsed: false
+      smooth_scroll: true
+    number_sections: true
+    theme: flatly
+    highlight: tango
+    code_folding: show
+    df_print: paged
+  pdf_document:
+    toc: true
+    number_sections: true
+    latex_engine: xelatex
+editor_options:
+  markdown:
+    wrap: 140
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  eval = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 10,
+  fig.height = 6,
+  cache = FALSE
+)
+
+# Chargement des packages nécessaires
+library(ggplot2)
+library(dplyr)
+```
+
+--------------------------------------------------------------------------------------------------------------------------------------------
+
+# Avant de commencer : Pourquoi ce cours est important pour vous
+
+## Une situation que vous allez forcément rencontrer
+
+En tant que sociologue, vous allez analyser des données issues de la société : revenus, populations, interactions sur les réseaux sociaux,
+citations académiques, etc. Or, ces données présentent souvent une caractéristique qui perturbe les analyses statistiques classiques que
+vous avez apprises jusqu'ici.
+
+**Imaginez cette situation concrète** : Vous réalisez une enquête sur les revenus dans un quartier de 100 habitants. Vous calculez le revenu
+moyen et trouvez 150 000 euros par an. Vous en concluez que c'est un quartier aisé. Erreur ! En réalité, 99 personnes gagnent 20 000 euros,
+et une seule personne (un footballeur professionnel) gagne 13 millions. La moyenne de 150 000 euros ne correspond à la situation de
+personne.
+
+Ce phénomène, où quelques valeurs exceptionnellement élevées "tirent" la moyenne vers le haut et la rendent non représentative, s'appelle
+une **distribution à queue lourde** (en anglais *heavy-tailed distribution*). Ce cours va vous apprendre à reconnaître ces situations et à
+les traiter correctement.
+
+## Objectifs d'apprentissage
+
+À la fin de ce cours, vous serez capable de :
+
+1.  **Identifier** visuellement et statistiquement une distribution à queue lourde
+2.  **Comprendre** pourquoi les statistiques classiques (moyenne, écart-type) peuvent être trompeuses
+3.  **Choisir** les bons outils statistiques selon la nature de vos données
+4.  **Transformer** vos données pour les rendre compatibles avec les analyses standard
+5.  **Interpréter** correctement vos résultats en tenant compte de ces spécificités
+
+## Un conseil avant de commencer
+
+Ce cours contient beaucoup de code R. Ne vous inquiétez pas si vous ne comprenez pas chaque ligne de code. L'important est de comprendre les
+**concepts** et de savoir **quand utiliser** chaque outil. Vous pourrez toujours revenir au code plus tard pour approfondir.
+
+--------------------------------------------------------------------------------------------------------------------------------------------
+
+# Partie 1 : Deux mondes statistiques différents
+
+## Le monde que vous connaissez : la distribution normale
+
+### L'image de la courbe en cloche
+
+Depuis le lycée, vous avez rencontré la **distribution normale** (aussi appelée *gaussienne* ou *courbe en cloche*). C'est la distribution
+la plus célèbre en statistique, et pour de bonnes raisons : elle décrit de nombreux phénomènes naturels.
+
+**Exemple concret** : La taille des adultes français. Si vous mesurez 10 000 personnes, vous obtiendrez une distribution qui ressemble à
+ceci :
+
+```{r normale-taille, fig.cap="Distribution de la taille des adultes français : une belle courbe en cloche symétrique"}
+# Simulons la taille de 10 000 adultes français
+# (données simulées basées sur les statistiques réelles de l'INSEE)
+set.seed(42)  # Pour que vous obteniez les mêmes résultats que moi
+
+# Les femmes : moyenne 164 cm, écart-type 6 cm
+taille_femmes <- rnorm(5000, mean = 164, sd = 6)
+
+# Les hommes : moyenne 177 cm, écart-type 7 cm
+taille_hommes <- rnorm(5000, mean = 177, sd = 7)
+
+# Créons un graphique pour les hommes seulement (plus simple à lire)
+ggplot(data.frame(taille = taille_hommes), aes(x = taille)) +
+  geom_histogram(aes(y = after_stat(density)), bins = 50, 
+                 fill = "steelblue", color = "white", alpha = 0.7) +
+  geom_density(color = "darkblue", linewidth = 1.2) +
+  geom_vline(xintercept = mean(taille_hommes), color = "red", 
+             linetype = "dashed", linewidth = 1) +
+  geom_vline(xintercept = median(taille_hommes), color = "darkgreen", 
+             linetype = "dotted", linewidth = 1) +
+  labs(
+    title = "Distribution de la taille des hommes adultes",
+    subtitle = "La ligne rouge (moyenne) et verte (médiane) sont presque confondues",
+    x = "Taille en centimètres",
+    y = "Densité"
+  ) +
+  annotate("text", x = 195, y = 0.05, 
+           label = paste("Moyenne =", round(mean(taille_hommes), 1), "cm"),
+           color = "red") +
+  annotate("text", x = 195, y = 0.045, 
+           label = paste("Médiane =", round(median(taille_hommes), 1), "cm"),
+           color = "darkgreen") +
+  theme_minimal(base_size = 12)
+```
+
+### Les propriétés rassurantes de la distribution normale
+
+**Pourquoi les statisticiens aiment-ils la distribution normale ?** Parce qu'elle possède des propriétés qui rendent l'analyse simple et
+fiable.
+
+**Propriété 1 : La symétrie.** La distribution est parfaitement symétrique autour de la moyenne. Autant de personnes sont plus petites que
+la moyenne que de personnes plus grandes.
+
+**Propriété 2 : Moyenne et médiane sont identiques.** Quand une distribution est symétrique, la moyenne (la somme divisée par le nombre) et
+la médiane (la valeur du milieu) donnent le même résultat. Cela signifie que la moyenne est une bonne représentation du "cas typique".
+
+**Propriété 3 : Les valeurs extrêmes sont très rares.** Dans une distribution normale, 95% des observations se trouvent dans un intervalle
+de ± 2 écarts-types autour de la moyenne. Les valeurs très éloignées de la moyenne sont exceptionnelles (moins de 0,3% au-delà de 3
+écarts-types).
+
+```{r normale-ecarts, fig.cap="Dans une distribution normale, les valeurs extrêmes sont très rares"}
+# Illustrons la règle des écarts-types
+x <- seq(-4, 4, length.out = 1000)
+y <- dnorm(x)
+df <- data.frame(x = x, y = y)
+
+ggplot(df, aes(x, y)) +
+  # Zone centrale (68%)
+  geom_area(data = subset(df, x >= -1 & x <= 1), 
+            fill = "steelblue", alpha = 0.5) +
+  # Zone élargie (95%)
+  geom_area(data = subset(df, x >= -2 & x <= 2), 
+            fill = "steelblue", alpha = 0.3) +
+  geom_line(linewidth = 1) +
+  geom_vline(xintercept = c(-2, -1, 0, 1, 2), 
+             linetype = "dashed", alpha = 0.5) +
+  annotate("text", x = 0, y = 0.2, label = "68%", size = 5) +
+  annotate("text", x = 0, y = 0.05, label = "95%", size = 4) +
+  labs(
+    title = "La règle des écarts-types dans une distribution normale",
+    subtitle = "68% des données sont à ± 1 écart-type, 95% à ± 2 écarts-types",
+    x = "Nombre d'écarts-types par rapport à la moyenne",
+    y = "Densité"
+  ) +
+  scale_x_continuous(breaks = -4:4) +
+  theme_minimal(base_size = 12)
+```
+
+**Propriété 4 : L'écart-type a un sens clair.** L'écart-type mesure la dispersion des données autour de la moyenne. Dans une distribution
+normale, il vous dit exactement quelle proportion des données se trouve à quelle distance de la moyenne.
+
+### Exemples de phénomènes qui suivent une distribution normale
+
+Voici des variables qui, en général, suivent approximativement une distribution normale :
+
+-   **Caractéristiques biologiques** : taille, poids (à âge égal), tension artérielle
+-   **Mesures psychométriques** : scores de QI (par construction), scores de personnalité
+-   **Erreurs de mesure** : quand vous pesez plusieurs fois un même objet, les petites variations suivent une normale
+-   **Moyennes d'échantillons** : grâce au théorème central limite, la moyenne de n'importe quel échantillon suffisamment grand tend vers
+    une normale
+
+--------------------------------------------------------------------------------------------------------------------------------------------
+
+## Le monde que vous allez découvrir : les distributions à queue lourde
+
+### L'image de la distribution asymétrique
+
+Maintenant, regardons un tout autre type de données : le nombre de followers sur Twitter (devenu X).
+
+```{r queue-lourde-intro, fig.cap="Distribution du nombre de followers : la plupart ont peu de followers, quelques-uns en ont énormément"}
+# Simulons une distribution réaliste de followers
+set.seed(123)
+
+# Cette simulation reproduit le pattern observé sur les vrais réseaux sociaux
+followers <- c(
+  # 70% des comptes : très peu de followers (utilisateurs "normaux")
+  rpois(7000, lambda = 50),
+  
+  # 20% : followers modérés (utilisateurs actifs)
+  rpois(2000, lambda = 300),
+  
+  # 8% : beaucoup de followers (micro-influenceurs)
+  rpois(800, lambda = 2000),
+  
+  # 1.9% : très beaucoup (influenceurs)
+  rpois(190, lambda = 20000),
+  
+  # 0.1% : célébrités (valeurs extrêmes mais réelles)
+  round(runif(10, 500000, 5000000))
+)
+followers <- pmax(followers, 1)  # Au minimum 1 follower
+
+# Créons le même type de graphique
+df_followers <- data.frame(followers = followers)
+
+ggplot(df_followers, aes(x = followers)) +
+  geom_histogram(bins = 100, fill = "coral", color = "white", alpha = 0.7) +
+  geom_vline(xintercept = mean(followers), color = "red", 
+             linetype = "dashed", linewidth = 1) +
+  geom_vline(xintercept = median(followers), color = "darkgreen", 
+             linetype = "solid", linewidth = 1) +
+  labs(
+    title = "Distribution du nombre de followers",
+    subtitle = "Notez comment tout est écrasé à gauche !",
+    x = "Nombre de followers",
+    y = "Nombre de comptes"
+  ) +
+  annotate("text", x = 3000000, y = 7000, 
+           label = paste("Moyenne =", format(round(mean(followers)), big.mark = " ")),
+           color = "red", hjust = 0) +
+  annotate("text", x = 3000000, y = 6000, 
+           label = paste("Médiane =", format(median(followers), big.mark = " ")),
+           color = "darkgreen", hjust = 0) +
+  theme_minimal(base_size = 12)
+```
+
+**Que voyez-vous ?** L'histogramme est complètement écrasé à gauche. On ne voit presque rien ! C'est parce que la plupart des comptes ont
+peu de followers, mais quelques comptes en ont des millions.
+
+Regardons les statistiques :
+
+```{r stats-followers}
+cat("=== Statistiques du nombre de followers ===\n\n")
+cat("Minimum :", format(min(followers), big.mark = " "), "followers\n")
+cat("Maximum :", format(max(followers), big.mark = " "), "followers\n")
+cat("Moyenne :", format(round(mean(followers)), big.mark = " "), "followers\n")
+cat("Médiane :", format(median(followers), big.mark = " "), "followers\n")
+cat("Écart-type :", format(round(sd(followers)), big.mark = " "), "followers\n\n")
+
+cat("Ratio moyenne/médiane :", round(mean(followers) / median(followers), 1), "\n")
+cat("(Dans une distribution normale, ce ratio serait proche de 1)\n")
+```
+
+**Observations importantes** :
+
+1.  **La moyenne est très différente de la médiane.** La moyenne (\~10 000) est environ 100 fois plus grande que la médiane (\~100). Dans
+    une distribution normale, ces deux valeurs seraient presque identiques.
+
+2.  **La moyenne ne représente personne.** Avec une moyenne de \~10 000 followers, on pourrait croire que l'utilisateur "typique" a 10 000
+    followers. En réalité, plus de 90% des comptes en ont moins de 1 000.
+
+3.  **L'écart-type est gigantesque.** L'écart-type est plus grand que la moyenne ! Dans une distribution normale, l'écart-type est
+    généralement beaucoup plus petit que la moyenne.
+
+4.  **Le maximum est astronomique.** Certains comptes ont des millions de followers, soit plus de 10 000 fois la médiane.
+
+### Pourquoi parle-t-on de "queue lourde" ?
+
+Le terme "queue lourde" fait référence à la forme de la distribution. Imaginons la distribution comme un animal avec un corps et une queue.
+
+```{r comparaison-queues, fig.cap="Comparaison des 'queues' : normale (fine) vs queue lourde (épaisse)"}
+set.seed(456)
+
+# Données normales (queue légère)
+normale <- rnorm(10000, mean = 100, sd = 20)
+normale <- normale[normale > 0]  # Garder les positifs pour la comparaison
+
+# Données à queue lourde (simulées)
+queue_lourde <- c(
+  rnorm(9000, mean = 50, sd = 20),
+  rnorm(800, mean = 150, sd = 50),
+  rnorm(180, mean = 400, sd = 100),
+  runif(20, 800, 2000)
+)
+queue_lourde <- pmax(queue_lourde, 1)
+
+# Préparons les données pour ggplot
+df_comp <- data.frame(
+  valeur = c(normale, queue_lourde),
+  type = rep(c("Distribution normale\n(queue légère)", 
+               "Distribution à queue lourde"), 
+             c(length(normale), length(queue_lourde)))
+)
+
+ggplot(df_comp, aes(x = valeur, fill = type)) +
+  geom_density(alpha = 0.5) +
+  facet_wrap(~type, scales = "free") +
+  labs(
+    title = "Pourquoi dit-on 'queue lourde' ?",
+    subtitle = "À droite, la 'queue' (les grandes valeurs) est plus épaisse et s'étend plus loin",
+    x = "Valeur",
+    y = "Densité"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "none")
+```
+
+Dans une **distribution normale** (à gauche), la "queue" (la partie droite de la courbe) devient très fine très rapidement. Les valeurs
+éloignées de la moyenne sont extrêmement rares.
+
+Dans une **distribution à queue lourde** (à droite), la "queue" reste épaisse plus longtemps. Des valeurs très éloignées de la médiane sont
+relativement fréquentes.
+
+### Un concept fondamental : la "queue" ne décroît pas de la même façon
+
+**Pour les matheux** (les autres peuvent passer) :
+
+Dans une distribution normale, la probabilité d'observer une valeur x décroît **exponentiellement** vite quand x augmente :
+
+$$P(X > x) \sim e^{-x^2}$$
+
+Dans une distribution à queue lourde, la probabilité décroît **polynomialement**, c'est-à-dire beaucoup plus lentement :
+
+$$P(X > x) \sim x^{-\alpha}$$
+
+où α (alpha) est un nombre généralement compris entre 1 et 3. Plus α est petit, plus la queue est "lourde" (plus les valeurs extrêmes sont
+probables).
+
+**En termes simples** : dans une distribution à queue lourde, les valeurs extrêmes ne sont pas des "accidents" ou des "erreurs" - elles font
+partie intégrante du phénomène étudié.
+
+--------------------------------------------------------------------------------------------------------------------------------------------
+
+## Pourquoi les sciences sociales sont particulièrement concernées
+
+### Les inégalités sont naturellement à queue lourde
+
+Les phénomènes sociaux impliquant des **accumulations** ou des **avantages cumulatifs** produisent presque toujours des distributions à
+queue lourde.
+
+**Le principe de Pareto** : En 1896, l'économiste italien Vilfredo Pareto observa que 80% des terres en Italie appartenaient à 20% de la
+population. Ce principe, souvent appelé la "règle des 80/20", se retrouve partout.
+
+```{r pareto-exemples}
+cat("=== Le principe de Pareto dans différents domaines ===\n\n")
+
+exemples <- data.frame(
+  Domaine = c("Économie", "Web", "Science", "Culture", "Linguistique"),
+  Observation = c(
+    "80% des richesses appartiennent à 20% de la population",
+    "80% du trafic va vers 20% des sites web",
+    "80% des citations vont vers 20% des articles",
+    "80% des ventes de musique viennent de 20% des artistes",
+    "80% du texte utilise 20% des mots du dictionnaire"
+  )
+)
+
+knitr::kable(exemples, caption = "Manifestations du principe de Pareto")
+```
+
+### L'effet "riche devient plus riche" (preferential attachment)
+
+En sociologie et en science des réseaux, on parle d'**attachement préférentiel** : les entités déjà populaires attirent plus de popularité.
+C'est ce que le sociologue Robert K. Merton appelait l'**effet Matthieu** (en référence à l'Évangile selon Matthieu : "Car on donnera à
+celui qui a, et il sera dans l'abondance").
+
+**Exemples** :
+
+-   **Citations académiques** : Un article souvent cité est plus visible, donc plus lu, donc plus cité
+-   **Réseaux sociaux** : Un compte avec beaucoup de followers apparaît plus souvent dans les recommandations, donc gagne plus de followers
+-   **Richesse** : Avoir du capital permet d'investir et de générer plus de capital
+
+Ce mécanisme produit mathématiquement des distributions à queue lourde, et plus précisément des **lois de puissance**.
+
+### Exemples concrets en sciences sociales
+
+Voici des variables que vous pourriez étudier et qui présentent généralement des queues lourdes :
+
+```{r tableau-exemples-shs}
+exemples_shs <- data.frame(
+  Variable = c(
+    "Revenus des ménages",
+    "Nombre de citations d'articles",
+    "Taille des villes",
+    "Nombre d'amis sur Facebook",
+    "Nombre de connexions professionnelles",
+    "Durée des appels téléphoniques",
+    "Nombre de mots dans les articles",
+    "Montant des dons à des associations"
+  ),
+  Caractéristique = c(
+    "Quelques très hauts revenus",
+    "Quelques articles très cités",
+    "Quelques mégalopoles",
+    "Quelques utilisateurs très connectés",
+    "Quelques 'super-connecteurs'",
+    "Quelques très longs appels",
+    "Quelques articles très longs",
+    "Quelques très gros donateurs"
+  ),
+  Consequence = c(
+    "La moyenne surévalue le niveau de vie 'typique'",
+    "L'impact moyen surévalue l'impact 'typique'",
+    "La moyenne n'a pas de sens (village vs mégalopole)",
+    "La moyenne surévalue la connectivité 'typique'",
+    "Les statistiques réseau sont biaisées",
+    "La moyenne surévalue la durée 'typique'",
+    "La moyenne n'est pas représentative",
+    "La moyenne masque la réalité des petits dons"
+  )
+)
+
+knitr::kable(exemples_shs, 
+             caption = "Variables à queue lourde fréquentes en sciences sociales",
+             col.names = c("Variable", "Caractéristique observée", "Conséquence sur l'analyse"))
+```
+
+--------------------------------------------------------------------------------------------------------------------------------------------
+
+# Partie 2 : Les problèmes concrets causés par les queues lourdes
+
+Maintenant que vous comprenez ce qu'est une distribution à queue lourde, voyons les problèmes pratiques qu'elle cause dans votre travail de
+sociologue.
+
+## Problème n°1 : La moyenne est trompeuse
+
+### Illustration avec l'exemple du bar
+
+Reprenons un exemple devenu classique en statistique :
+
+```{r exemple-bar, fig.cap="L'effet d'une valeur extrême sur la moyenne"}
+# Scénario initial : 10 personnes dans un bar
+revenus_bar <- rep(30000, 10)  # Tous gagnent 30 000 €
+
+# Bill Gates entre dans le bar (fortune estimée à 100 milliards €)
+revenus_avec_gates <- c(revenus_bar, 100000000000)
+
+cat("=== Avant l'entrée de Bill Gates ===\n")
+cat("Nombre de personnes :", length(revenus_bar), "\n")
+cat("Revenu moyen :", format(mean(revenus_bar), big.mark = " "), "€\n")
+cat("Revenu médian :", format(median(revenus_bar), big.mark = " "), "€\n\n")
+
+cat("=== Après l'entrée de Bill Gates ===\n")
+cat("Nombre de personnes :", length(revenus_avec_gates), "\n")
+cat("Revenu moyen :", format(round(mean(revenus_avec_gates)), big.mark = " "), "€\n")
+cat("Revenu médian :", format(median(revenus_avec_gates), big.mark = " "), "€\n\n")
+
+cat("La moyenne a été multipliée par", 
+    round(mean(revenus_avec_gates) / mean(revenus_bar)), "!\n")
+cat("La médiane n'a presque pas changé.\n")
+```
+
+**Leçon** : La moyenne est **sensible aux valeurs extrêmes**. Une seule observation peut complètement la déformer. La médiane, elle, reste
+stable.
+
+### Pourquoi la moyenne "explose" avec les queues lourdes
+
+**Explication intuitive** : La moyenne, c'est "la somme divisée par le nombre". Si vous avez des valeurs très grandes, elles contribuent
+énormément à la somme, donc à la moyenne.
+
+**Explication mathématique** (pour les curieux) : Pour une loi de puissance avec exposant α :
+
+-   Si **α \< 2** : La moyenne n'existe même pas mathématiquement (elle est infinie)
+-   Si **2 \< α \< 3** : La moyenne existe mais la variance est infinie
+-   Si **α \> 3** : Moyenne et variance existent
+
+La plupart des données sociales ont α entre 2 et 3, ce qui signifie que la moyenne est techniquement définie mais très instable.
+
+### Conséquence pratique : quelle mesure de tendance centrale utiliser ?
+
+```{r comparaison-tendance-centrale}
+# Créons des données à queue lourde
+set.seed(789)
+donnees <- c(
+  rpois(900, lambda = 10),   # Majorité : petites valeurs
+  rpois(90, lambda = 100),   # Quelques moyennes
+  rpois(10, lambda = 1000)   # Rares grandes valeurs
+)
+
+cat("=== Comparaison des mesures de tendance centrale ===\n\n")
+
+cat("Moyenne :", round(mean(donnees), 2), "\n")
+cat("Médiane :", median(donnees), "\n")
+cat("Mode approximatif :", names(sort(table(donnees), decreasing = TRUE))[1], "\n\n")
+
+# Calculons les quantiles
+quantiles <- quantile(donnees, probs = c(0.25, 0.5, 0.75, 0.90, 0.95, 0.99))
+cat("=== Distribution des quantiles ===\n")
+print(quantiles)
+
+cat("\nInterprétation : 50% des observations (la médiane) sont inférieures à", 
+    median(donnees), "\n")
+cat("Mais la moyenne (", round(mean(donnees), 1), 
+    ") suggère un niveau bien plus élevé.\n")
+```
+
+**Recommandation** : Avec des données à queue lourde, utilisez toujours la **médiane** plutôt que la moyenne pour décrire le cas "typique".
+Mentionnez également les **quantiles** pour donner une image complète de la distribution.
+
+--------------------------------------------------------------------------------------------------------------------------------------------
+
+## Problème n°2 : Les visualisations standard sont illisibles
+
+### Le problème de l'histogramme classique
+
+Quand vous faites un histogramme de données à queue lourde, vous obtenez généralement quelque chose d'illisible :
+
+```{r histogramme-probleme, fig.cap="Problème : l'histogramme classique écrase toutes les données à gauche"}
+# Données simulées (comme des partages Facebook)
+set.seed(111)
+partages <- c(
+  rep(0, 4000),              # 40% : aucun partage
+  rpois(4000, lambda = 5),   # 40% : quelques partages
+  rpois(1500, lambda = 50),  # 15% : partages modérés
+  rpois(400, lambda = 500),  # 4% : viral modéré
+  round(runif(100, 5000, 100000))  # 1% : très viral
+)
+
+ggplot(data.frame(x = partages), aes(x = x)) +
+  geom_histogram(bins = 50, fill = "steelblue", color = "white") +
+  labs(
+    title = "Nombre de partages Facebook (histogramme classique)",
+    subtitle = "Problème : on ne voit rien ! Tout est écrasé à gauche.",
+    x = "Nombre de partages",
+    y = "Fréquence"
+  ) +
+  theme_minimal(base_size = 12)
+```
+
+**Que se passe-t-il ?** L'axe des X doit s'étendre jusqu'à 100 000 pour inclure les valeurs maximales. Mais comme 90% des données sont entre
+0 et 100, elles sont toutes compressées dans une minuscule portion du graphique.
+
+### La solution : la transformation logarithmique
+
+La transformation logarithmique "étale" les petites valeurs et "compresse" les grandes :
+
+```{r histogramme-log, fig.cap="Solution : après transformation log, on voit la structure des données"}
+# Attention : log(0) = -Inf, donc on utilise log(1 + x)
+ggplot(data.frame(x = partages), aes(x = log1p(x))) +
+  geom_histogram(bins = 50, fill = "coral", color = "white") +
+  labs(
+    title = "Nombre de partages Facebook (après transformation log)",
+    subtitle = "Maintenant on voit la structure : pic à zéro, puis décroissance",
+    x = "log(1 + nombre de partages)",
+    y = "Fréquence"
+  ) +
+  theme_minimal(base_size = 12)
+```
+
+**Explication de log1p** : La fonction `log1p(x)` calcule `log(1 + x)`. On ajoute 1 car log(0) n'existe pas (c'est moins l'infini). Avec
+log(1 + 0) = log(1) = 0, on peut traiter les zéros.
+
+### Comparaison côte à côte
+
+```{r comparaison-histogrammes, fig.height=4, fig.cap="La transformation log révèle la structure cachée des données"}
+library(gridExtra)
+
+p1 <- ggplot(data.frame(x = partages), aes(x = x)) +
+  geom_histogram(bins = 50, fill = "steelblue", color = "white") +
+  labs(title = "Échelle normale", x = "Valeur", y = "Fréquence") +
+  theme_minimal(base_size = 10)
+
+p2 <- ggplot(data.frame(x = partages), aes(x = log1p(x))) +
+  geom_histogram(bins = 50, fill = "coral", color = "white") +
+  labs(title = "Échelle logarithmique", x = "log(1 + valeur)", y = "Fréquence") +
+  theme_minimal(base_size = 10)
+
+grid.arrange(p1, p2, ncol = 2)
+```
+
+--------------------------------------------------------------------------------------------------------------------------------------------
+
+## Problème n°3 : Les tests statistiques classiques échouent
+
+### Le test de Student (t-test) et ses hypothèses
+
+Le test de Student, que vous utilisez probablement pour comparer deux groupes, repose sur plusieurs hypothèses :
+
+1.  Les données suivent une distribution **normale** (ou l'échantillon est très grand)
+2.  Les variances des deux groupes sont **similaires** (homoscédasticité)
+3.  Les observations sont **indépendantes**
+
+Avec des données à queue lourde, les hypothèses 1 et 2 sont souvent violées.
+
+### Démonstration : un t-test peut donner des résultats trompeurs
+
+```{r ttest-probleme}
+set.seed(222)
+
+# Créons deux groupes avec des distributions à queue lourde
+# En réalité, ces groupes sont similaires, mais avec des outliers différents
+
+groupe_A <- c(rpois(100, lambda = 20), rpois(5, lambda = 500))
+groupe_B <- c(rpois(100, lambda = 22), rpois(5, lambda = 800))
+
+cat("=== Statistiques descriptives ===\n\n")
+cat("Groupe A :\n")
+cat("  - Moyenne :", round(mean(groupe_A), 2), "\n")
+cat("  - Médiane :", median(groupe_A), "\n")
+cat("  - Écart-type :", round(sd(groupe_A), 2), "\n\n")
+
+cat("Groupe B :\n")
+cat("  - Moyenne :", round(mean(groupe_B), 2), "\n")
+cat("  - Médiane :", median(groupe_B), "\n")
+cat("  - Écart-type :", round(sd(groupe_B), 2), "\n\n")
+
+# Test t classique
+test_t <- t.test(groupe_A, groupe_B)
+
+# Test non-paramétrique (Wilcoxon)
+test_wilcox <- wilcox.test(groupe_A, groupe_B)
+
+cat("=== Résultats des tests ===\n\n")
+cat("Test t (paramétrique) :\n")
+cat("  - p-value :", round(test_t$p.value, 4), "\n")
+if (test_t$p.value < 0.05) {
+  cat("  - Conclusion : Différence significative (au seuil 5%)\n\n")
+} else {
+  cat("  - Conclusion : Pas de différence significative\n\n")
+}
+
+cat("Test de Wilcoxon (non-paramétrique) :\n")
+cat("  - p-value :", round(test_wilcox$p.value, 4), "\n")
+if (test_wilcox$p.value < 0.05) {
+  cat("  - Conclusion : Différence significative (au seuil 5%)\n")
+} else {
+  cat("  - Conclusion : Pas de différence significative\n")
+}
+```
+
+**Interprétation** : Les deux tests peuvent donner des conclusions différentes ! Le test de Wilcoxon, qui est **non-paramétrique** (il ne
+suppose pas de distribution particulière), est plus fiable avec des données à queue lourde car il compare les **rangs** plutôt que les
+valeurs brutes.
+
+### Recommandation : préférez les tests non-paramétriques
+
+Avec des données à queue lourde, privilégiez :
+
+-   **Test de Wilcoxon** (ou Mann-Whitney) au lieu du test t
+-   **Test de Kruskal-Wallis** au lieu de l'ANOVA
+-   **Corrélation de Spearman** au lieu de la corrélation de Pearson
+
+--------------------------------------------------------------------------------------------------------------------------------------------
+
+## Problème n°4 : Les régressions sont biaisées par les outliers
+
+### L'influence disproportionnée des valeurs extrêmes
+
+Dans une régression linéaire, les points éloignés de la tendance générale ont une influence considérable sur la droite de régression.
+
+```{r regression-outliers, fig.cap="Un seul outlier peut complètement modifier la droite de régression"}
+set.seed(333)
+
+# Créons des données avec une relation linéaire
+n <- 20
+x <- 1:n
+y <- 2 * x + 5 + rnorm(n, sd = 3)
+
+# Version sans outlier
+df_sans <- data.frame(x = x, y = y)
+
+# Version avec un outlier
+df_avec <- data.frame(x = c(x, 22), y = c(y, 100))
+
+# Régressions
+lm_sans <- lm(y ~ x, data = df_sans)
+lm_avec <- lm(y ~ x, data = df_avec)
+
+# Graphiques
+p1 <- ggplot(df_sans, aes(x = x, y = y)) +
+  geom_point(size = 3, color = "steelblue") +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  labs(title = "Sans outlier",
+       subtitle = paste("Pente =", round(coef(lm_sans)[2], 2))) +
+  ylim(0, 110) +
+  theme_minimal(base_size = 11)
+
+p2 <- ggplot(df_avec, aes(x = x, y = y)) +
+  geom_point(size = 3, color = "steelblue") +
+  geom_point(data = data.frame(x = 22, y = 100), 
+             size = 5, color = "coral", shape = 17) +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  geom_abline(intercept = coef(lm_sans)[1], slope = coef(lm_sans)[2],
+              color = "gray", linetype = "dashed") +
+  labs(title = "Avec UN outlier",
+       subtitle = paste("Pente =", round(coef(lm_avec)[2], 2))) +
+  ylim(0, 110) +
+  theme_minimal(base_size = 11)
+
+grid.arrange(p1, p2, ncol = 2)
+```
+
+**Observation** : Un seul point (le triangle orange) fait passer la pente de \~2 à \~3.5. Toute votre interprétation change !
+
+### Solutions pour la régression
+
+Plusieurs approches existent :
+
+1.  **Régression robuste** : Utilise des méthodes moins sensibles aux outliers (package `MASS`, fonction `rlm`)
+2.  **Transformation des variables** : Appliquer log aux variables avant la régression
+3.  **Identification et traitement des outliers** : Diagnostiquer et éventuellement exclure les points aberrants (avec justification !)
+
+--------------------------------------------------------------------------------------------------------------------------------------------
+
+# Partie 3 : Comment identifier une distribution à queue lourde
+
+Avant d'appliquer des solutions, il faut d'abord **diagnostiquer** le problème. Voici les méthodes pour reconnaître une distribution à queue
+lourde.
+
+## Méthode 1 : Les indicateurs statistiques simples
+
+### Le ratio moyenne / médiane
+
+C'est l'indicateur le plus simple et le plus parlant.
+
+```{r ratio-moyenne-mediane}
+# Fonction pour calculer les indicateurs
+diagnostiquer_queue <- function(x, nom = "Variable") {
+  cat("=== Diagnostic de", nom, "===\n\n")
+  
+  # Statistiques de base
+  moy <- mean(x, na.rm = TRUE)
+  med <- median(x, na.rm = TRUE)
+  et <- sd(x, na.rm = TRUE)
+  
+  cat("Moyenne :", round(moy, 2), "\n")
+  cat("Médiane :", round(med, 2), "\n")
+  cat("Écart-type :", round(et, 2), "\n\n")
+  
+  # Ratios diagnostiques
+  ratio_moy_med <- moy / med
+  coef_var <- et / moy
+  
+  cat("--- Indicateurs de queue lourde ---\n")
+  cat("Ratio moyenne/médiane :", round(ratio_moy_med, 2), "\n")
+  
+  if (ratio_moy_med > 2) {
+    cat("  → ALERTE : ratio > 2, probable queue lourde\n")
+  } else if (ratio_moy_med > 1.5) {
+    cat("  → ATTENTION : ratio > 1.5, asymétrie possible\n")
+  } else {
+    cat("  → OK : ratio proche de 1, distribution probablement symétrique\n")
+  }
+  
+  cat("\nCoefficient de variation (CV = écart-type/moyenne) :", round(coef_var, 2), "\n")
+  
+  if (coef_var > 1) {
+    cat("  → ALERTE : CV > 1, dispersion très forte\n")
+  } else if (coef_var > 0.5) {
+    cat("  → ATTENTION : CV > 0.5, dispersion notable\n")
+  } else {
+    cat("  → OK : CV < 0.5, dispersion modérée\n")
+  }
+}
+
+# Exemple avec des données normales
+set.seed(100)
+donnees_normales <- rnorm(1000, mean = 100, sd = 15)
+diagnostiquer_queue(donnees_normales, "Données normales")
+
+cat("\n\n")
+
+# Exemple avec des données à queue lourde
+donnees_lourdes <- c(rpois(900, 10), rpois(90, 100), rpois(10, 1000))
+diagnostiquer_queue(donnees_lourdes, "Données à queue lourde")
+```
+
+### Règles pratiques d'interprétation
+
+Voici un guide pour interpréter ces indicateurs :
+
+```{r tableau-interpretation}
+interpretation <- data.frame(
+  Indicateur = c(
+    "Ratio moyenne/médiane",
+    "Ratio moyenne/médiane",
+    "Ratio moyenne/médiane",
+    "Coefficient de variation",
+    "Coefficient de variation",
+    "Coefficient de variation"
+  ),
+  Valeur = c(
+    "≈ 1",
+    "1.5 - 2",
+    "> 2",
+    "< 0.5",
+    "0.5 - 1",
+    "> 1"
+  ),
+  Interpretation = c(
+    "Distribution symétrique, pas de queue lourde",
+    "Asymétrie modérée, attention",
+    "Probable queue lourde, investigations nécessaires",
+    "Dispersion modérée, données homogènes",
+    "Dispersion notable, hétérogénéité possible",
+    "Très forte dispersion, probable queue lourde"
+  )
+)
+
+knitr::kable(interpretation, 
+             caption = "Guide d'interprétation des indicateurs de queue lourde")
+```
+
+## Méthode 2 : L'analyse visuelle
+
+### L'histogramme avec transformation log
+
+Comme nous l'avons vu, comparer l'histogramme brut et l'histogramme après transformation log est très révélateur.
+
+```{r diagnostic-visuel, fig.height=8, fig.cap="Diagnostic visuel : histogramme brut vs log"}
+# Fonction de diagnostic visuel
+diagnostic_visuel <- function(x, nom = "Variable") {
+  df <- data.frame(
+    brut = x,
+    log = log1p(x)
+  )
+  
+  p1 <- ggplot(df, aes(x = brut)) +
+    geom_histogram(bins = 50, fill = "steelblue", color = "white", alpha = 0.7) +
+    geom_vline(xintercept = mean(x), color = "red", linetype = "dashed") +
+    geom_vline(xintercept = median(x), color = "green", linetype = "solid") +
+    labs(title = paste(nom, "- Échelle normale"),
+         subtitle = "Rouge = moyenne, Vert = médiane",
+         x = "Valeur brute", y = "Fréquence") +
+    theme_minimal()
+  
+  p2 <- ggplot(df, aes(x = log)) +
+    geom_histogram(bins = 50, fill = "coral", color = "white", alpha = 0.7) +
+    labs(title = paste(nom, "- Échelle logarithmique"),
+         subtitle = "Si cette distribution semble plus 'normale', c'est une queue lourde",
+         x = "log(1 + valeur)", y = "Fréquence") +
+    theme_minimal()
+  
+  grid.arrange(p1, p2, nrow = 2)
+}
+
+# Appliquons sur nos données
+diagnostic_visuel(donnees_lourdes, "Partages Facebook")
+```
+
+### Le graphique log-log (pour les lois de puissance)
+
+Si vous suspectez une **loi de puissance** (un type particulier de queue lourde), le graphique log-log est très utile. Dans ce graphique,
+une loi de puissance apparaît comme une **droite**.
+
+```{r graphique-loglog, fig.cap="Graphique log-log : si les points forment une droite, c'est probablement une loi de puissance"}
+# Créons des données qui suivent vraiment une loi de puissance
+set.seed(444)
+n <- 5000
+alpha <- 2.5  # Exposant de la loi de puissance
+xmin <- 1
+
+# Simulation d'une loi de puissance (méthode de l'inverse)
+u <- runif(n)
+x_powerlaw <- xmin * (1 - u)^(-1/(alpha - 1))
+x_powerlaw <- round(x_powerlaw)
+
+# Calculons la distribution empirique
+freq_table <- table(x_powerlaw)
+valeurs <- as.numeric(names(freq_table))
+frequences <- as.numeric(freq_table)
+
+# Graphique log-log
+df_loglog <- data.frame(x = valeurs, y = frequences)
+
+ggplot(df_loglog, aes(x = x, y = y)) +
+  geom_point(alpha = 0.6, color = "steelblue") +
+  scale_x_log10() +
+  scale_y_log10() +
+  geom_smooth(method = "lm", color = "red", linetype = "dashed") +
+  labs(
+    title = "Graphique log-log : test visuel de la loi de puissance",
+    subtitle = "Si les points s'alignent sur une droite, c'est probablement une loi de puissance",
+    x = "Valeur (échelle log)",
+    y = "Fréquence (échelle log)"
+  ) +
+  theme_minimal(base_size = 12)
+
+# Calculons la pente (= exposant alpha estimé)
+fit <- lm(log(y) ~ log(x), data = df_loglog)
+cat("Pente estimée :", round(-coef(fit)[2], 2), 
+    "(devrait être proche de", alpha, ")\n")
+```
+
+**Interprétation** : Si les points forment approximativement une droite en échelle log-log, les données suivent probablement une loi de
+puissance. La pente de cette droite (en valeur absolue) est l'exposant α.
+
+--------------------------------------------------------------------------------------------------------------------------------------------
+
+# Partie 4 : Les solutions pratiques
+
+Maintenant que vous savez identifier une distribution à queue lourde, voyons comment adapter vos analyses.
+
+## Solution 1 : Utiliser les bonnes statistiques descriptives
+
+### Tableau récapitulatif : quelle statistique pour quel usage ?
+
+```{r tableau-stats}
+stats_alternatives <- data.frame(
+  Objectif = c(
+    "Mesurer le cas 'typique'",
+    "Mesurer la dispersion",
+    "Mesurer l'association entre deux variables",
+    "Comparer deux groupes",
+    "Résumer la distribution"
+  ),
+  Stat_classique = c(
+    "Moyenne",
+    "Écart-type",
+    "Corrélation de Pearson",
+    "Test t",
+    "Moyenne ± écart-type"
+  ),
+  Alternative_robuste = c(
+    "Médiane",
+    "IQR (écart interquartile) ou MAD",
+    "Corrélation de Spearman",
+    "Test de Wilcoxon",
+    "Médiane + quantiles (25%, 75%)"
+  ),
+  Quand_utiliser = c(
+    "Toujours si ratio moy/méd > 1.5",
+    "Toujours si CV > 0.5",
+    "Si relation non linéaire ou outliers",
+    "Si normalité douteuse",
+    "Pour les rapports avec données asymétriques"
+  )
+)
+
+knitr::kable(stats_alternatives,
+             col.names = c("Objectif", "Statistique classique", 
+                          "Alternative robuste", "Quand utiliser l'alternative"),
+             caption = "Guide des statistiques robustes pour les queues lourdes")
+```
+
+### Exemple pratique : rapport descriptif complet
+
+```{r rapport-descriptif}
+# Fonction pour un rapport descriptif complet
+rapport_descriptif <- function(x, nom = "Variable") {
+  cat("=== Rapport descriptif de", nom, "===\n\n")
+  
+  cat("MESURES DE TENDANCE CENTRALE :\n")
+  cat("  Moyenne :", round(mean(x, na.rm = TRUE), 2), "\n")
+  cat("  Médiane :", round(median(x, na.rm = TRUE), 2), 
+      "(UTILISER CELLE-CI si ratio > 1.5)\n")
+  
+  cat("\nMESURES DE DISPERSION :\n")
+  cat("  Écart-type :", round(sd(x, na.rm = TRUE), 2), "\n")
+  cat("  IQR (Q3 - Q1) :", round(IQR(x, na.rm = TRUE), 2), 
+      "(UTILISER CELUI-CI si CV > 0.5)\n")
+  cat("  MAD :", round(mad(x, na.rm = TRUE), 2), "\n")
+  
+  cat("\nQUANTILES (pour comprendre la distribution) :\n")
+  q <- quantile(x, probs = c(0, 0.10, 0.25, 0.50, 0.75, 0.90, 0.95, 0.99, 1), 
+                na.rm = TRUE)
+  print(q)
+  
+  cat("\nINDICATEURS DE QUEUE LOURDE :\n")
+  cat("  Ratio moyenne/médiane :", 
+      round(mean(x, na.rm = TRUE) / median(x, na.rm = TRUE), 2), "\n")
+  cat("  Coefficient de variation :", 
+      round(sd(x, na.rm = TRUE) / mean(x, na.rm = TRUE), 2), "\n")
+}
+
+# Appliquons sur nos données de partages
+rapport_descriptif(donnees_lourdes, "Nombre de partages")
+```
+
+## Solution 2 : Transformer les données
+
+### Pourquoi transformer ?
+
+La transformation des données sert à :
+
+1.  **Rendre la distribution plus symétrique** (pour utiliser les tests paramétriques)
+2.  **Stabiliser la variance** (pour les régressions)
+3.  **Améliorer les visualisations** (pour voir la structure des données)
+
+**Important** : Transformer n'est pas "tricher" ! C'est une pratique standard et recommandée en statistique. Cependant, il faut toujours
+documenter les transformations appliquées.
+
+### Les principales transformations
+
+#### Transformation logarithmique (log ou log1p)
+
+C'est la transformation la plus courante pour les données à queue lourde.
+
+```{r transformation-log}
+# Données originales
+x <- c(1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 10000)
+
+# Transformation log
+log_x <- log(x)        # Logarithme naturel
+log10_x <- log10(x)    # Logarithme en base 10
+log1p_x <- log1p(x)    # log(1 + x), utile si x peut être 0
+
+cat("=== Effet de la transformation logarithmique ===\n\n")
+df_log <- data.frame(
+  Original = x,
+  Log_naturel = round(log_x, 2),
+  Log_base_10 = round(log10_x, 2),
+  Log1p = round(log1p_x, 2)
+)
+print(df_log)
+
+cat("\n\nObservation : les grandes valeurs sont 'compressées'\n")
+cat("10000 devient", round(log(10000), 1), "en log naturel\n")
+cat("Rapport 10000/1 = 10000 devient rapport", 
+    round(log(10000), 1), "/", round(log(1), 1), "=", 
+    round(log(10000)/log(1), 1), "... enfin, presque (log(1) = 0)\n")
+```
+
+**Quand utiliser log ?**
+
+-   Données strictement positives (log de 0 ou négatif n'existe pas)
+-   Données avec des ordres de grandeur très différents (de 1 à 1 million)
+-   Quand les pourcentages de variation sont plus pertinents que les différences absolues
+
+#### Transformation racine carrée (sqrt)
+
+Moins "agressive" que le log, utile quand les données ne sont pas extrêmement asymétriques.
+
+```{r transformation-sqrt}
+# Comparaison log vs sqrt
+x <- c(1, 4, 9, 16, 25, 100, 400, 10000)
+
+cat("=== Comparaison log vs racine carrée ===\n\n")
+df_sqrt <- data.frame(
+  Original = x,
+  Racine_carree = sqrt(x),
+  Log = round(log(x), 2)
+)
+print(df_sqrt)
+
+cat("\nLa racine carrée 'compresse' moins que le log\n")
+```
+
+**Quand utiliser sqrt ?**
+
+-   Données de comptage (nombre d'événements)
+-   Asymétrie modérée (ratio moy/méd entre 1.5 et 3)
+-   Quand log semble "trop fort"
+
+#### Transformation par rangs (rank)
+
+Ignore complètement les valeurs absolues, ne conserve que l'ordre.
+
+```{r transformation-rang}
+# Transformation par rangs
+x <- c(5, 10, 12, 15, 20, 100, 500, 10000)
+
+cat("=== Transformation par rangs ===\n\n")
+df_rang <- data.frame(
+  Original = x,
+  Rang = rank(x)
+)
+print(df_rang)
+
+cat("\nObservation : 10000 et 100 ont des rangs proches (8 et 6)\n")
+cat("Les valeurs extrêmes n'ont plus d'influence disproportionnée\n")
+```
+
+**Quand utiliser les rangs ?**
+
+-   Beaucoup de zéros dans les données
+-   Outliers très extrêmes
+-   Quand seul l'ordre relatif compte (qui est premier, deuxième, etc.)
+
+### Tableau récapitulatif des transformations
+
+```{r tableau-transformations}
+transformations <- data.frame(
+  Transformation = c("log(x)", "log1p(x) = log(1+x)", "sqrt(x)", 
+                     "rank(x)", "Box-Cox", "Yeo-Johnson"),
+  Quand_utiliser = c(
+    "x strictement positif, forte asymétrie",
+    "x ≥ 0 (peut contenir des zéros)",
+    "x ≥ 0, asymétrie modérée",
+    "Beaucoup de zéros ou outliers extrêmes",
+    "x > 0, choix automatique du paramètre",
+    "Tout x (même négatif), choix automatique"
+  ),
+  Avantage = c(
+    "Très efficace pour loi de puissance",
+    "Gère les zéros",
+    "Moins agressive que log",
+    "Élimine tout effet des outliers",
+    "Optimise automatiquement la normalité",
+    "Le plus polyvalent"
+  ),
+  Inconvenient = c(
+    "Échoue si x ≤ 0",
+    "Légère distorsion près de 0",
+    "Moins efficace si très forte asymétrie",
+    "Perd l'information sur les distances",
+    "x doit être strictement positif",
+    "Plus complexe à interpréter"
+  )
+)
+
+knitr::kable(transformations,
+             caption = "Guide des transformations pour les distributions à queue lourde")
+```
+
+### Exemple pratique : comparer plusieurs transformations
+
+```{r comparaison-transformations, fig.height=10, fig.cap="Effet de différentes transformations sur une distribution à queue lourde"}
+set.seed(555)
+
+# Données à queue lourde
+x_orig <- c(
+  rpois(800, lambda = 5),
+  rpois(150, lambda = 50),
+  rpois(40, lambda = 200),
+  rpois(10, lambda = 1000)
+)
+
+# Créons un dataframe avec toutes les transformations
+df_trans <- data.frame(
+  original = x_orig,
+  log1p = log1p(x_orig),
+  sqrt = sqrt(x_orig),
+  rang = rank(x_orig) / length(x_orig)  # Rangs normalisés entre 0 et 1
+)
+
+# Visualisation
+p_orig <- ggplot(df_trans, aes(x = original)) +
+  geom_histogram(bins = 50, fill = "gray60") +
+  labs(title = "1. Données originales", x = "Valeur", y = "Fréquence") +
+  theme_minimal()
+
+p_log <- ggplot(df_trans, aes(x = log1p)) +
+  geom_histogram(bins = 50, fill = "steelblue") +
+  labs(title = "2. Après log(1+x)", x = "Valeur transformée", y = "Fréquence") +
+  theme_minimal()
+
+p_sqrt <- ggplot(df_trans, aes(x = sqrt)) +
+  geom_histogram(bins = 50, fill = "coral") +
+  labs(title = "3. Après sqrt(x)", x = "Valeur transformée", y = "Fréquence") +
+  theme_minimal()
+
+p_rang <- ggplot(df_trans, aes(x = rang)) +
+  geom_histogram(bins = 50, fill = "forestgreen") +
+  labs(title = "4. Après transformation en rangs", 
+       x = "Rang normalisé", y = "Fréquence") +
+  theme_minimal()
+
+grid.arrange(p_orig, p_log, p_sqrt, p_rang, ncol = 2)
+
+# Statistiques comparatives
+cat("=== Comparaison des transformations ===\n\n")
+
+for (col in names(df_trans)) {
+  ratio <- mean(df_trans[[col]]) / median(df_trans[[col]])
+  cat(col, ": ratio moy/méd =", round(ratio, 2), "\n")
+}
+```
+
+## Solution 3 : Identifier les sous-groupes (clustering)
+
+### L'idée : il y a peut-être plusieurs populations
+
+Les données à queue lourde reflètent souvent l'existence de **sous-populations distinctes**. Par exemple :
+
+-   Utilisateurs "normaux" vs influenceurs vs célébrités
+-   Produits de niche vs best-sellers
+-   Articles académiques "ordinaires" vs articles fondateurs
+
+### Le clustering sur données à queue lourde
+
+L'algorithme classique k-means fonctionne mal sur les données brutes à queue lourde (les outliers attirent des clusters entiers). La
+solution : **transformer d'abord, puis clustériser**.
+
+```{r clustering-exemple, fig.cap="Le clustering sur données transformées révèle les sous-groupes naturels"}
+set.seed(666)
+
+# Simulons des données avec 3 sous-populations distinctes
+petit <- rnorm(600, mean = 10, sd = 3)
+moyen <- rnorm(300, mean = 80, sd = 20)
+grand <- rnorm(100, mean = 400, sd = 80)
+
+x_melange <- c(petit, moyen, grand)
+x_melange <- pmax(x_melange, 1)  # Pas de valeurs négatives
+x_melange <- sample(x_melange)  # Mélangeons
+
+# Clustering sur données transformées (log)
+x_log <- log(x_melange)
+
+# Utilisons une méthode simple : kmeans sur les données log
+set.seed(123)
+km <- kmeans(x_log, centers = 3, nstart = 25)
+
+# Visualisation
+df_cluster <- data.frame(
+  original = x_melange,
+  log = x_log,
+  cluster = factor(km$cluster)
+)
+
+p1 <- ggplot(df_cluster, aes(x = original, fill = cluster)) +
+  geom_histogram(bins = 50, alpha = 0.7, position = "identity") +
+  labs(title = "Données originales colorées par cluster",
+       x = "Valeur originale", y = "Fréquence") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+p2 <- ggplot(df_cluster, aes(x = log, fill = cluster)) +
+  geom_histogram(bins = 50, alpha = 0.7, position = "identity") +
+  labs(title = "Données log colorées par cluster",
+       subtitle = "Les 3 groupes sont clairement visibles",
+       x = "log(valeur)", y = "Fréquence") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+grid.arrange(p1, p2, ncol = 1)
+
+# Statistiques par cluster
+cat("=== Caractéristiques des clusters ===\n\n")
+for (i in 1:3) {
+  vals <- df_cluster$original[df_cluster$cluster == i]
+  cat("Cluster", i, ":\n")
+  cat("  - N =", length(vals), "\n")
+  cat("  - Médiane =", round(median(vals), 1), "\n")
+  cat("  - Min-Max =", round(min(vals), 1), "-", round(max(vals), 1), "\n\n")
+}
+```
+
+### Créer des catégories interprétables
+
+Une fois les clusters identifiés, vous pouvez créer des **catégories** avec des noms significatifs.
+
+```{r categories-interpretables}
+# Créons des catégories basées sur les clusters
+df_cluster$categorie <- factor(
+  df_cluster$cluster,
+  levels = 1:3,
+  labels = c("Petit", "Moyen", "Grand")
+)
+
+# Réordonnons selon la médiane
+medians <- tapply(df_cluster$original, df_cluster$categorie, median)
+df_cluster$categorie <- factor(df_cluster$categorie, 
+                                levels = names(sort(medians)))
+
+# Tableau croisé
+cat("=== Distribution des catégories ===\n\n")
+print(table(df_cluster$categorie))
+print(prop.table(table(df_cluster$categorie)) * 100)
+```
+
+--------------------------------------------------------------------------------------------------------------------------------------------
+
+# Partie 5 : Un workflow complet
+
+Voici la démarche recommandée quand vous analysez une variable potentiellement à queue lourde.
+
+## Étape 1 : Explorer et diagnostiquer
+
+```{r workflow-etape1, eval=FALSE}
+# 1. Chargez vos données
+mes_donnees <- read.csv("mon_fichier.csv")
+ma_variable <- mes_donnees$ma_colonne
+
+# 2. Calculez les indicateurs de base
+mean(ma_variable, na.rm = TRUE)
+median(ma_variable, na.rm = TRUE)
+sd(ma_variable, na.rm = TRUE)
+
+# 3. Calculez le ratio moyenne/médiane
+ratio <- mean(ma_variable, na.rm = TRUE) / median(ma_variable, na.rm = TRUE)
+cat("Ratio moyenne/médiane :", ratio, "\n")
+
+# Si ratio > 1.5 : suspicion de queue lourde
+# Si ratio > 2 : probable queue lourde
+```
+
+## Étape 2 : Visualiser
+
+```{r workflow-etape2, eval=FALSE}
+# 4. Histogramme brut
+hist(ma_variable, breaks = 50, main = "Distribution brute")
+
+# 5. Histogramme après log
+hist(log1p(ma_variable), breaks = 50, main = "Distribution après log")
+
+# Si l'histogramme log semble plus "normal" : c'est une queue lourde
+```
+
+## Étape 3 : Choisir les bonnes statistiques
+
+```{r workflow-etape3, eval=FALSE}
+# Pour la tendance centrale : utilisez la médiane
+mediane <- median(ma_variable, na.rm = TRUE)
+
+# Pour la dispersion : utilisez l'IQR
+iqr <- IQR(ma_variable, na.rm = TRUE)
+
+# Pour les quantiles : donnez une vue complète
+quantile(ma_variable, probs = c(0.25, 0.50, 0.75, 0.90, 0.95), na.rm = TRUE)
+```
+
+## Étape 4 : Transformer si nécessaire
+
+```{r workflow-etape4, eval=FALSE}
+# Si vous devez faire des tests ou des régressions :
+
+# Option A : transformation log (si pas de zéros)
+ma_variable_log <- log(ma_variable)
+
+# Option B : transformation log1p (si des zéros possibles)
+ma_variable_log <- log1p(ma_variable)
+
+# Vérifiez que la transformation améliore la distribution
+hist(ma_variable_log, breaks = 50)
+
+# Calculez le nouveau ratio
+ratio_apres <- mean(ma_variable_log) / median(ma_variable_log)
+cat("Ratio après transformation :", ratio_apres, "\n")
+```
+
+## Étape 5 : Analyser et interpréter
+
+```{r workflow-etape5, eval=FALSE}
+# Exemple : test de comparaison entre deux groupes
+
+# Si queue lourde : utilisez Wilcoxon (non-paramétrique)
+wilcox.test(ma_variable ~ mon_groupe)
+
+# Si transformation appliquée : vous pouvez aussi utiliser t-test sur les données transformées
+t.test(ma_variable_log ~ mon_groupe)
+
+# Dans votre rapport, mentionnez TOUJOURS :
+# 1. Que la distribution originale est à queue lourde
+# 2. Quelle(s) transformation(s) vous avez appliquée(s)
+# 3. Pourquoi vous avez choisi telle ou telle méthode
+```
+
+--------------------------------------------------------------------------------------------------------------------------------------------
+
+# Partie 6 : Exercices pratiques
+
+## Exercice 1 : Diagnostic (niveau débutant)
+
+Voici un jeu de données simulées représentant le nombre de publications Facebook de 1000 utilisateurs.
+
+```{r exercice1-donnees}
+set.seed(42)
+publications <- c(
+  rpois(700, lambda = 3),    # Utilisateurs peu actifs
+  rpois(200, lambda = 20),   # Utilisateurs actifs
+  rpois(80, lambda = 100),   # Utilisateurs très actifs
+  rpois(20, lambda = 500)    # Power users
+)
+```
+
+**Questions :**
+
+1.  Calculez la moyenne et la médiane. Que remarquez-vous ?
+2.  Calculez le ratio moyenne/médiane. Qu'en concluez-vous ?
+3.  Créez un histogramme brut puis un histogramme après transformation log. Commentez.
+
+```{r exercice1-solution, echo=FALSE, eval=FALSE}
+# Solution
+cat("Moyenne :", mean(publications), "\n")
+cat("Médiane :", median(publications), "\n")
+cat("Ratio :", mean(publications) / median(publications), "\n")
+
+par(mfrow = c(1, 2))
+hist(publications, breaks = 50, main = "Brut")
+hist(log1p(publications), breaks = 50, main = "Log")
+par(mfrow = c(1, 1))
+```
+
+## Exercice 2 : Comparaison de groupes (niveau intermédiaire)
+
+Vous avez deux groupes d'utilisateurs : ceux qui utilisent l'application le matin et ceux qui l'utilisent le soir. Vous voulez comparer leur
+nombre de publications.
+
+```{r exercice2-donnees}
+set.seed(123)
+
+# Groupe matin
+matin <- c(rpois(200, lambda = 5), rpois(30, lambda = 50), rpois(5, lambda = 200))
+
+# Groupe soir  
+soir <- c(rpois(180, lambda = 6), rpois(35, lambda = 60), rpois(8, lambda = 250))
+```
+
+**Questions :**
+
+1.  Comparez les deux groupes avec un test t classique. Que concluez-vous ?
+2.  Comparez les deux groupes avec un test de Wilcoxon. Que concluez-vous ?
+3.  Transformez les données en log et refaites le test t. Le résultat change-t-il ?
+4.  Quel test vous semble le plus approprié et pourquoi ?
+
+## Exercice 3 : Projet intégré (niveau avancé)
+
+Téléchargez un jeu de données réelles (par exemple, le nombre de citations d'articles scientifiques, la population des villes françaises, ou
+les revenus par commune).
+
+Réalisez une analyse complète comprenant :
+
+1.  Diagnostic de la distribution (indicateurs + visualisations)
+2.  Choix et justification des transformations appropriées
+3.  Création de catégories interprétables (clustering ou quantiles)
+4.  Statistiques descriptives adaptées
+5.  Interprétation sociologique des résultats
+
+--------------------------------------------------------------------------------------------------------------------------------------------
+
+# Conclusion
+
+## Ce que vous devez retenir
+
+**1. Les données sociales sont souvent à queue lourde.** Les phénomènes impliquant des accumulations ou des avantages cumulatifs (revenus,
+popularité, citations...) produisent naturellement des distributions asymétriques avec des valeurs extrêmes.
+
+**2. La moyenne peut être trompeuse.** Avec des données à queue lourde, la moyenne ne représente souvent pas le cas "typique". Préférez la
+médiane pour décrire la tendance centrale.
+
+**3. Les tests classiques peuvent échouer.** Les tests paramétriques (t-test, ANOVA) supposent une distribution normale. Avec des queues
+lourdes, préférez les tests non-paramétriques (Wilcoxon, Kruskal-Wallis).
+
+**4. La transformation n'est pas de la triche.** Appliquer une transformation logarithmique pour normaliser vos données est une pratique
+standard et recommandée. Il suffit de le documenter.
+
+**5. Les visualisations doivent être adaptées.** Un histogramme brut sera souvent illisible. Utilisez des échelles logarithmiques ou des
+graphiques de quantiles.
+
+## Pour aller plus loin
+
+### Lectures recommandées
+
+**En français :**
+
+-   Degenne, A., & Forsé, M. (2004). *Les réseaux sociaux*. Armand Colin. (Chapitre sur les distributions de degré)
+-   Lemieux, V. (2000). *Les réseaux d'acteurs sociaux*. PUF.
+
+**En anglais :**
+
+-   Clauset, A., Shalizi, C. R., & Newman, M. E. J. (2009). Power-law distributions in empirical data. *SIAM Review*, 51(4), 661-703.
+    (L'article de référence)
+-   Barabási, A.-L. (2016). *Network Science*. Cambridge University Press. (Disponible gratuitement en ligne)
+-   Mitzenmacher, M. (2004). A brief history of generative models for power law and lognormal distributions. *Internet Mathematics*, 1(2),
+    226-251.
+
+### Packages R utiles
+
+-   `poweRlaw` : Test formel de lois de puissance
+-   `moments` : Calcul du skewness et kurtosis
+-   `bestNormalize` : Choix automatique de la meilleure transformation
+-   `mclust` : Clustering par modèles de mélange gaussien
+
+--------------------------------------------------------------------------------------------------------------------------------------------
+
+*Ce cours a été conçu pour les étudiants de Licence en Sciences Sociales. Il vise à fournir une compréhension intuitive et pratique des
+distributions à queue lourde, sans exiger de connaissances mathématiques avancées.*
+
+*Dernière mise à jour : `r format(Sys.Date(), "%d %B %Y")`*
