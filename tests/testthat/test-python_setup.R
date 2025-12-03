@@ -170,6 +170,26 @@ test_that("is_windows_store_python detects zero-byte stub files", {
   expect_true(is_windows_store_python("C:/SomePath/python.exe"))
 })
 
+test_that("is_windows_store_python detects Windows 8.3 short name paths", {
+  mockery::stub(is_windows_store_python, "is_windows", TRUE)
+  # normalizePath does NOT expand short names (returns input as-is)
+  mockery::stub(is_windows_store_python, "normalizePath", function(p, ...) p)
+  mockery::stub(is_windows_store_python, "file.info",
+                data.frame(size = 1000, stringsAsFactors = FALSE))
+
+  # Short name variants that should be detected
+  expect_true(is_windows_store_python(
+    "C:/Users/Test/AppData/Local/MICROS1/WINDOW1/python3.exe"
+  ))
+  expect_true(is_windows_store_python(
+    "C:/Users/Test/AppData/Local/MICROS~1/WINDOW~1/python3.exe"
+  ))
+  # Backslash variant
+  expect_true(is_windows_store_python(
+    "C:\\Users\\Test\\AppData\\Local\\MICROS~1\\WINDOW~1\\python3.exe"
+  ))
+})
+
 test_that("can_create_virtualenv rejects Windows Store Python", {
   mockery::stub(can_create_virtualenv, "is_windows_store_python", TRUE)
   expect_false(can_create_virtualenv("/fake/python"))

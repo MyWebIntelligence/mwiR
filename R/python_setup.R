@@ -389,7 +389,14 @@ is_windows_store_python <- function(python_path) {
     return(TRUE)
   }
 
-  # Pattern 3: Zero-byte stub files are Windows Store aliases
+  # Pattern 3: Windows 8.3 short name variants of Microsoft\WindowsApps
+  # Paths like: AppData\Local\MICROS~1\WINDOW~1 or MICROS1\WINDOW1
+  # normalizePath() fails to expand these when target is a Store alias stub
+  if (grepl("appdata.*local.*micros[^/\\\\]*[/\\\\]window", normalized_lower)) {
+    return(TRUE)
+  }
+
+  # Pattern 4: Zero-byte stub files are Windows Store aliases
 tryCatch({
     info <- file.info(python_path)
     if (!is.na(info$size) && info$size == 0) return(TRUE)
