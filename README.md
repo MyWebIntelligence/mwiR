@@ -1,7 +1,10 @@
-# mwiR 0.4.0 The R Package of My Web Intelligence Project
+# mwiR 1.0 The R Package of My Web Intelligence Project
 <!-- badges: start -->
 ![MyWebIntelligence Banner](man/figures/mwibanner.png)
 <!-- badges: end -->
+
+Component repository (R package for analysis).
+Start here for the main tool and data pipeline: https://github.com/MyWebIntelligence/mwi
 
 ## Purpose of My Web Intelligence
 
