@@ -1,6 +1,10 @@
-# mwiR 1.0 The R Package of My Web Intelligence Project
-Component repository (R package for analysis).
-Start here for the main tool and data pipeline: https://github.com/MyWebIntelligence/mwi
+COMPONENT REPOSITORY (R ANALYSIS BRIDGE). MAIN TOOL AND DATA PIPELINE: https://github.com/MyWebIntelligence/mwi
+
+# mwiR (R package for My Web Intelligence)
+
+Status: stable as an analysis bridge (imports/analysis). Not the entry point.
+
+If you are looking for installation and end-to-end usage, start here: https://github.com/MyWebIntelligence/mwi
 
 ## Purpose of My Web Intelligence
 
